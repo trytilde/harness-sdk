@@ -25,6 +25,20 @@ const tilde = createClient(createConfig({
 }));
 ```
 
+## AI Gateway
+
+```ts
+const profile = await tilde.aiGateway.createProfile({
+  id: "openai-prod",
+  providerId: "openai",
+  resourceServerCredentialId: "00000000-0000-0000-0000-000000000000",
+  kind: "chat",
+  model: "gpt-5-mini"
+});
+
+console.log(tilde.aiGateway.openAiCompatibleBaseUrl({ profileId: profile.id }));
+```
+
 ## MCP Server URL
 
 ```ts
@@ -35,7 +49,17 @@ const server = await tilde.mcp.createServer({
 });
 
 console.log(server.url);
+
+await tilde.mcp.addFunction({
+  serverId: server.id,
+  toolSourceTypeId: "tool-source-type",
+  toolGroupSourceTypeId: "tool-group-source-type",
+  toolGroupInstanceId: "tool-group-instance-id",
+  toolName: "tool-name"
+});
 ```
+
+`client.mcp.getServerUrl({ id })` returns the raw Streamable HTTP MCP URL for AI SDK clients and other MCP-capable runtimes.
 
 ## Vercel AI Endpoint
 
@@ -66,6 +90,10 @@ const history = await tilde.messages.list({
   pageSize: 100
 });
 ```
+
+## Examples
+
+- `examples/nextjs-agent`: Next.js agent using Tilde AI gateway, ChatKit signed webhooks, dynamic MCP, and the Vercel AI SDK.
 
 ## Development
 

@@ -2989,6 +2989,1157 @@
         }
       }
     },
+    "/api/v1/team/{team_id}/chatkit/agent": {
+      "get": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "List inbox agents",
+        "description": "List all agent inboxes (inbox_type=agent) with their linked inboxes (inboxes that pipe to them)",
+        "operationId": "list-inbox-agents",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "style": "form"
+          },
+          {
+            "name": "next_page_token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List agents with linked inboxes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxWithLinkedInboxesPaginatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/team/{team_id}/chatkit/inbox": {
+      "get": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "List inboxes",
+        "description": "List all configured inboxes with pagination and optional filtering by type",
+        "operationId": "list-inboxes",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "style": "form"
+          },
+          {
+            "name": "next_page_token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "name": "inbox_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/InboxType"
+                }
+              ]
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List inboxes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxPaginatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/team/{team_id}/chatkit/session": {
+      "get": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "List sessions",
+        "description": "List all chat sessions with pagination. Optionally filter by inbox_id to get sessions for a specific inbox.",
+        "operationId": "list-sessions",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of items to return per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "next_page_token",
+            "in": "query",
+            "description": "Token for the next page of results",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "inbox_id",
+            "in": "query",
+            "description": "Filter sessions by inbox_id (via session_inbox_instance join)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPaginatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "Create session",
+        "description": "Create a new chat session. Optionally include inbox_instances to register participants.",
+        "operationId": "create-session",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionInner"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Create a session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/team/{team_id}/chatkit/session/{session_id}/event-history": {
+      "get": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "Get session event history",
+        "description": "Get paginated historical events for a session. Optionally include events from child sessions.",
+        "operationId": "get-session-event-history",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Number of items to return per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "next_page_token",
+            "in": "query",
+            "description": "Token for the next page of results",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "include_child_sessions",
+            "in": "query",
+            "description": "Whether to include events from child sessions",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredEventPaginatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/team/{team_id}/chatkit/session/{session_id}/inbox-instances": {
+      "get": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "List session inbox instances",
+        "description": "Get all inbox instances (participants) registered in a session.",
+        "operationId": "list-session-inbox-instances",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List inbox instances for a session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InboxInstance"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/team/{team_id}/chatkit/session/{session_id}/message": {
+      "get": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "List messages in session",
+        "description": "List all messages in a session with pagination",
+        "operationId": "list-messages",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WrappedUuidV4"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "next_page_token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "channel_inbox_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "participant_inbox_instance_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "user_external_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "created_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/WrappedChronoDateTime"
+                }
+              ]
+            }
+          },
+          {
+            "name": "created_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/WrappedChronoDateTime"
+                }
+              ]
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagePaginatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "Create message",
+        "description": "Create a new message in a session",
+        "operationId": "create-message",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WrappedUuidV4"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Create a message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/team/{team_id}/chatkit/session/{session_id}/message/{message_id}": {
+      "get": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "Get message",
+        "description": "Retrieve a message by its ID",
+        "operationId": "get-message",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WrappedUuidV4"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "description": "Message ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WrappedUuidV4"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "Delete message",
+        "description": "Delete a message by its ID",
+        "operationId": "delete-message",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WrappedUuidV4"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "description": "Message ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WrappedUuidV4"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteMessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/team/{team_id}/chatkit/session/{session_id}/observe": {
+      "get": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "Observe session events via SSE",
+        "description": "Subscribe to real-time events on a session via Server-Sent Events. Optionally filter by event types and cascade into child sessions.",
+        "operationId": "observe-session",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session ID to observe",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subscribe_to_events",
+            "in": "query",
+            "description": "Comma-separated event types to subscribe to (e.g. \"message_created,message_streaming\").\nIf not set, all events are forwarded.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "attach_to_child_sessions",
+            "in": "query",
+            "description": "Whether to auto-attach to child sessions created under the observed session",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream of session events"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
     "/api/v1/team/{team_id}/credential/broker/{broker_state_id}/resume": {
       "post": {
         "summary": "Resume a user-credential brokering flow",
@@ -3680,1093 +4831,6 @@
             }
           }
         }
-      }
-    },
-    "/api/v1/team/{team_id}/inbox/agent": {
-      "get": {
-        "tags": [
-          "inbox",
-          "v1"
-        ],
-        "summary": "List inbox agents",
-        "description": "List all agent inboxes (inbox_type=agent) with their linked inboxes (inboxes that pipe to them)",
-        "operationId": "list-inbox-agents",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "style": "form"
-          },
-          {
-            "name": "next_page_token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "style": "form"
-          },
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List agents with linked inboxes",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InboxWithLinkedInboxesPaginatedResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          },
-          {
-            "bearer_token": []
-          }
-        ]
-      }
-    },
-    "/api/v1/team/{team_id}/inbox/inbox": {
-      "get": {
-        "tags": [
-          "inbox",
-          "v1"
-        ],
-        "summary": "List inboxes",
-        "description": "List all configured inboxes with pagination and optional filtering by type",
-        "operationId": "list-inboxes",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "style": "form"
-          },
-          {
-            "name": "next_page_token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "style": "form"
-          },
-          {
-            "name": "inbox_type",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "oneOf": [
-                {
-                  "type": "null"
-                },
-                {
-                  "$ref": "#/components/schemas/InboxType"
-                }
-              ]
-            }
-          },
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List inboxes",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InboxPaginatedResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          },
-          {
-            "bearer_token": []
-          }
-        ]
-      }
-    },
-    "/api/v1/team/{team_id}/inbox/session": {
-      "get": {
-        "tags": [
-          "inbox",
-          "v1"
-        ],
-        "summary": "List sessions",
-        "description": "List all chat sessions with pagination. Optionally filter by inbox_id to get sessions for a specific inbox.",
-        "operationId": "list-sessions",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "description": "Number of items to return per page",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "next_page_token",
-            "in": "query",
-            "description": "Token for the next page of results",
-            "required": false,
-            "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          {
-            "name": "inbox_id",
-            "in": "query",
-            "description": "Filter sessions by inbox_id (via session_inbox_instance join)",
-            "required": false,
-            "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List sessions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionPaginatedResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          },
-          {
-            "bearer_token": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "inbox",
-          "v1"
-        ],
-        "summary": "Create session",
-        "description": "Create a new chat session. Optionally include inbox_instances to register participants.",
-        "operationId": "create-session",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateSessionInner"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Create a session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Session"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          },
-          {
-            "bearer_token": []
-          }
-        ]
-      }
-    },
-    "/api/v1/team/{team_id}/inbox/session/{session_id}/event-history": {
-      "get": {
-        "tags": [
-          "inbox",
-          "v1"
-        ],
-        "summary": "Get session event history",
-        "description": "Get paginated historical events for a session. Optionally include events from child sessions.",
-        "operationId": "get-session-event-history",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "session_id",
-            "in": "path",
-            "description": "Session ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "description": "Number of items to return per page",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "next_page_token",
-            "in": "query",
-            "description": "Token for the next page of results",
-            "required": false,
-            "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          {
-            "name": "include_child_sessions",
-            "in": "query",
-            "description": "Whether to include events from child sessions",
-            "required": false,
-            "schema": {
-              "type": [
-                "boolean",
-                "null"
-              ]
-            }
-          },
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Event history",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StoredEventPaginatedResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          },
-          {
-            "bearer_token": []
-          }
-        ]
-      }
-    },
-    "/api/v1/team/{team_id}/inbox/session/{session_id}/inbox-instances": {
-      "get": {
-        "tags": [
-          "inbox",
-          "v1"
-        ],
-        "summary": "List session inbox instances",
-        "description": "Get all inbox instances (participants) registered in a session.",
-        "operationId": "list-session-inbox-instances",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "session_id",
-            "in": "path",
-            "description": "Session ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List inbox instances for a session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/InboxInstance"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          },
-          {
-            "bearer_token": []
-          }
-        ]
-      }
-    },
-    "/api/v1/team/{team_id}/inbox/session/{session_id}/message": {
-      "get": {
-        "tags": [
-          "inbox",
-          "v1"
-        ],
-        "summary": "List messages in session",
-        "description": "List all messages in a session with pagination",
-        "operationId": "list-messages",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "session_id",
-            "in": "path",
-            "description": "Session ID",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WrappedUuidV4"
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "style": "form"
-          },
-          {
-            "name": "next_page_token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "style": "form"
-          },
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List messages",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessagePaginatedResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Session Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          },
-          {
-            "bearer_token": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "inbox",
-          "v1"
-        ],
-        "summary": "Create message",
-        "description": "Create a new message in a session",
-        "operationId": "create-message",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "session_id",
-            "in": "path",
-            "description": "Session ID",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WrappedUuidV4"
-            }
-          },
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateMessageRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Create a message",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Message"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Session Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          },
-          {
-            "bearer_token": []
-          }
-        ]
-      }
-    },
-    "/api/v1/team/{team_id}/inbox/session/{session_id}/message/{message_id}": {
-      "get": {
-        "tags": [
-          "inbox",
-          "v1"
-        ],
-        "summary": "Get message",
-        "description": "Retrieve a message by its ID",
-        "operationId": "get-message",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "session_id",
-            "in": "path",
-            "description": "Session ID",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WrappedUuidV4"
-            }
-          },
-          {
-            "name": "message_id",
-            "in": "path",
-            "description": "Message ID",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WrappedUuidV4"
-            }
-          },
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Get message",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Message"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          },
-          {
-            "bearer_token": []
-          }
-        ]
-      },
-      "delete": {
-        "tags": [
-          "inbox",
-          "v1"
-        ],
-        "summary": "Delete message",
-        "description": "Delete a message by its ID",
-        "operationId": "delete-message",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "session_id",
-            "in": "path",
-            "description": "Session ID",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WrappedUuidV4"
-            }
-          },
-          {
-            "name": "message_id",
-            "in": "path",
-            "description": "Message ID",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WrappedUuidV4"
-            }
-          },
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Delete message",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeleteMessageResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          },
-          {
-            "bearer_token": []
-          }
-        ]
-      }
-    },
-    "/api/v1/team/{team_id}/inbox/session/{session_id}/observe": {
-      "get": {
-        "tags": [
-          "inbox",
-          "v1"
-        ],
-        "summary": "Observe session events via SSE",
-        "description": "Subscribe to real-time events on a session via Server-Sent Events. Optionally filter by event types and cascade into child sessions.",
-        "operationId": "observe-session",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "session_id",
-            "in": "path",
-            "description": "Session ID to observe",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "subscribe_to_events",
-            "in": "query",
-            "description": "Comma-separated event types to subscribe to (e.g. \"message_created,message_streaming\").\nIf not set, all events are forwarded.",
-            "required": false,
-            "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          {
-            "name": "attach_to_child_sessions",
-            "in": "query",
-            "description": "Whether to auto-attach to child sessions created under the observed session",
-            "required": false,
-            "schema": {
-              "type": [
-                "boolean",
-                "null"
-              ]
-            }
-          },
-          {
-            "name": "team_id",
-            "in": "path",
-            "description": "Team ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "SSE stream of session events"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Session not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          },
-          {
-            "bearer_token": []
-          }
-        ]
       }
     },
     "/api/v1/team/{team_id}/mcp/available-tool-groups": {
@@ -9291,6 +9355,8 @@
         "description": "An inbox instance - a configured instance of an inbox provider",
         "required": [
           "id",
+          "org_id",
+          "team_id",
           "provider_id",
           "status",
           "configuration",
@@ -9320,11 +9386,17 @@
               }
             ]
           },
+          "org_id": {
+            "type": "string"
+          },
           "provider_id": {
             "type": "string"
           },
           "status": {
             "$ref": "#/components/schemas/InboxStatus"
+          },
+          "team_id": {
+            "type": "string"
           },
           "updated_at": {
             "$ref": "#/components/schemas/WrappedChronoDateTime"
@@ -12414,8 +12486,8 @@
       "description": "MCP endpoints"
     },
     {
-      "name": "inbox",
-      "description": "Inbox endpoints"
+      "name": "chatkit",
+      "description": "ChatKit endpoints"
     },
     {
       "name": "billing",

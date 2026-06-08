@@ -680,6 +680,178 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/team/{team_id}/chatkit/agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List inbox agents
+         * @description List all agent inboxes (inbox_type=agent) with their linked inboxes (inboxes that pipe to them)
+         */
+        get: operations["list-inbox-agents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team/{team_id}/chatkit/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List inboxes
+         * @description List all configured inboxes with pagination and optional filtering by type
+         */
+        get: operations["list-inboxes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team/{team_id}/chatkit/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List sessions
+         * @description List all chat sessions with pagination. Optionally filter by inbox_id to get sessions for a specific inbox.
+         */
+        get: operations["list-sessions"];
+        put?: never;
+        /**
+         * Create session
+         * @description Create a new chat session. Optionally include inbox_instances to register participants.
+         */
+        post: operations["create-session"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team/{team_id}/chatkit/session/{session_id}/event-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get session event history
+         * @description Get paginated historical events for a session. Optionally include events from child sessions.
+         */
+        get: operations["get-session-event-history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team/{team_id}/chatkit/session/{session_id}/inbox-instances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List session inbox instances
+         * @description Get all inbox instances (participants) registered in a session.
+         */
+        get: operations["list-session-inbox-instances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team/{team_id}/chatkit/session/{session_id}/message": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List messages in session
+         * @description List all messages in a session with pagination
+         */
+        get: operations["list-messages"];
+        put?: never;
+        /**
+         * Create message
+         * @description Create a new message in a session
+         */
+        post: operations["create-message"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team/{team_id}/chatkit/session/{session_id}/message/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get message
+         * @description Retrieve a message by its ID
+         */
+        get: operations["get-message"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete message
+         * @description Delete a message by its ID
+         */
+        delete: operations["delete-message"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team/{team_id}/chatkit/session/{session_id}/observe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Observe session events via SSE
+         * @description Subscribe to real-time events on a session via Server-Sent Events. Optionally filter by event types and cascade into child sessions.
+         */
+        get: operations["observe-session"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/team/{team_id}/credential/broker/{broker_state_id}/resume": {
         parameters: {
             query?: never;
@@ -855,178 +1027,6 @@ export interface paths {
         head?: never;
         /** Update a user credential */
         patch: operations["update_user_credential"];
-        trace?: never;
-    };
-    "/api/v1/team/{team_id}/inbox/agent": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List inbox agents
-         * @description List all agent inboxes (inbox_type=agent) with their linked inboxes (inboxes that pipe to them)
-         */
-        get: operations["list-inbox-agents"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/team/{team_id}/inbox/inbox": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List inboxes
-         * @description List all configured inboxes with pagination and optional filtering by type
-         */
-        get: operations["list-inboxes"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/team/{team_id}/inbox/session": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List sessions
-         * @description List all chat sessions with pagination. Optionally filter by inbox_id to get sessions for a specific inbox.
-         */
-        get: operations["list-sessions"];
-        put?: never;
-        /**
-         * Create session
-         * @description Create a new chat session. Optionally include inbox_instances to register participants.
-         */
-        post: operations["create-session"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/team/{team_id}/inbox/session/{session_id}/event-history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get session event history
-         * @description Get paginated historical events for a session. Optionally include events from child sessions.
-         */
-        get: operations["get-session-event-history"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/team/{team_id}/inbox/session/{session_id}/inbox-instances": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List session inbox instances
-         * @description Get all inbox instances (participants) registered in a session.
-         */
-        get: operations["list-session-inbox-instances"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/team/{team_id}/inbox/session/{session_id}/message": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List messages in session
-         * @description List all messages in a session with pagination
-         */
-        get: operations["list-messages"];
-        put?: never;
-        /**
-         * Create message
-         * @description Create a new message in a session
-         */
-        post: operations["create-message"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/team/{team_id}/inbox/session/{session_id}/message/{message_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get message
-         * @description Retrieve a message by its ID
-         */
-        get: operations["get-message"];
-        put?: never;
-        post?: never;
-        /**
-         * Delete message
-         * @description Delete a message by its ID
-         */
-        delete: operations["delete-message"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/team/{team_id}/inbox/session/{session_id}/observe": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Observe session events via SSE
-         * @description Subscribe to real-time events on a session via Server-Sent Events. Optionally filter by event types and cascade into child sessions.
-         */
-        get: operations["observe-session"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/v1/team/{team_id}/mcp/available-tool-groups": {
@@ -1839,8 +1839,10 @@ export interface components {
             id: string;
             inbox_type?: components["schemas"]["InboxType"];
             message_format?: null | components["schemas"]["MessageFormatConfig"];
+            org_id: string;
             provider_id: string;
             status: components["schemas"]["InboxStatus"];
+            team_id: string;
             updated_at: components["schemas"]["WrappedChronoDateTime"];
         };
         /** @description Stored inbox instance representation */
@@ -4592,6 +4594,554 @@ export interface operations {
             };
         };
     };
+    "list-inbox-agents": {
+        parameters: {
+            query: {
+                page_size: number;
+                next_page_token?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Team ID */
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List agents with linked inboxes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxWithLinkedInboxesPaginatedResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "list-inboxes": {
+        parameters: {
+            query: {
+                page_size: number;
+                next_page_token?: string;
+                inbox_type?: null | components["schemas"]["InboxType"];
+            };
+            header?: never;
+            path: {
+                /** @description Team ID */
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List inboxes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxPaginatedResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "list-sessions": {
+        parameters: {
+            query?: {
+                /** @description Number of items to return per page */
+                page_size?: number;
+                /** @description Token for the next page of results */
+                next_page_token?: string | null;
+                /** @description Filter sessions by inbox_id (via session_inbox_instance join) */
+                inbox_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Team ID */
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List sessions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionPaginatedResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "create-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Team ID */
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSessionInner"];
+            };
+        };
+        responses: {
+            /** @description Create a session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "get-session-event-history": {
+        parameters: {
+            query?: {
+                /** @description Number of items to return per page */
+                page_size?: number;
+                /** @description Token for the next page of results */
+                next_page_token?: string | null;
+                /** @description Whether to include events from child sessions */
+                include_child_sessions?: boolean | null;
+            };
+            header?: never;
+            path: {
+                /** @description Team ID */
+                team_id: string;
+                /** @description Session ID */
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredEventPaginatedResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "list-session-inbox-instances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Team ID */
+                team_id: string;
+                /** @description Session ID */
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List inbox instances for a session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxInstance"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "list-messages": {
+        parameters: {
+            query?: {
+                page_size?: number;
+                next_page_token?: string | null;
+                channel_inbox_id?: string | null;
+                participant_inbox_instance_id?: string | null;
+                user_external_id?: string | null;
+                created_after?: null | components["schemas"]["WrappedChronoDateTime"];
+                created_before?: null | components["schemas"]["WrappedChronoDateTime"];
+            };
+            header?: never;
+            path: {
+                /** @description Team ID */
+                team_id: string;
+                /** @description Session ID */
+                session_id: components["schemas"]["WrappedUuidV4"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List messages */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagePaginatedResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Session Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "create-message": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Team ID */
+                team_id: string;
+                /** @description Session ID */
+                session_id: components["schemas"]["WrappedUuidV4"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description Create a message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Message"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Session Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "get-message": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Team ID */
+                team_id: string;
+                /** @description Session ID */
+                session_id: components["schemas"]["WrappedUuidV4"];
+                /** @description Message ID */
+                message_id: components["schemas"]["WrappedUuidV4"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Get message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Message"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "delete-message": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Team ID */
+                team_id: string;
+                /** @description Session ID */
+                session_id: components["schemas"]["WrappedUuidV4"];
+                /** @description Message ID */
+                message_id: components["schemas"]["WrappedUuidV4"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Delete message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteMessageResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    "observe-session": {
+        parameters: {
+            query?: {
+                /**
+                 * @description Comma-separated event types to subscribe to (e.g. "message_created,message_streaming").
+                 *     If not set, all events are forwarded.
+                 */
+                subscribe_to_events?: string | null;
+                /** @description Whether to auto-attach to child sessions created under the observed session */
+                attach_to_child_sessions?: boolean | null;
+            };
+            header?: never;
+            path: {
+                /** @description Team ID */
+                team_id: string;
+                /** @description Session ID to observe */
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description SSE stream of session events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     resume_user_credential_brokering: {
         parameters: {
             query?: never;
@@ -4952,549 +5502,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserCredentialSerialized"];
-                };
-            };
-        };
-    };
-    "list-inbox-agents": {
-        parameters: {
-            query: {
-                page_size: number;
-                next_page_token?: string;
-            };
-            header?: never;
-            path: {
-                /** @description Team ID */
-                team_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List agents with linked inboxes */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InboxWithLinkedInboxesPaginatedResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    "list-inboxes": {
-        parameters: {
-            query: {
-                page_size: number;
-                next_page_token?: string;
-                inbox_type?: null | components["schemas"]["InboxType"];
-            };
-            header?: never;
-            path: {
-                /** @description Team ID */
-                team_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List inboxes */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InboxPaginatedResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    "list-sessions": {
-        parameters: {
-            query?: {
-                /** @description Number of items to return per page */
-                page_size?: number;
-                /** @description Token for the next page of results */
-                next_page_token?: string | null;
-                /** @description Filter sessions by inbox_id (via session_inbox_instance join) */
-                inbox_id?: string | null;
-            };
-            header?: never;
-            path: {
-                /** @description Team ID */
-                team_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List sessions */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SessionPaginatedResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    "create-session": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Team ID */
-                team_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateSessionInner"];
-            };
-        };
-        responses: {
-            /** @description Create a session */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Session"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    "get-session-event-history": {
-        parameters: {
-            query?: {
-                /** @description Number of items to return per page */
-                page_size?: number;
-                /** @description Token for the next page of results */
-                next_page_token?: string | null;
-                /** @description Whether to include events from child sessions */
-                include_child_sessions?: boolean | null;
-            };
-            header?: never;
-            path: {
-                /** @description Team ID */
-                team_id: string;
-                /** @description Session ID */
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Event history */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StoredEventPaginatedResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    "list-session-inbox-instances": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Team ID */
-                team_id: string;
-                /** @description Session ID */
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List inbox instances for a session */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InboxInstance"][];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    "list-messages": {
-        parameters: {
-            query: {
-                page_size: number;
-                next_page_token?: string;
-            };
-            header?: never;
-            path: {
-                /** @description Team ID */
-                team_id: string;
-                /** @description Session ID */
-                session_id: components["schemas"]["WrappedUuidV4"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List messages */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MessagePaginatedResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Session Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    "create-message": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Team ID */
-                team_id: string;
-                /** @description Session ID */
-                session_id: components["schemas"]["WrappedUuidV4"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateMessageRequest"];
-            };
-        };
-        responses: {
-            /** @description Create a message */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Message"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Session Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    "get-message": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Team ID */
-                team_id: string;
-                /** @description Session ID */
-                session_id: components["schemas"]["WrappedUuidV4"];
-                /** @description Message ID */
-                message_id: components["schemas"]["WrappedUuidV4"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Get message */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Message"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    "delete-message": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Team ID */
-                team_id: string;
-                /** @description Session ID */
-                session_id: components["schemas"]["WrappedUuidV4"];
-                /** @description Message ID */
-                message_id: components["schemas"]["WrappedUuidV4"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Delete message */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeleteMessageResponse"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    "observe-session": {
-        parameters: {
-            query?: {
-                /**
-                 * @description Comma-separated event types to subscribe to (e.g. "message_created,message_streaming").
-                 *     If not set, all events are forwarded.
-                 */
-                subscribe_to_events?: string | null;
-                /** @description Whether to auto-attach to child sessions created under the observed session */
-                attach_to_child_sessions?: boolean | null;
-            };
-            header?: never;
-            path: {
-                /** @description Team ID */
-                team_id: string;
-                /** @description Session ID to observe */
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description SSE stream of session events */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Session not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

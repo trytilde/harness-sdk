@@ -1,5 +1,8 @@
 node_modules/
 dist/
 packages/*/dist/
+examples/*/.next/
+examples/*/node_modules/
 .DS_Store
 *.log
+*.tsbuildinfo

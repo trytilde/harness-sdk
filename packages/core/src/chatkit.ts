@@ -1,6 +1,6 @@
 import type { Config } from "./config";
 import { requestJson } from "./internal/fetch-client";
-import { pathWithParams, teamPath } from "./internal/paths";
+import { buildUrl, pathWithParams, teamPath } from "./internal/paths";
 import { MessagesClient } from "./messages";
 
 const REGISTER_HTTP_AGENT_PATH =
@@ -107,6 +107,19 @@ export class ChatKitClient {
       }
       throw error;
     }
+  }
+
+  vercelUiEndpoint(input: {
+    sessionId: string;
+    inboxId: string;
+    instanceId: string;
+    stream?: boolean;
+  }): string {
+    const suffix = input.stream ? "/ai/ui/stream" : "/ai/ui";
+    return buildUrl(
+      this.#config,
+      `/api/v1/team/${encodeURIComponent(this.#config.teamId)}/inbox/session/${encodeURIComponent(input.sessionId)}/inbox/${encodeURIComponent(input.inboxId)}/instance/${encodeURIComponent(input.instanceId)}${suffix}`,
+    );
   }
 }
 
