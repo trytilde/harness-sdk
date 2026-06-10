@@ -1,6 +1,11 @@
 import type { Config } from "./config";
 import { requestJson } from "./internal/fetch-client";
 import { buildUrl, pathWithParams, teamPath } from "./internal/paths";
+import {
+  type LocalMcpTool,
+  type LocalMcpToolsClient,
+  wrapMcpClientWithLocalTools,
+} from "./mcp-local-tools";
 
 const MCP_SERVER_PATH = "/api/v1/team/{team_id}/mcp/mcp-server";
 const MCP_SERVER_INSTANCE_PATH =
@@ -193,6 +198,15 @@ export class McpClient {
         mcp_server_instance_id: input.id,
       }),
     );
+  }
+
+  withLocalTools<TClient extends object>(input: {
+    client: TClient;
+    serverId: string;
+    tools: LocalMcpTool[];
+    registerWithServer?: boolean;
+  }): LocalMcpToolsClient<TClient> {
+    return wrapMcpClientWithLocalTools(input);
   }
 
   #toMcpServer(raw: RawMcpServer): McpServer {

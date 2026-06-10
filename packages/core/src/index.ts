@@ -17,4 +17,18 @@ export {
   McpClient,
   type McpServer,
 } from "./mcp";
+export {
+  type JsonObject,
+  type LocalMcpTool,
+  type LocalMcpToolContext,
+  type LocalMcpToolsClient,
+  type LocalMcpToolWrapperOptions,
+  type McpClientLike,
+  MULTI_EXECUTE_TOOL_NAME,
+  type MultiExecuteToolRequest,
+  type MultiExecuteToolResult,
+  type ToolInvocationRequest,
+  type ToolInvocationResult,
+  wrapMcpClientWithLocalTools,
+} from "./mcp-local-tools";
 export { MessagesClient } from "./messages";

@@ -61,6 +61,41 @@ await tilde.mcp.addFunction({
 
 `client.mcp.getServerUrl({ id })` returns the raw Streamable HTTP MCP URL for AI SDK clients and other MCP-capable runtimes.
 
+## MCP Local Tools
+
+Wrap an existing MCP client to add process-local tools. Local tools are exposed
+alongside remote MCP tools, execute in-process, and are split out of
+`MULTI_EXECUTE_TOOL` calls automatically.
+
+```ts
+import { createMCPClient } from "@ai-sdk/mcp";
+import { wrapMcpClientWithLocalTools } from "@tilde/harness-sdk";
+
+const mcp = await createMCPClient({
+  transport: {
+    type: "http",
+    url: tilde.mcp.getServerUrl({ id: "my-agent-tools" })
+  }
+});
+
+const wrappedMcp = wrapMcpClientWithLocalTools({
+  client: mcp,
+  serverId: "my-agent-tools",
+  tools: [
+    {
+      name: "LOCAL_GET_USER_CONTEXT",
+      description: "Return app-local user context.",
+      inputSchema: { type: "object", properties: {} },
+      async execute() {
+        return { plan: "pro" };
+      }
+    }
+  ]
+});
+
+const tools = await wrappedMcp.tools();
+```
+
 ## Vercel AI Endpoint
 
 ```ts
