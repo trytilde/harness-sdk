@@ -152,10 +152,11 @@ export function wrapMcpClientWithLocalTools<TClient extends object>(
     if (!options.registerWithServer) {
       return;
     }
-    registrationPromise ??= registerLocalToolsWithServer(
-      options,
-      client,
-      localTools,
+    registrationPromise ??= registerLocalToolsWithServer(options, client, localTools).catch(
+      (error: unknown) => {
+        registrationPromise = undefined;
+        throw error;
+      },
     );
     await registrationPromise;
   };
@@ -425,12 +426,17 @@ async function routeGetToolSchemas(
   if (remoteToolNames.length === 0) {
     return { tools: localSchemas };
   }
-  const remoteResult = normalizeGetToolSchemasResult(
-    await callRemoteTool(GET_TOOL_SCHEMAS_NAME, {
-      ...input,
-      tool_names: remoteToolNames,
-    }),
-  );
+  let remoteResult: { tools: JsonObject[] };
+  try {
+    remoteResult = normalizeGetToolSchemasResult(
+      await callRemoteTool(GET_TOOL_SCHEMAS_NAME, {
+        ...input,
+        tool_names: remoteToolNames,
+      }),
+    );
+  } catch {
+    remoteResult = { tools: [] };
+  }
   return {
     ...remoteResult,
     tools: [...remoteResult.tools, ...localSchemas],
@@ -580,12 +586,7 @@ function scoreLocalTool(
     .toLowerCase()
     .split(/[^a-z0-9_]+/)
     .filter((token) => token.length > 1);
-  const haystack = [
-    tool.name,
-    tool.description,
-    inputSchemaSummary,
-    "local",
-  ]
+  const haystack = [tool.name, tool.description, inputSchemaSummary]
     .join(" ")
     .toLowerCase();
   if (tokens.length === 0) {

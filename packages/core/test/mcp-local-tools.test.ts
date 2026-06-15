@@ -135,6 +135,26 @@ describe("local MCP tools wrapper", () => {
     });
   });
 
+  it("retries server registration after a transient failure", async () => {
+    const request = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("temporary network failure"))
+      .mockResolvedValueOnce({ registered: ["LOCAL_ECHO"] });
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: {
+        request,
+        tools: async () => ({}),
+      },
+      serverId: "server_1",
+      tools: [localEchoTool()],
+      registerWithServer: true,
+    });
+
+    await expect(wrapped.tools()).rejects.toThrow("temporary network failure");
+    await expect(wrapped.tools()).resolves.toHaveProperty("LOCAL_ECHO");
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
   it("merges local tools into SEARCH_TOOLS results", async () => {
     const callTool = vi.fn(async (name: string) => {
       expect(name).toBe(SEARCH_TOOLS_NAME);
@@ -210,6 +230,42 @@ describe("local MCP tools wrapper", () => {
     });
   });
 
+  it("does not boost every local SEARCH_TOOLS result for the word local", async () => {
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: {},
+      serverId: "server_1",
+      tools: [
+        localEchoTool("LOCAL_ECHO"),
+        {
+          ...localEchoTool("CLIENT_CALENDAR"),
+          description: "Create calendar events.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+            },
+          },
+        },
+      ],
+    });
+
+    const result = await wrapped.callTool(SEARCH_TOOLS_NAME, {
+      use_case: "local echo value",
+      include_schemas: false,
+    });
+
+    expect(result).toMatchObject({
+      recommended_tool: {
+        tool_name: "LOCAL_ECHO",
+      },
+    });
+    expect((result as { tools: Array<{ tool_name: string; score: number }> }).tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ tool_name: "CLIENT_CALENDAR", score: 0 }),
+      ]),
+    );
+  });
+
   it("merges local schemas into GET_TOOL_SCHEMAS results", async () => {
     const callTool = vi.fn(async (name: string, input?: Record<string, unknown>) => {
       expect(name).toBe(GET_TOOL_SCHEMAS_NAME);
@@ -260,6 +316,35 @@ describe("local MCP tools wrapper", () => {
     await expect(
       wrapped.callTool(GET_TOOL_SCHEMAS_NAME, {
         tool_names: ["LOCAL_ECHO"],
+      }),
+    ).resolves.toEqual({
+      tools: [
+        {
+          tool_name: "LOCAL_ECHO",
+          toolkit: "local",
+          description: "Echo local input.",
+          input_schema: localEchoTool().inputSchema,
+          output_schema: { type: "object" },
+          input_schema_summary: "Fields: value",
+          output_schema_summary: "Object schema",
+        },
+      ],
+    });
+  });
+
+  it("returns local GET_TOOL_SCHEMAS results when remote schema lookup fails", async () => {
+    const callTool = vi.fn(async () => {
+      throw new Error("remote schemas unavailable");
+    });
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: { callTool },
+      serverId: "server_1",
+      tools: [localEchoTool()],
+    });
+
+    await expect(
+      wrapped.callTool(GET_TOOL_SCHEMAS_NAME, {
+        tool_names: ["LOCAL_ECHO", "REMOTE_SEARCH"],
       }),
     ).resolves.toEqual({
       tools: [
