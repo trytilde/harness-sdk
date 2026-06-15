@@ -337,6 +337,61 @@ describe("local MCP tools wrapper", () => {
     });
   });
 
+  it("executes local and remote MULTI_EXECUTE_TOOL branches in parallel", async () => {
+    let releaseLocal: () => void = () => undefined;
+    const localStarted = vi.fn();
+    const callTool = vi.fn(async () => ({
+      results: [
+        {
+          tool_name: "REMOTE_ONE",
+          success: true,
+          output: { remote: true },
+        },
+      ],
+    }));
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: { callTool },
+      serverId: "server_1",
+      tools: [
+        {
+          ...localEchoTool(),
+          async execute() {
+            localStarted();
+            await new Promise<void>((resolve) => {
+              releaseLocal = resolve;
+            });
+            return { local: true };
+          },
+        },
+      ],
+    });
+
+    const resultPromise = wrapped.callTool(MULTI_EXECUTE_TOOL_NAME, {
+      invocations: [
+        { tool_name: "LOCAL_ECHO" },
+        { tool_name: "REMOTE_ONE" },
+      ],
+    });
+    await expect.poll(() => localStarted.mock.calls.length).toBe(1);
+    await expect.poll(() => callTool.mock.calls.length).toBe(1);
+    releaseLocal();
+
+    await expect(resultPromise).resolves.toEqual({
+      results: [
+        {
+          tool_name: "LOCAL_ECHO",
+          success: true,
+          output: { local: true },
+        },
+        {
+          tool_name: "REMOTE_ONE",
+          success: true,
+          output: { remote: true },
+        },
+      ],
+    });
+  });
+
   it("returns per-tool errors for local failures in MULTI_EXECUTE_TOOL", async () => {
     const wrapped = wrapMcpClientWithLocalTools({
       client: {},

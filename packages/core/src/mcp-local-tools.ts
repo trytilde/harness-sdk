@@ -313,36 +313,48 @@ async function routeMultiExecute(
   const results = new Array<ToolInvocationResult>(request.invocations.length);
   const remoteInvocations: ToolInvocationRequest[] = [];
   const remoteIndexes: number[] = [];
+  const localInvocations: Array<{
+    entry: LocalToolEntry;
+    invocation: ToolInvocationRequest;
+    index: number;
+  }> = [];
 
-  const localPromises = request.invocations.map(async (invocation, index) => {
+  request.invocations.forEach((invocation, index) => {
     const entry = localTools.get(normalizeToolName(invocation.tool_name));
     if (!entry) {
       remoteInvocations.push(invocation);
       remoteIndexes.push(index);
       return;
     }
-    results[index] = await executeLocalInvocation(
-      entry.tool,
-      invocation,
-      context,
-    );
+    localInvocations.push({ entry, invocation, index });
   });
 
-  await Promise.all(localPromises);
+  const localPromise = Promise.all(
+    localInvocations.map(async ({ entry, invocation, index }) => ({
+      index,
+      result: await executeLocalInvocation(entry.tool, invocation, context),
+    })),
+  );
+  const remotePromise =
+    remoteInvocations.length > 0
+      ? executeRemoteMultiExecute(remoteInvocations, callRemoteTool)
+      : Promise.resolve<MultiExecuteToolResult>({ results: [] });
 
-  if (remoteInvocations.length > 0) {
-    const normalized = await executeRemoteMultiExecute(
-      remoteInvocations,
-      callRemoteTool,
-    );
-    for (let i = 0; i < remoteIndexes.length; i += 1) {
-      const result = normalized.results[i];
-      const index = remoteIndexes[i];
-      if (result === undefined || index === undefined) {
-        continue;
-      }
-      results[index] = result;
+  const [localResults, normalizedRemote] = await Promise.all([
+    localPromise,
+    remotePromise,
+  ]);
+
+  for (const { index, result } of localResults) {
+    results[index] = result;
+  }
+  for (let i = 0; i < remoteIndexes.length; i += 1) {
+    const result = normalizedRemote.results[i];
+    const index = remoteIndexes[i];
+    if (result === undefined || index === undefined) {
+      continue;
     }
+    results[index] = result;
   }
 
   return {
