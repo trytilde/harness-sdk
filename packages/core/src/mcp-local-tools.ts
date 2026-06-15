@@ -699,12 +699,16 @@ function normalizeMultiExecuteResult(
   }
 
   if (invocations.length === 1) {
+    const error =
+      isJsonObject(value) && typeof value.error === "string"
+        ? value.error
+        : "Remote MULTI_EXECUTE_TOOL returned an invalid result shape";
     return {
       results: [
         {
           tool_name: invocations[0]?.tool_name ?? "",
-          success: true,
-          output: value,
+          success: false,
+          error,
         },
       ],
     };

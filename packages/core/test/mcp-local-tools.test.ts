@@ -681,6 +681,58 @@ describe("local MCP tools wrapper", () => {
     });
   });
 
+  it("treats malformed single remote MULTI_EXECUTE_TOOL error responses as failures", async () => {
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: {
+        async callTool() {
+          return { error: "not found" };
+        },
+      },
+      serverId: "server_1",
+      tools: [localEchoTool()],
+    });
+
+    await expect(
+      wrapped.callTool(MULTI_EXECUTE_TOOL_NAME, {
+        invocations: [{ tool_name: "REMOTE_ONE" }],
+      }),
+    ).resolves.toEqual({
+      results: [
+        {
+          tool_name: "REMOTE_ONE",
+          success: false,
+          error: "not found",
+        },
+      ],
+    });
+  });
+
+  it("treats arbitrary single remote MULTI_EXECUTE_TOOL responses as invalid", async () => {
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: {
+        async callTool() {
+          return "unexpected";
+        },
+      },
+      serverId: "server_1",
+      tools: [localEchoTool()],
+    });
+
+    await expect(
+      wrapped.callTool(MULTI_EXECUTE_TOOL_NAME, {
+        invocations: [{ tool_name: "REMOTE_ONE" }],
+      }),
+    ).resolves.toEqual({
+      results: [
+        {
+          tool_name: "REMOTE_ONE",
+          success: false,
+          error: "Remote MULTI_EXECUTE_TOOL returned an invalid result shape",
+        },
+      ],
+    });
+  });
+
   it("forwards close to the wrapped client", async () => {
     const close = vi.fn();
     const wrapped = wrapMcpClientWithLocalTools({
