@@ -2,9 +2,9 @@
 
 This example shows a Next.js agent that uses:
 
-- Tilde AI gateway through an OpenAI-compatible Vercel AI SDK provider.
 - Tilde dynamic MCP through `@ai-sdk/mcp`.
-- Tilde ChatKit inbound webhooks through `@tilde/harness-sdk-vercel`.
+- Tilde ChatKit inbound webhooks through `@tilde/harness-sdk-vercel-ai-node`.
+- A caller-configured OpenAI-compatible model provider through the Vercel AI SDK.
 
 ## Setup
 
@@ -41,10 +41,8 @@ await tilde.mcp.addFunction({
 });
 ```
 
-Set `TILDE_MCP_SERVER_ID` to that server id. Set `TILDE_AI_GATEWAY_PROFILE_ID`
-to a chat profile configured in the Tilde AI gateway. If your deployment exposes
-the credential proxy at a custom public URL, set `TILDE_AI_GATEWAY_BASE_URL`;
-otherwise the example derives the conventional profile proxy URL from the SDK.
+Set `TILDE_MCP_SERVER_ID` to that server id. Set `MODEL_BASE_URL`,
+`MODEL_API_KEY`, and `MODEL_NAME` for your OpenAI-compatible model provider.
 
 Browser chat posts to `/api/chat`. ChatKit should call `/api/chatkit` with
 Tilde webhook signing headers.

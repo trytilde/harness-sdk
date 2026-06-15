@@ -16,12 +16,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "openapi-fetch": "^0.14.0"
+    "test": "vitest run --config ../../vitest.config.ts"
   },
   "devDependencies": {}
 }

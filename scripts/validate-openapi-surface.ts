@@ -12,12 +12,6 @@ const requiredOperations = [
   "list-tool-deployments-by-alias",
   "list-available-tool-groups",
   "create-tool-group-instance",
-  "ai_gateway_list_profiles",
-  "ai_gateway_create_profile",
-  "ai_gateway_get_profile",
-  "ai_gateway_delete_profile",
-  "ai_gateway_update_profile",
-  "ai_gateway_list_providers",
   "list-messages",
   "get-session-event-history",
 ];

@@ -1,37 +1,27 @@
-import { createMCPClient } from "@ai-sdk/mcp";
+import { createMCPClient } from "@tilde/harness-sdk-vercel-ai-node";
 import {
   convertToModelMessages,
   streamText,
   type ToolSet,
   type UIMessage,
 } from "ai";
-import { tildeAiGateway, tildeMcpServerUrl } from "./tilde";
+import { modelProvider, tilde } from "./tilde";
 
 export type AgentRequestBody = {
   messages: UIMessage[];
 };
 
 export async function runAgent(body: AgentRequestBody) {
-  const gateway = tildeAiGateway();
-  const apiKey = process.env.TILDE_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing required environment variable: TILDE_API_KEY");
-  }
-
+  const provider = modelProvider();
   const mcp = await createMCPClient({
-    transport: {
-      type: "http",
-      url: tildeMcpServerUrl(),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-    },
+    client: tilde,
+    serverId: process.env.TILDE_MCP_SERVER_ID || "my-agent-tools",
   });
 
   try {
     const tools: ToolSet = await mcp.tools();
     const result = streamText({
-      model: gateway(process.env.TILDE_AI_GATEWAY_MODEL || "gpt-5-mini"),
+      model: provider(process.env.MODEL_NAME || "gpt-5-mini"),
       messages: await convertToModelMessages(body.messages),
       tools,
       async onFinish() {

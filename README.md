@@ -5,12 +5,14 @@ TypeScript SDK packages for Tilde Harness APIs.
 ## Packages
 
 - `@tilde/harness-sdk`: core client, MCP helpers, ChatKit helpers, and message history.
-- `@tilde/harness-sdk-vercel`: ChatKit webhook verification and Vercel AI SDK endpoint helper.
+- `@tilde/harness-sdk-react`: React provider and ChatKit hooks.
+- `@tilde/harness-sdk-vercel-ai-node`: ChatKit webhook verification and Vercel AI SDK route helpers.
+- `@tilde/harness-sdk-vercel-ai-react`: React helpers for Vercel AI SDK ChatKit UIs.
 
 ## Install
 
 ```bash
-pnpm add @tilde/harness-sdk @tilde/harness-sdk-vercel
+pnpm add @tilde/harness-sdk @tilde/harness-sdk-react @tilde/harness-sdk-vercel-ai-node @tilde/harness-sdk-vercel-ai-react
 ```
 
 ## Core Config
@@ -19,24 +21,12 @@ pnpm add @tilde/harness-sdk @tilde/harness-sdk-vercel
 import { createClient, createConfig } from "@tilde/harness-sdk";
 
 const tilde = createClient(createConfig({
-  baseUrl: "https://org-example.api.trytilde.com",
+  orgId: "org-example",
   teamId: "team_123",
-  apiKey: process.env.TILDE_API_KEY
+  apiKey: process.env.TILDE_API_KEY,
+  // Optional. Defaults to process.env.TILDE_BASE_API_URL or https://api.trytilde.com.
+  baseApiUrl: "https://api.trytilde.com"
 }));
-```
-
-## AI Gateway
-
-```ts
-const profile = await tilde.aiGateway.createProfile({
-  id: "openai-prod",
-  providerId: "openai",
-  resourceServerCredentialId: "00000000-0000-0000-0000-000000000000",
-  kind: "chat",
-  model: "gpt-5-mini"
-});
-
-console.log(tilde.aiGateway.openAiCompatibleBaseUrl({ profileId: profile.id }));
 ```
 
 ## MCP Server URL
@@ -96,10 +86,47 @@ const wrappedMcp = wrapMcpClientWithLocalTools({
 const tools = await wrappedMcp.tools();
 ```
 
+## Vercel AI MCP Client
+
+Use the Vercel AI node package to create an `@ai-sdk/mcp` client with Tilde
+MCP URL construction and `x-api-key` authentication. Tools passed in the map are
+registered as local tools alongside the remote MCP server tools.
+
+```ts
+import { jsonSchema, tool } from "ai";
+import { createClient } from "@tilde/harness-sdk";
+import { createMCPClient } from "@tilde/harness-sdk-vercel-ai-node";
+
+const client = createClient({
+  orgId: process.env.TILDE_ORG_ID!,
+  teamId: process.env.TILDE_TEAM_ID!,
+  apiKey: process.env.TILDE_API_KEY!
+});
+
+const example = tool({
+  description: "Return an example result.",
+  inputSchema: jsonSchema({
+    type: "object",
+    properties: {}
+  }),
+  async execute() {
+    return { ok: true };
+  }
+});
+
+const mcp = await createMCPClient({
+  client,
+  serverId: "my-agent-tools",
+  tools: { example }
+});
+
+const tools = await mcp.tools();
+```
+
 ## Vercel AI Endpoint
 
 ```ts
-import { chatKitEndpoint } from "@tilde/harness-sdk-vercel";
+import { chatKitEndpoint } from "@tilde/harness-sdk-vercel-ai-node";
 import { streamText } from "ai";
 
 export const POST = chatKitEndpoint({
@@ -117,6 +144,25 @@ export const POST = chatKitEndpoint({
 });
 ```
 
+## React ChatKit Hooks
+
+```tsx
+import { TildeProvider, useChatKitSessionEvents } from "@tilde/harness-sdk-react";
+
+function Events({ sessionId }: { sessionId: string }) {
+  const events = useChatKitSessionEvents({ sessionId, pollIntervalMs: 3000 });
+  return <pre>{JSON.stringify(events.items, null, 2)}</pre>;
+}
+
+export function App() {
+  return (
+    <TildeProvider config={{ baseUrl, teamId, apiKey }}>
+      <Events sessionId="00000000-0000-0000-0000-000000000000" />
+    </TildeProvider>
+  );
+}
+```
+
 ## Message History
 
 ```ts
@@ -128,7 +174,7 @@ const history = await tilde.messages.list({
 
 ## Examples
 
-- `examples/nextjs-agent`: Next.js agent using Tilde AI gateway, ChatKit signed webhooks, dynamic MCP, and the Vercel AI SDK.
+- `examples/nextjs-agent`: Next.js agent using Tilde ChatKit signed webhooks, dynamic MCP, and the Vercel AI SDK.
 
 ## Development
 
@@ -138,4 +184,4 @@ pnpm sdk:refresh
 pnpm lint
 ```
 
-The generated OpenAPI types are internal. Add public APIs through hand-authored wrappers.
+Package builds use Vite and tests use Vitest. The generated OpenAPI types are internal. Add public APIs through hand-authored wrappers.

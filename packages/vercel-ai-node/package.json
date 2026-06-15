@@ -1,7 +1,7 @@
 {
-  "name": "@tilde/harness-sdk-vercel",
+  "name": "@tilde/harness-sdk-vercel-ai-node",
   "version": "0.0.0",
-  "description": "Vercel AI SDK adapter for Tilde ChatKit endpoints.",
+  "description": "Node and route-handler helpers for Tilde ChatKit Vercel AI SDK endpoints.",
   "license": "UNLICENSED",
   "type": "module",
   "main": "dist/index.js",
@@ -16,16 +16,22 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --config ../../vitest.config.ts"
   },
   "peerDependencies": {
+    "@ai-sdk/mcp": "^1.0.46",
+    "@tilde/harness-sdk": "0.0.0",
     "ai": ">=5 || >=6"
   },
   "peerDependenciesMeta": {
     "ai": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "@ai-sdk/mcp": "^1.0.46",
+    "@tilde/harness-sdk": "workspace:*"
   }
 }

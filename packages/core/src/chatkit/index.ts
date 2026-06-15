@@ -1,6 +1,6 @@
-import type { Config } from "./config";
-import { requestJson } from "./internal/fetch-client";
-import { buildUrl, pathWithParams, teamPath } from "./internal/paths";
+import type { Config } from "../config";
+import { requestJson } from "../internal/fetch-client";
+import { buildUrl, pathWithParams, teamPath } from "../internal/paths";
 import { MessagesClient } from "./messages";
 
 const REGISTER_HTTP_AGENT_PATH =
@@ -122,6 +122,8 @@ export class ChatKitClient {
     );
   }
 }
+
+export { MessagesClient } from "./messages";
 
 function isMissingChatKitRoute(error: unknown): boolean {
   return (

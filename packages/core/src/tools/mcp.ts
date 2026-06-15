@@ -1,12 +1,12 @@
-import type { Config } from "./config";
-import { requestJson } from "./internal/fetch-client";
-import { buildUrl, pathWithParams, teamPath } from "./internal/paths";
+import type { Config } from "../config";
+import { requestJson } from "../internal/fetch-client";
+import { buildUrl, pathWithParams, teamPath } from "../internal/paths";
 import {
   type LocalMcpTool,
   type LocalMcpToolsClient,
   type RegisterLocalMcpToolsRequest,
   wrapMcpClientWithLocalTools,
-} from "./mcp-local-tools";
+} from "./local";
 
 const MCP_SERVER_PATH = "/api/v1/team/{team_id}/mcp/mcp-server";
 const MCP_SERVER_INSTANCE_PATH =
@@ -17,6 +17,10 @@ const AVAILABLE_TOOL_GROUPS_PATH =
   "/api/v1/team/{team_id}/mcp/available-tool-groups";
 const CREATE_TOOL_GROUP_PATH =
   "/api/v1/team/{team_id}/mcp/available-tool-groups/{tool_group_source_type_id}/available-credentials/{credential_source_type_id}";
+const TOOL_GROUP_PATH =
+  "/api/v1/team/{team_id}/mcp/tool-group/{tool_group_instance_id}";
+const TOOL_PATH =
+  "/api/v1/team/{team_id}/mcp/tool-group/{tool_group_instance_id}/tool/{tool_source_type_id}";
 const TOOL_DEPLOYMENTS_BY_ALIAS_PATH =
   "/api/v1/team/{team_id}/mcp/tool-deployments/{alias}";
 
@@ -45,6 +49,12 @@ export type AddMcpServerFunctionInput = {
   toolDescription?: string | null;
 };
 
+export type UpdateMcpServerInput = {
+  id: string;
+  name: string;
+  isDynamicToolDiscovery: boolean;
+};
+
 export type CreateToolGroupInput = {
   toolGroupSourceTypeId: string;
   credentialSourceTypeId: string;
@@ -53,6 +63,12 @@ export type CreateToolGroupInput = {
   resourceServerCredentialId?: string | null;
   userCredentialId?: string | null;
   returnOnSuccessfulBrokering?: unknown;
+};
+
+export type EnableMcpToolInput = {
+  toolGroupInstanceId: string;
+  toolSourceTypeId: string;
+  boundParams?: unknown;
 };
 
 type RawMcpServer = {
@@ -119,6 +135,29 @@ export class McpClient {
     return this.#toMcpServer(raw);
   }
 
+  async updateServer(input: UpdateMcpServerInput): Promise<McpServer> {
+    const raw = await requestJson<RawMcpServer>(this.#config, {
+      method: "PATCH",
+      path: pathWithParams(teamPath(this.#config, MCP_SERVER_INSTANCE_PATH), {
+        mcp_server_instance_id: input.id,
+      }),
+      body: {
+        name: input.name,
+        is_dynamic_tool_discovery: input.isDynamicToolDiscovery,
+      },
+    });
+    return this.#toMcpServer(raw);
+  }
+
+  async deleteServer(input: { id: string }): Promise<void> {
+    await requestJson<void>(this.#config, {
+      method: "DELETE",
+      path: pathWithParams(teamPath(this.#config, MCP_SERVER_INSTANCE_PATH), {
+        mcp_server_instance_id: input.id,
+      }),
+    });
+  }
+
   async addFunction(input: AddMcpServerFunctionInput): Promise<McpServer> {
     const raw = await requestJson<RawMcpServer>(this.#config, {
       method: "POST",
@@ -168,6 +207,28 @@ export class McpClient {
         resource_server_credential_id: input.resourceServerCredentialId,
         user_credential_id: input.userCredentialId,
         return_on_successful_brokering: input.returnOnSuccessfulBrokering,
+      },
+    });
+  }
+
+  async deleteToolGroup(input: { id: string }): Promise<void> {
+    await requestJson<void>(this.#config, {
+      method: "DELETE",
+      path: pathWithParams(teamPath(this.#config, TOOL_GROUP_PATH), {
+        tool_group_instance_id: input.id,
+      }),
+    });
+  }
+
+  async enableTool(input: EnableMcpToolInput): Promise<unknown> {
+    return requestJson<unknown>(this.#config, {
+      method: "POST",
+      path: `${pathWithParams(teamPath(this.#config, TOOL_PATH), {
+        tool_group_instance_id: input.toolGroupInstanceId,
+        tool_source_type_id: input.toolSourceTypeId,
+      })}/enable`,
+      body: {
+        bound_params: input.boundParams,
       },
     });
   }
