@@ -4,6 +4,7 @@ import { buildUrl, pathWithParams, teamPath } from "./internal/paths";
 import {
   type LocalMcpTool,
   type LocalMcpToolsClient,
+  type RegisterLocalMcpToolsRequest,
   wrapMcpClientWithLocalTools,
 } from "./mcp-local-tools";
 
@@ -205,6 +206,9 @@ export class McpClient {
     serverId: string;
     tools: LocalMcpTool[];
     registerWithServer?: boolean;
+    registerLocalTools?: (
+      request: RegisterLocalMcpToolsRequest,
+    ) => Promise<unknown>;
   }): LocalMcpToolsClient<TClient> {
     return wrapMcpClientWithLocalTools(input);
   }

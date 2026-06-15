@@ -17,7 +17,21 @@ export type LocalMcpTool = {
 export type McpClientLike = {
   tools?: () => Promise<Record<string, unknown>>;
   callTool?: (name: string, input?: JsonObject) => Promise<unknown>;
+  request?: (
+    request: { method: string; params?: unknown },
+    options?: unknown,
+  ) => Promise<unknown>;
   close?: () => Promise<void> | void;
+};
+
+export type RegisterLocalMcpToolsRequest = {
+  tools: Array<{
+    name: string;
+    display_name?: string;
+    description: string;
+    input_schema: JsonObject;
+    output_schema?: JsonObject;
+  }>;
 };
 
 export type LocalMcpToolWrapperOptions<TClient extends object> = {
@@ -25,6 +39,7 @@ export type LocalMcpToolWrapperOptions<TClient extends object> = {
   serverId: string;
   tools: LocalMcpTool[];
   registerWithServer?: boolean;
+  registerLocalTools?: (request: RegisterLocalMcpToolsRequest) => Promise<unknown>;
 };
 
 export type ToolInvocationRequest = {
@@ -56,10 +71,13 @@ export type LocalMcpToolsClient<TClient extends object> = TClient & {
 };
 
 export const MULTI_EXECUTE_TOOL_NAME = "MULTI_EXECUTE_TOOL";
+export const SEARCH_TOOLS_NAME = "SEARCH_TOOLS";
+export const GET_TOOL_SCHEMAS_NAME = "GET_TOOL_SCHEMAS";
+export const REGISTER_LOCAL_TOOLS_METHOD = "tilde/localTools.register";
 
 const RESERVED_TOOL_NAMES = new Set([
-  "SEARCH_TOOLS",
-  "GET_TOOL_SCHEMAS",
+  SEARCH_TOOLS_NAME,
+  GET_TOOL_SCHEMAS_NAME,
   MULTI_EXECUTE_TOOL_NAME,
 ]);
 
@@ -78,12 +96,7 @@ export function wrapMcpClientWithLocalTools<TClient extends object>(
   }));
   const byName = new Map(localTools.map((entry) => [entry.key, entry]));
   const client = options.client as TClient & McpClientLike;
-
-  if (options.registerWithServer) {
-    throw new TypeError(
-      "Server-side local tool registration is not available in this SDK version",
-    );
-  }
+  let registrationPromise: Promise<unknown> | undefined;
 
   const wrapper = Object.create(client) as LocalMcpToolsClient<TClient>;
 
@@ -112,6 +125,13 @@ export function wrapMcpClientWithLocalTools<TClient extends object>(
     name: string,
     input?: JsonObject,
   ): Promise<unknown> => {
+    await ensureServerRegistration();
+    if (normalizeToolName(name) === SEARCH_TOOLS_NAME) {
+      return routeSearchTools(input, localTools, callRemoteTool);
+    }
+    if (normalizeToolName(name) === GET_TOOL_SCHEMAS_NAME) {
+      return routeGetToolSchemas(input, localTools, callRemoteTool);
+    }
     if (normalizeToolName(name) === MULTI_EXECUTE_TOOL_NAME) {
       return routeMultiExecute(input, byName, context, callRemoteTool);
     }
@@ -128,6 +148,18 @@ export function wrapMcpClientWithLocalTools<TClient extends object>(
     callRemoteTool,
   };
 
+  const ensureServerRegistration = async (): Promise<void> => {
+    if (!options.registerWithServer) {
+      return;
+    }
+    registrationPromise ??= registerLocalToolsWithServer(
+      options,
+      client,
+      localTools,
+    );
+    await registrationPromise;
+  };
+
   Object.defineProperties(wrapper, {
     serverId: {
       enumerable: true,
@@ -140,6 +172,7 @@ export function wrapMcpClientWithLocalTools<TClient extends object>(
     tools: {
       enumerable: true,
       value: async () => {
+        await ensureServerRegistration();
         const remoteTools = client.tools ? await client.tools() : {};
         return mergeLocalTools(remoteTools, localTools, context);
       },
@@ -157,6 +190,33 @@ export function wrapMcpClientWithLocalTools<TClient extends object>(
   });
 
   return wrapper;
+}
+
+async function registerLocalToolsWithServer<TClient extends object>(
+  options: LocalMcpToolWrapperOptions<TClient>,
+  client: TClient & McpClientLike,
+  localTools: LocalToolEntry[],
+): Promise<unknown> {
+  const request: RegisterLocalMcpToolsRequest = {
+    tools: localTools.map(({ tool }) => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.inputSchema,
+      ...(tool.outputSchema ? { output_schema: tool.outputSchema } : {}),
+    })),
+  };
+  if (options.registerLocalTools) {
+    return options.registerLocalTools(request);
+  }
+  if (client.request) {
+    return client.request({
+      method: REGISTER_LOCAL_TOOLS_METHOD,
+      params: request,
+    });
+  }
+  throw new TypeError(
+    "registerWithServer requires registerLocalTools or an MCP client request method",
+  );
 }
 
 function validateWrapperOptions<TClient extends object>(
@@ -298,6 +358,243 @@ async function routeMultiExecute(
       };
     }),
   };
+}
+
+async function routeSearchTools(
+  input: JsonObject | undefined,
+  localTools: LocalToolEntry[],
+  callRemoteTool: (name: string, input?: JsonObject) => Promise<unknown>,
+): Promise<JsonObject> {
+  const request = parseSearchToolsRequest(input);
+  let result: ReturnType<typeof normalizeSearchToolsResult>;
+  try {
+    result = normalizeSearchToolsResult(
+      await callRemoteTool(SEARCH_TOOLS_NAME, input),
+    );
+  } catch {
+    result = normalizeSearchToolsResult(undefined);
+  }
+  const remoteNames = new Set(
+    result.tools.map((tool) => normalizeToolName(String(tool.tool_name))),
+  );
+  const localRanked = localTools
+    .filter((entry) => !remoteNames.has(entry.key))
+    .map((entry) => localToolToRankedTool(entry.tool, request))
+    .sort((a, b) => Number(b.score) - Number(a.score));
+
+  const tools = [...localRanked, ...result.tools]
+    .sort((a, b) => Number(b.score) - Number(a.score))
+    .slice(0, request.max_results);
+  return {
+    ...result,
+    tools,
+    recommended_tool: tools[0] ?? result.recommended_tool,
+    confidence:
+      typeof result.confidence === "number"
+        ? Math.max(result.confidence, Number(tools[0]?.score ?? 0))
+        : Number(tools[0]?.score ?? 0),
+  };
+}
+
+async function routeGetToolSchemas(
+  input: JsonObject | undefined,
+  localTools: LocalToolEntry[],
+  callRemoteTool: (name: string, input?: JsonObject) => Promise<unknown>,
+): Promise<JsonObject> {
+  const toolNames = parseToolNames(input);
+  const localByName = new Map(localTools.map((entry) => [entry.key, entry.tool]));
+  const localSchemas = toolNames
+    .map((name) => localByName.get(normalizeToolName(name)))
+    .filter((tool): tool is LocalMcpTool => tool !== undefined)
+    .map(localToolToSchemaInfo);
+  const remoteToolNames = toolNames.filter(
+    (name) => !localByName.has(normalizeToolName(name)),
+  );
+  if (remoteToolNames.length === 0) {
+    return { tools: localSchemas };
+  }
+  const remoteResult = normalizeGetToolSchemasResult(
+    await callRemoteTool(GET_TOOL_SCHEMAS_NAME, {
+      ...input,
+      tool_names: remoteToolNames,
+    }),
+  );
+  return {
+    ...remoteResult,
+    tools: [...remoteResult.tools, ...localSchemas],
+  };
+}
+
+function parseSearchToolsRequest(input: JsonObject | undefined): {
+  use_case: string;
+  max_results: number;
+  include_schemas: boolean;
+} {
+  const useCase = input?.use_case;
+  if (typeof useCase !== "string" || useCase.trim().length === 0) {
+    throw new TypeError("SEARCH_TOOLS input must include use_case");
+  }
+  const maxResults = input?.max_results;
+  const includeSchemas = input?.include_schemas;
+  return {
+    use_case: useCase,
+    max_results:
+      typeof maxResults === "number" && Number.isFinite(maxResults)
+        ? Math.max(1, Math.floor(maxResults))
+        : 10,
+    include_schemas: includeSchemas === true,
+  };
+}
+
+function parseToolNames(input: JsonObject | undefined): string[] {
+  const toolNames = input?.tool_names;
+  if (!Array.isArray(toolNames)) {
+    throw new TypeError("GET_TOOL_SCHEMAS input must include tool_names");
+  }
+  return toolNames.map((name, index) => {
+    if (typeof name !== "string" || name.length === 0) {
+      throw new TypeError(`GET_TOOL_SCHEMAS tool_names[${index}] must be a string`);
+    }
+    return name;
+  });
+}
+
+function normalizeSearchToolsResult(value: unknown): {
+  tools: JsonObject[];
+  recommended_tool?: JsonObject;
+  recommended_plan_steps: unknown[];
+  next_steps: unknown[];
+  confidence: number;
+} {
+  const result = unwrapStructuredResult(value);
+  if (!isJsonObject(result)) {
+    return {
+      tools: [],
+      recommended_plan_steps: [],
+      next_steps: [],
+      confidence: 0,
+    };
+  }
+  const normalized: {
+    tools: JsonObject[];
+    recommended_tool?: JsonObject;
+    recommended_plan_steps: unknown[];
+    next_steps: unknown[];
+    confidence: number;
+  } = {
+    ...result,
+    tools: Array.isArray(result.tools)
+      ? result.tools.filter(isJsonObject)
+      : [],
+    recommended_plan_steps: Array.isArray(result.recommended_plan_steps)
+      ? result.recommended_plan_steps
+      : [],
+    next_steps: Array.isArray(result.next_steps) ? result.next_steps : [],
+    confidence:
+      typeof result.confidence === "number" ? result.confidence : 0,
+  };
+  if (isJsonObject(result.recommended_tool)) {
+    normalized.recommended_tool = result.recommended_tool;
+  }
+  return normalized;
+}
+
+function normalizeGetToolSchemasResult(value: unknown): { tools: JsonObject[] } {
+  const result = unwrapStructuredResult(value);
+  if (!isJsonObject(result) || !Array.isArray(result.tools)) {
+    return { tools: [] };
+  }
+  return {
+    ...result,
+    tools: result.tools.filter(isJsonObject),
+  };
+}
+
+function unwrapStructuredResult(value: unknown): unknown {
+  if (isJsonObject(value) && "structuredContent" in value) {
+    return value.structuredContent;
+  }
+  if (isJsonObject(value) && "structured_content" in value) {
+    return value.structured_content;
+  }
+  return value;
+}
+
+function localToolToRankedTool(
+  tool: LocalMcpTool,
+  request: {
+    use_case: string;
+    include_schemas: boolean;
+  },
+): JsonObject {
+  const inputSchemaSummary = summarizeSchema(tool.inputSchema);
+  const outputSchema = tool.outputSchema ?? { type: "object" };
+  const outputSchemaSummary = summarizeSchema(outputSchema);
+  const ranked: JsonObject = {
+    tool_name: tool.name,
+    toolkit: "local",
+    score: scoreLocalTool(request.use_case, tool, inputSchemaSummary),
+    reason: `Matches the use case against ${tool.name} from local tools.`,
+    description: tool.description,
+    input_schema_summary: inputSchemaSummary,
+    output_schema_summary: outputSchemaSummary,
+  };
+  if (request.include_schemas) {
+    ranked.input_schema = tool.inputSchema;
+    ranked.output_schema = outputSchema;
+  }
+  return ranked;
+}
+
+function localToolToSchemaInfo(tool: LocalMcpTool): JsonObject {
+  const outputSchema = tool.outputSchema ?? { type: "object" };
+  return {
+    tool_name: tool.name,
+    toolkit: "local",
+    description: tool.description,
+    input_schema: tool.inputSchema,
+    output_schema: outputSchema,
+    input_schema_summary: summarizeSchema(tool.inputSchema),
+    output_schema_summary: summarizeSchema(outputSchema),
+  };
+}
+
+function scoreLocalTool(
+  useCase: string,
+  tool: LocalMcpTool,
+  inputSchemaSummary: string,
+): number {
+  const tokens = useCase
+    .toLowerCase()
+    .split(/[^a-z0-9_]+/)
+    .filter((token) => token.length > 1);
+  const haystack = [
+    tool.name,
+    tool.description,
+    inputSchemaSummary,
+    "local",
+  ]
+    .join(" ")
+    .toLowerCase();
+  if (tokens.length === 0) {
+    return 0.2;
+  }
+  const hits = tokens.filter((token) => haystack.includes(token)).length;
+  return Math.min(1, hits / tokens.length);
+}
+
+function summarizeSchema(schema: JsonObject): string {
+  const properties = isJsonObject(schema.properties)
+    ? Object.keys(schema.properties).slice(0, 6)
+    : [];
+  const required = Array.isArray(schema.required)
+    ? schema.required.filter((value): value is string => typeof value === "string")
+    : [];
+  const fields =
+    properties.length > 0 ? `Fields: ${properties.join(", ")}` : "Object schema";
+  return required.length > 0
+    ? `${fields}. Required: ${required.join(", ")}`
+    : fields;
 }
 
 async function executeRemoteMultiExecute(

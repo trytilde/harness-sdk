@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createClient,
+  GET_TOOL_SCHEMAS_NAME,
   type LocalMcpTool,
   MULTI_EXECUTE_TOOL_NAME,
+  REGISTER_LOCAL_TOOLS_METHOD,
+  SEARCH_TOOLS_NAME,
   wrapMcpClientWithLocalTools,
 } from "../src";
 
@@ -102,6 +105,123 @@ describe("local MCP tools wrapper", () => {
       wrapped.callTool("LOCAL_ECHO", { value: "hello" }),
     ).resolves.toEqual({ local: "hello" });
     expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it("registers local tool schemas with the remote MCP session", async () => {
+    const request = vi.fn(async () => ({ registered: ["LOCAL_ECHO"] }));
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: {
+        request,
+        tools: async () => ({}),
+      },
+      serverId: "server_1",
+      tools: [localEchoTool()],
+      registerWithServer: true,
+    });
+
+    await wrapped.tools();
+
+    expect(request).toHaveBeenCalledWith({
+      method: REGISTER_LOCAL_TOOLS_METHOD,
+      params: {
+        tools: [
+          {
+            name: "LOCAL_ECHO",
+            description: "Echo local input.",
+            input_schema: localEchoTool().inputSchema,
+          },
+        ],
+      },
+    });
+  });
+
+  it("merges local tools into SEARCH_TOOLS results", async () => {
+    const callTool = vi.fn(async (name: string) => {
+      expect(name).toBe(SEARCH_TOOLS_NAME);
+      return {
+        tools: [
+          {
+            tool_name: "REMOTE_SEARCH",
+            toolkit: "remote",
+            score: 0.1,
+            reason: "remote",
+            description: "Remote search.",
+            input_schema_summary: "Fields: query",
+            output_schema_summary: "Object schema",
+          },
+        ],
+        recommended_plan_steps: [],
+        next_steps: [],
+        confidence: 0.1,
+      };
+    });
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: { callTool },
+      serverId: "server_1",
+      tools: [localEchoTool()],
+    });
+
+    const result = await wrapped.callTool(SEARCH_TOOLS_NAME, {
+      use_case: "echo local value",
+      include_schemas: true,
+    });
+
+    expect(result).toMatchObject({
+      recommended_tool: {
+        tool_name: "LOCAL_ECHO",
+        toolkit: "local",
+      },
+      tools: [
+        {
+          tool_name: "LOCAL_ECHO",
+          toolkit: "local",
+          input_schema: localEchoTool().inputSchema,
+        },
+        {
+          tool_name: "REMOTE_SEARCH",
+        },
+      ],
+    });
+  });
+
+  it("merges local schemas into GET_TOOL_SCHEMAS results", async () => {
+    const callTool = vi.fn(async (name: string, input?: Record<string, unknown>) => {
+      expect(name).toBe(GET_TOOL_SCHEMAS_NAME);
+      expect(input).toMatchObject({ tool_names: ["REMOTE_SEARCH"] });
+      return {
+        tools: [
+          {
+            tool_name: "REMOTE_SEARCH",
+            toolkit: "remote",
+            description: "Remote search.",
+            input_schema: { type: "object" },
+            output_schema: { type: "object" },
+            input_schema_summary: "Object schema",
+            output_schema_summary: "Object schema",
+          },
+        ],
+      };
+    });
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: { callTool },
+      serverId: "server_1",
+      tools: [localEchoTool()],
+    });
+
+    await expect(
+      wrapped.callTool(GET_TOOL_SCHEMAS_NAME, {
+        tool_names: ["LOCAL_ECHO", "REMOTE_SEARCH"],
+      }),
+    ).resolves.toMatchObject({
+      tools: [
+        { tool_name: "REMOTE_SEARCH" },
+        {
+          tool_name: "LOCAL_ECHO",
+          toolkit: "local",
+          input_schema: localEchoTool().inputSchema,
+        },
+      ],
+    });
   });
 
   it("forwards direct remote tool calls", async () => {
