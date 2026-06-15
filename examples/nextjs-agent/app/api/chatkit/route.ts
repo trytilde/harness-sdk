@@ -1,4 +1,4 @@
-import { chatKitEndpoint } from "@tilde/harness-sdk-vercel";
+import { chatKitEndpoint } from "@tilde/harness-sdk-vercel-ai-node";
 import { type AgentRequestBody, runAgent } from "@/lib/agent";
 
 export const maxDuration = 60;

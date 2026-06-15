@@ -11,6 +11,44 @@ describe("createConfig", () => {
     expect(config.baseUrl).toBe("https://api.example.test");
   });
 
+  it("derives baseUrl from orgId", () => {
+    const config = createConfig({
+      orgId: "org-example",
+      teamId: "team_123",
+    });
+
+    expect(config.baseUrl).toBe("https://org-example.api.trytilde.com");
+  });
+
+  it("derives org baseUrl from configured baseApiUrl", () => {
+    const config = createConfig({
+      baseApiUrl: "https://api.staging.trytilde.com",
+      orgId: "org-example",
+      teamId: "team_123",
+    });
+
+    expect(config.baseUrl).toBe("https://org-example.api.staging.trytilde.com");
+  });
+
+  it("derives org baseUrl from TILDE_BASE_API_URL", () => {
+    const previous = process.env.TILDE_BASE_API_URL;
+    process.env.TILDE_BASE_API_URL = "https://api.env.trytilde.com";
+    try {
+      const config = createConfig({
+        orgId: "org-example",
+        teamId: "team_123",
+      });
+
+      expect(config.baseUrl).toBe("https://org-example.api.env.trytilde.com");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TILDE_BASE_API_URL;
+      } else {
+        process.env.TILDE_BASE_API_URL = previous;
+      }
+    }
+  });
+
   it("rejects relative baseUrl", () => {
     expect(() =>
       createConfig({
@@ -87,9 +125,18 @@ describe("MCP client", () => {
         Response.json({ msg: "nope" }, { status: 403 })) as typeof fetch,
     });
 
-    await expect(
-      client.mcp.getServer({ id: "missing" }),
-    ).rejects.toBeInstanceOf(ApiError);
+    try {
+      await client.mcp.getServer({ id: "missing" });
+      throw new Error("Expected request to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({
+        name: "ApiError",
+        message: "nope",
+        status: 403,
+        body: { msg: "nope" },
+      });
+    }
   });
 
   it("adds a dynamic function to an MCP server", async () => {
@@ -136,6 +183,108 @@ describe("MCP client", () => {
     });
   });
 
+  it("updates an MCP server", async () => {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        expect(String(input)).toBe(
+          "https://api.example.test/api/v1/team/team_123/mcp/mcp-server/server_1",
+        );
+        expect(init?.method).toBe("PATCH");
+        expect(JSON.parse(String(init?.body))).toEqual({
+          name: "Server 1 updated",
+          is_dynamic_tool_discovery: false,
+        });
+
+        return Response.json({
+          id: "server_1",
+          name: "Server 1 updated",
+          team_id: "team_123",
+          is_dynamic_tool_discovery: false,
+          tools: [],
+        });
+      },
+    );
+
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      teamId: "team_123",
+      fetch: fetchMock as typeof fetch,
+    });
+
+    await expect(
+      client.mcp.updateServer({
+        id: "server_1",
+        name: "Server 1 updated",
+        isDynamicToolDiscovery: false,
+      }),
+    ).resolves.toMatchObject({
+      id: "server_1",
+      isDynamicToolDiscovery: false,
+    });
+  });
+
+  it("enables a tool on an MCP tool group", async () => {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        expect(String(input)).toBe(
+          "https://api.example.test/api/v1/team/team_123/mcp/tool-group/tool_group_instance/tool/tool_source/enable",
+        );
+        expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toEqual({
+          bound_params: { workspace: "sdk" },
+        });
+
+        return Response.json({
+          tool_source_type_id: "tool_source",
+          tool_group_instance_id: "tool_group_instance",
+        });
+      },
+    );
+
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      teamId: "team_123",
+      fetch: fetchMock as typeof fetch,
+    });
+
+    await expect(
+      client.mcp.enableTool({
+        toolGroupInstanceId: "tool_group_instance",
+        toolSourceTypeId: "tool_source",
+        boundParams: { workspace: "sdk" },
+      }),
+    ).resolves.toMatchObject({
+      tool_source_type_id: "tool_source",
+      tool_group_instance_id: "tool_group_instance",
+    });
+  });
+
+  it("deletes MCP server and tool group fixtures", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => {
+      return new Response(null, { status: 204 });
+    });
+
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      teamId: "team_123",
+      fetch: fetchMock as typeof fetch,
+    });
+
+    await client.mcp.deleteServer({ id: "server_1" });
+    await client.mcp.deleteToolGroup({ id: "tool_group_1" });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.example.test/api/v1/team/team_123/mcp/mcp-server/server_1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.example.test/api/v1/team/team_123/mcp/tool-group/tool_group_1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
   it("lists available tool groups with deployment alias", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       expect(String(input)).toBe(
@@ -162,72 +311,6 @@ describe("MCP client", () => {
       items: [{ type_id: "github" }],
       nextPageToken: "next",
     });
-  });
-});
-
-describe("AI gateway client", () => {
-  it("creates an AI gateway profile through the team-scoped API", async () => {
-    const fetchMock = vi.fn(
-      async (input: RequestInfo | URL, init?: RequestInit) => {
-        expect(String(input)).toBe(
-          "https://api.example.test/api/v1/team/team_123/ai-gateway/profile",
-        );
-        expect(init?.method).toBe("POST");
-        expect(JSON.parse(String(init?.body))).toEqual({
-          id: "openai-prod",
-          provider_id: "openai",
-          resource_server_credential_id: "cred_123",
-          kind: "chat",
-          model: "gpt-5-mini",
-          custom_headers: {},
-        });
-
-        return Response.json({
-          id: "openai-prod",
-          provider_id: "openai",
-          base_url: "https://api.openai.com/v1",
-          resource_server_credential_id: "cred_123",
-          kind: "chat",
-          model: "gpt-5-mini",
-          org_id: "org_123",
-          team_id: "team_123",
-          custom_headers: {},
-        });
-      },
-    );
-
-    const client = createClient({
-      baseUrl: "https://api.example.test",
-      teamId: "team_123",
-      fetch: fetchMock as typeof fetch,
-    });
-
-    await expect(
-      client.aiGateway.createProfile({
-        id: "openai-prod",
-        providerId: "openai",
-        resourceServerCredentialId: "cred_123",
-        kind: "chat",
-        model: "gpt-5-mini",
-      }),
-    ).resolves.toMatchObject({
-      id: "openai-prod",
-      providerId: "openai",
-      model: "gpt-5-mini",
-    });
-  });
-
-  it("constructs OpenAI-compatible gateway base URLs", () => {
-    const client = createClient({
-      baseUrl: "https://api.example.test/",
-      teamId: "team 123",
-    });
-
-    expect(
-      client.aiGateway.openAiCompatibleBaseUrl({ profileId: "openai/prod" }),
-    ).toBe(
-      "https://api.example.test/api/v1/team/team%20123/credential-proxy/openai%2Fprod/",
-    );
   });
 });
 

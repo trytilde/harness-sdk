@@ -1,8 +1,19 @@
 export {
+  type Client,
+  type Config,
+  createClient,
+  createConfig,
+} from "./client";
+export {
   type ChatKitEndpointContext,
   type ChatKitEndpointOptions,
   chatKitEndpoint,
 } from "./handler";
+export {
+  type CreateMCPClientOptions,
+  createMCPClient,
+  type TildeMCPClient,
+} from "./mcp";
 export {
   DEFAULT_TOLERANCE_SECONDS,
   signBody,

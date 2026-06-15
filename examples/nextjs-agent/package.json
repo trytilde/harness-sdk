@@ -14,7 +14,7 @@
     "@ai-sdk/openai-compatible": "^2.0.48",
     "@ai-sdk/react": "^3.0.199",
     "@tilde/harness-sdk": "file:../../packages/core",
-    "@tilde/harness-sdk-vercel": "file:../../packages/vercel-ai",
+    "@tilde/harness-sdk-vercel-ai-node": "file:../../packages/vercel-ai-node",
     "ai": "^6.0.197",
     "next": "^16.2.7",
     "react": "^19.2.7",

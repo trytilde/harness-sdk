@@ -4,8 +4,7 @@ import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: "Tilde Agent",
-  description:
-    "Next.js agent example using Tilde ChatKit, AI gateway, and MCP.",
+  description: "Next.js agent example using Tilde ChatKit and MCP.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

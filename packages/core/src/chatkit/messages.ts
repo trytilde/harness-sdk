@@ -1,6 +1,6 @@
-import type { Config } from "./config";
-import { requestJson } from "./internal/fetch-client";
-import { pathWithParams, teamPath } from "./internal/paths";
+import type { Config } from "../config";
+import { requestJson } from "../internal/fetch-client";
+import { pathWithParams, teamPath } from "../internal/paths";
 
 const MESSAGE_PATH =
   "/api/v1/team/{team_id}/inbox/session/{session_id}/message";

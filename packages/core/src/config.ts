@@ -1,5 +1,7 @@
 export type Config = {
-  baseUrl: string;
+  baseUrl?: string;
+  baseApiUrl?: string;
+  orgId?: string;
   teamId: string;
   apiKey?: string;
   bearerToken?: string;
@@ -12,8 +14,10 @@ export type NormalizedConfig = Config & {
 };
 
 export function createConfig(input: Config): NormalizedConfig {
-  if (!input.baseUrl || input.baseUrl.trim().length === 0) {
-    throw new TypeError("baseUrl is required");
+  const baseUrlInput =
+    input.baseUrl ?? baseUrlFromOrgId(input.orgId, input.baseApiUrl);
+  if (!baseUrlInput || baseUrlInput.trim().length === 0) {
+    throw new TypeError("baseUrl or orgId is required");
   }
   if (!input.teamId || input.teamId.trim().length === 0) {
     throw new TypeError("teamId is required");
@@ -21,7 +25,7 @@ export function createConfig(input: Config): NormalizedConfig {
 
   let url: URL;
   try {
-    url = new URL(input.baseUrl);
+    url = new URL(baseUrlInput);
   } catch {
     throw new TypeError("baseUrl must be an absolute URL");
   }
@@ -30,7 +34,7 @@ export function createConfig(input: Config): NormalizedConfig {
     throw new TypeError("baseUrl must use http or https");
   }
 
-  const baseUrl = input.baseUrl.replace(/\/+$/, "");
+  const baseUrl = baseUrlInput.replace(/\/+$/, "");
   return {
     ...input,
     baseUrl,
@@ -55,4 +59,27 @@ export function configFetch(config: Config): typeof fetch {
     throw new TypeError("No fetch implementation is available");
   }
   return fetch;
+}
+
+function baseUrlFromOrgId(
+  orgId: string | undefined,
+  configuredBaseApiUrl: string | undefined,
+): string | undefined {
+  if (!orgId || orgId.trim().length === 0) {
+    return undefined;
+  }
+  const apiUrl = new URL(baseApiUrl(configuredBaseApiUrl));
+  apiUrl.hostname = `${orgId.trim()}.${apiUrl.hostname}`;
+  return apiUrl.toString();
+}
+
+function baseApiUrl(configuredBaseApiUrl: string | undefined): string {
+  return configuredBaseApiUrl ?? envBaseApiUrl() ?? "https://api.trytilde.com";
+}
+
+function envBaseApiUrl(): string | undefined {
+  if (typeof process === "undefined") {
+    return undefined;
+  }
+  return process.env.TILDE_BASE_API_URL;
 }

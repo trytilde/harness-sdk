@@ -6,3 +6,7 @@ examples/*/node_modules/
 .DS_Store
 *.log
 *.tsbuildinfo
+secrets.yaml
+.env.e2e
+.env.secrets.e2e
+.tilde-e2e-runs/

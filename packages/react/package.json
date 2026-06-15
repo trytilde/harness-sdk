@@ -1,0 +1,33 @@
+{
+  "name": "@tilde/harness-sdk-react",
+  "version": "0.0.0",
+  "description": "React helpers for Tilde Harness SDK applications.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config ../../vitest.config.ts"
+  },
+  "peerDependencies": {
+    "@tilde/harness-sdk": "0.0.0",
+    "react": ">=18 || >=19"
+  },
+  "devDependencies": {
+    "@tilde/harness-sdk": "workspace:*",
+    "@types/react": "^19.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

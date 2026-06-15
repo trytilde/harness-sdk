@@ -17,22 +17,11 @@ export const tilde = createClient(
   }),
 );
 
-export function tildeAiGateway() {
-  const profileId = requireEnv("TILDE_AI_GATEWAY_PROFILE_ID");
-  const baseURL =
-    process.env.TILDE_AI_GATEWAY_BASE_URL ||
-    tilde.aiGateway.openAiCompatibleBaseUrl({ profileId });
-
+export function modelProvider() {
   return createOpenAICompatible({
-    name: "tilde-ai-gateway",
-    baseURL,
-    apiKey: requireEnv("TILDE_API_KEY"),
-  });
-}
-
-export function tildeMcpServerUrl(): string {
-  return tilde.mcp.getServerUrl({
-    id: requireEnv("TILDE_MCP_SERVER_ID"),
+    name: "model-provider",
+    baseURL: requireEnv("MODEL_BASE_URL"),
+    apiKey: requireEnv("MODEL_API_KEY"),
   });
 }
 

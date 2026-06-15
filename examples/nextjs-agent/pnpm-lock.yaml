@@ -20,9 +20,9 @@ importers:
       '@tilde/harness-sdk':
         specifier: file:../../packages/core
         version: file:../../packages/core
-      '@tilde/harness-sdk-vercel':
-        specifier: file:../../packages/vercel-ai
-        version: file:../../packages/vercel-ai(ai@6.0.197(zod@4.4.3))
+      '@tilde/harness-sdk-vercel-ai-node':
+        specifier: file:../../packages/vercel-ai-node
+        version: file:../../packages/vercel-ai-node(@ai-sdk/mcp@1.0.46(zod@4.4.3))(@tilde/harness-sdk@file:../../packages/core)(ai@6.0.197(zod@4.4.3))
       ai:
         specifier: ^6.0.197
         version: 6.0.197(zod@4.4.3)
@@ -306,9 +306,11 @@ packages:
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
 
-  '@tilde/harness-sdk-vercel@file:../../packages/vercel-ai':
-    resolution: {directory: ../../packages/vercel-ai, type: directory}
+  '@tilde/harness-sdk-vercel-ai-node@file:../../packages/vercel-ai-node':
+    resolution: {directory: ../../packages/vercel-ai-node, type: directory}
     peerDependencies:
+      '@ai-sdk/mcp': ^1.0.46
+      '@tilde/harness-sdk': 0.0.0
       ai: '>=5 || >=6'
     peerDependenciesMeta:
       ai:
@@ -392,12 +394,6 @@ packages:
         optional: true
       sass:
         optional: true
-
-  openapi-fetch@0.14.1:
-    resolution: {integrity: sha512-l7RarRHxlEZYjMLd/PR0slfMVse2/vvIAGm75/F7J6MlQ8/b9uUQmUF2kCPrQhJqMXSxmYWObVgeYXbFYzZR+A==}
-
-  openapi-typescript-helpers@0.0.15:
-    resolution: {integrity: sha512-opyTPaunsklCBpTK8JGef6mfPhLSnyy5a0IN9vKtx3+4aExf+KxEqYwIy3hqkedXIB97u357uLMJsOnm3GVjsw==}
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -655,13 +651,14 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@tilde/harness-sdk-vercel@file:../../packages/vercel-ai(ai@6.0.197(zod@4.4.3))':
+  '@tilde/harness-sdk-vercel-ai-node@file:../../packages/vercel-ai-node(@ai-sdk/mcp@1.0.46(zod@4.4.3))(@tilde/harness-sdk@file:../../packages/core)(ai@6.0.197(zod@4.4.3))':
+    dependencies:
+      '@ai-sdk/mcp': 1.0.46(zod@4.4.3)
+      '@tilde/harness-sdk': file:../../packages/core
     optionalDependencies:
       ai: 6.0.197(zod@4.4.3)
 
-  '@tilde/harness-sdk@file:../../packages/core':
-    dependencies:
-      openapi-fetch: 0.14.1
+  '@tilde/harness-sdk@file:../../packages/core': {}
 
   '@types/node@24.13.1':
     dependencies:
@@ -728,12 +725,6 @@ snapshots:
     transitivePeerDependencies:
       - '@babel/core'
       - babel-plugin-macros
-
-  openapi-fetch@0.14.1:
-    dependencies:
-      openapi-typescript-helpers: 0.0.15
-
-  openapi-typescript-helpers@0.0.15: {}
 
   picocolors@1.1.1: {}
 

@@ -5,7 +5,7 @@ TypeScript SDK monorepo for Tilde Harness APIs.
 ## Rules
 
 - Use `pnpm`.
-- Public packages are `@tilde/harness-sdk` and `@tilde/harness-sdk-vercel`.
+- Public packages are `@tilde/harness-sdk`, `@tilde/harness-sdk-react`, `@tilde/harness-sdk-vercel-ai-node`, and `@tilde/harness-sdk-vercel-ai-react`.
 - Public helper names should be concise: `createClient`, `createConfig`, `chatKitEndpoint`.
 - Do not add public names like `createTildeClient`, `createTildeConfig`, or `createTildeVercelAiSdkHandler`.
 - Generated OpenAPI files must not be manually edited.
