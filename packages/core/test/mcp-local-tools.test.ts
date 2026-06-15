@@ -184,6 +184,32 @@ describe("local MCP tools wrapper", () => {
     });
   });
 
+  it("returns local SEARCH_TOOLS results without a remote client", async () => {
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: {},
+      serverId: "server_1",
+      tools: [localEchoTool()],
+    });
+
+    await expect(
+      wrapped.callTool(SEARCH_TOOLS_NAME, {
+        use_case: "echo value locally",
+        include_schemas: true,
+      }),
+    ).resolves.toMatchObject({
+      recommended_tool: {
+        tool_name: "LOCAL_ECHO",
+        toolkit: "local",
+      },
+      tools: [
+        {
+          tool_name: "LOCAL_ECHO",
+          input_schema: localEchoTool().inputSchema,
+        },
+      ],
+    });
+  });
+
   it("merges local schemas into GET_TOOL_SCHEMAS results", async () => {
     const callTool = vi.fn(async (name: string, input?: Record<string, unknown>) => {
       expect(name).toBe(GET_TOOL_SCHEMAS_NAME);
@@ -218,6 +244,57 @@ describe("local MCP tools wrapper", () => {
         {
           tool_name: "LOCAL_ECHO",
           toolkit: "local",
+          input_schema: localEchoTool().inputSchema,
+        },
+      ],
+    });
+  });
+
+  it("returns local GET_TOOL_SCHEMAS results without a remote client", async () => {
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: {},
+      serverId: "server_1",
+      tools: [localEchoTool()],
+    });
+
+    await expect(
+      wrapped.callTool(GET_TOOL_SCHEMAS_NAME, {
+        tool_names: ["LOCAL_ECHO"],
+      }),
+    ).resolves.toEqual({
+      tools: [
+        {
+          tool_name: "LOCAL_ECHO",
+          toolkit: "local",
+          description: "Echo local input.",
+          input_schema: localEchoTool().inputSchema,
+          output_schema: { type: "object" },
+          input_schema_summary: "Fields: value",
+          output_schema_summary: "Object schema",
+        },
+      ],
+    });
+  });
+
+  it("uses registerLocalTools hook when the MCP client has no raw request method", async () => {
+    const registerLocalTools = vi.fn(async () => ({ registered: ["LOCAL_ECHO"] }));
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: {
+        tools: async () => ({}),
+      },
+      serverId: "server_1",
+      tools: [localEchoTool()],
+      registerWithServer: true,
+      registerLocalTools,
+    });
+
+    await wrapped.tools();
+
+    expect(registerLocalTools).toHaveBeenCalledWith({
+      tools: [
+        {
+          name: "LOCAL_ECHO",
+          description: "Echo local input.",
           input_schema: localEchoTool().inputSchema,
         },
       ],
@@ -333,6 +410,70 @@ describe("local MCP tools wrapper", () => {
           success: false,
           error: "remote failed",
         },
+      ],
+    });
+  });
+
+  it("executes local-only MULTI_EXECUTE_TOOL calls without calling remote", async () => {
+    const callTool = vi.fn();
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: { callTool },
+      serverId: "server_1",
+      tools: [localEchoTool()],
+    });
+
+    await expect(
+      wrapped.callTool(MULTI_EXECUTE_TOOL_NAME, {
+        invocations: [
+          { tool_name: "LOCAL_ECHO", parameters: { value: "local" } },
+        ],
+      }),
+    ).resolves.toEqual({
+      results: [
+        {
+          tool_name: "LOCAL_ECHO",
+          success: true,
+          output: { echoed: "local" },
+        },
+      ],
+    });
+    expect(callTool).not.toHaveBeenCalled();
+  });
+
+  it("forwards remote-only MULTI_EXECUTE_TOOL calls unchanged", async () => {
+    const callTool = vi.fn(async () => ({
+      results: [
+        {
+          tool_name: "REMOTE_ONE",
+          success: true,
+          output: { remote: true },
+        },
+      ],
+    }));
+    const wrapped = wrapMcpClientWithLocalTools({
+      client: { callTool },
+      serverId: "server_1",
+      tools: [localEchoTool()],
+    });
+
+    await expect(
+      wrapped.callTool(MULTI_EXECUTE_TOOL_NAME, {
+        invocations: [
+          { tool_name: "REMOTE_ONE", parameters: { q: "remote" } },
+        ],
+      }),
+    ).resolves.toEqual({
+      results: [
+        {
+          tool_name: "REMOTE_ONE",
+          success: true,
+          output: { remote: true },
+        },
+      ],
+    });
+    expect(callTool).toHaveBeenCalledWith(MULTI_EXECUTE_TOOL_NAME, {
+      invocations: [
+        { tool_name: "REMOTE_ONE", parameters: { q: "remote" } },
       ],
     });
   });
