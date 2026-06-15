@@ -30,6 +30,27 @@ describe("createConfig", () => {
     expect(config.baseUrl).toBe("https://org-example.api.staging.trytilde.com");
   });
 
+  it("rejects orgId values that cannot be used as a hostname label", () => {
+    const invalidOrgIds = [
+      "org example",
+      "org/example",
+      "-org-example",
+      "org-example-",
+      "org.example",
+    ];
+
+    for (const orgId of invalidOrgIds) {
+      expect(() =>
+        createConfig({
+          orgId,
+          teamId: "team_123",
+        }),
+      ).toThrow(
+        "orgId must be a valid hostname label using letters, numbers, or hyphens",
+      );
+    }
+  });
+
   it("derives org baseUrl from TILDE_BASE_API_URL", () => {
     const previous = process.env.TILDE_BASE_API_URL;
     process.env.TILDE_BASE_API_URL = "https://api.env.trytilde.com";

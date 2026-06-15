@@ -69,9 +69,22 @@ function baseUrlFromOrgId(
   if (!orgId || orgId.trim().length === 0) {
     return undefined;
   }
+  const normalizedOrgId = orgId.trim();
+  if (!isValidHostnameLabel(normalizedOrgId)) {
+    throw new TypeError(
+      "orgId must be a valid hostname label using letters, numbers, or hyphens",
+    );
+  }
   const apiUrl = new URL(baseApiUrl(configuredBaseApiUrl));
-  apiUrl.hostname = `${orgId.trim()}.${apiUrl.hostname}`;
+  apiUrl.hostname = `${normalizedOrgId}.${apiUrl.hostname}`;
   return apiUrl.toString();
+}
+
+function isValidHostnameLabel(value: string): boolean {
+  return (
+    value.length <= 63 &&
+    /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(value)
+  );
 }
 
 function baseApiUrl(configuredBaseApiUrl: string | undefined): string {
