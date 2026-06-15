@@ -39,7 +39,9 @@ export type LocalMcpToolWrapperOptions<TClient extends object> = {
   serverId: string;
   tools: LocalMcpTool[];
   registerWithServer?: boolean;
-  registerLocalTools?: (request: RegisterLocalMcpToolsRequest) => Promise<unknown>;
+  registerLocalTools?: (
+    request: RegisterLocalMcpToolsRequest,
+  ) => Promise<unknown>;
 };
 
 export type ToolInvocationRequest = {
@@ -152,12 +154,14 @@ export function wrapMcpClientWithLocalTools<TClient extends object>(
     if (!options.registerWithServer) {
       return;
     }
-    registrationPromise ??= registerLocalToolsWithServer(options, client, localTools).catch(
-      (error: unknown) => {
-        registrationPromise = undefined;
-        throw error;
-      },
-    );
+    registrationPromise ??= registerLocalToolsWithServer(
+      options,
+      client,
+      localTools,
+    ).catch((error: unknown) => {
+      registrationPromise = undefined;
+      throw error;
+    });
     await registrationPromise;
   };
 
@@ -415,7 +419,9 @@ async function routeGetToolSchemas(
   callRemoteTool: (name: string, input?: JsonObject) => Promise<unknown>,
 ): Promise<JsonObject> {
   const toolNames = parseToolNames(input);
-  const localByName = new Map(localTools.map((entry) => [entry.key, entry.tool]));
+  const localByName = new Map(
+    localTools.map((entry) => [entry.key, entry.tool]),
+  );
   const localSchemas = toolNames
     .map((name) => localByName.get(normalizeToolName(name)))
     .filter((tool): tool is LocalMcpTool => tool !== undefined)
@@ -471,7 +477,9 @@ function parseToolNames(input: JsonObject | undefined): string[] {
   }
   return toolNames.map((name, index) => {
     if (typeof name !== "string" || name.length === 0) {
-      throw new TypeError(`GET_TOOL_SCHEMAS tool_names[${index}] must be a string`);
+      throw new TypeError(
+        `GET_TOOL_SCHEMAS tool_names[${index}] must be a string`,
+      );
     }
     return name;
   });
@@ -501,15 +509,12 @@ function normalizeSearchToolsResult(value: unknown): {
     confidence: number;
   } = {
     ...result,
-    tools: Array.isArray(result.tools)
-      ? result.tools.filter(isJsonObject)
-      : [],
+    tools: Array.isArray(result.tools) ? result.tools.filter(isJsonObject) : [],
     recommended_plan_steps: Array.isArray(result.recommended_plan_steps)
       ? result.recommended_plan_steps
       : [],
     next_steps: Array.isArray(result.next_steps) ? result.next_steps : [],
-    confidence:
-      typeof result.confidence === "number" ? result.confidence : 0,
+    confidence: typeof result.confidence === "number" ? result.confidence : 0,
   };
   if (isJsonObject(result.recommended_tool)) {
     normalized.recommended_tool = result.recommended_tool;
@@ -517,7 +522,9 @@ function normalizeSearchToolsResult(value: unknown): {
   return normalized;
 }
 
-function normalizeGetToolSchemasResult(value: unknown): { tools: JsonObject[] } {
+function normalizeGetToolSchemasResult(value: unknown): {
+  tools: JsonObject[];
+} {
   const result = unwrapStructuredResult(value);
   if (!isJsonObject(result) || !Array.isArray(result.tools)) {
     return { tools: [] };
@@ -601,10 +608,14 @@ function summarizeSchema(schema: JsonObject): string {
     ? Object.keys(schema.properties).slice(0, 6)
     : [];
   const required = Array.isArray(schema.required)
-    ? schema.required.filter((value): value is string => typeof value === "string")
+    ? schema.required.filter(
+        (value): value is string => typeof value === "string",
+      )
     : [];
   const fields =
-    properties.length > 0 ? `Fields: ${properties.join(", ")}` : "Object schema";
+    properties.length > 0
+      ? `Fields: ${properties.join(", ")}`
+      : "Object schema";
   return required.length > 0
     ? `${fields}. Required: ${required.join(", ")}`
     : fields;

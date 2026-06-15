@@ -259,7 +259,9 @@ describe("local MCP tools wrapper", () => {
         tool_name: "LOCAL_ECHO",
       },
     });
-    expect((result as { tools: Array<{ tool_name: string; score: number }> }).tools).toEqual(
+    expect(
+      (result as { tools: Array<{ tool_name: string; score: number }> }).tools,
+    ).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ tool_name: "CLIENT_CALENDAR", score: 0 }),
       ]),
@@ -267,23 +269,25 @@ describe("local MCP tools wrapper", () => {
   });
 
   it("merges local schemas into GET_TOOL_SCHEMAS results", async () => {
-    const callTool = vi.fn(async (name: string, input?: Record<string, unknown>) => {
-      expect(name).toBe(GET_TOOL_SCHEMAS_NAME);
-      expect(input).toMatchObject({ tool_names: ["REMOTE_SEARCH"] });
-      return {
-        tools: [
-          {
-            tool_name: "REMOTE_SEARCH",
-            toolkit: "remote",
-            description: "Remote search.",
-            input_schema: { type: "object" },
-            output_schema: { type: "object" },
-            input_schema_summary: "Object schema",
-            output_schema_summary: "Object schema",
-          },
-        ],
-      };
-    });
+    const callTool = vi.fn(
+      async (name: string, input?: Record<string, unknown>) => {
+        expect(name).toBe(GET_TOOL_SCHEMAS_NAME);
+        expect(input).toMatchObject({ tool_names: ["REMOTE_SEARCH"] });
+        return {
+          tools: [
+            {
+              tool_name: "REMOTE_SEARCH",
+              toolkit: "remote",
+              description: "Remote search.",
+              input_schema: { type: "object" },
+              output_schema: { type: "object" },
+              input_schema_summary: "Object schema",
+              output_schema_summary: "Object schema",
+            },
+          ],
+        };
+      },
+    );
     const wrapped = wrapMcpClientWithLocalTools({
       client: { callTool },
       serverId: "server_1",
@@ -362,7 +366,9 @@ describe("local MCP tools wrapper", () => {
   });
 
   it("uses registerLocalTools hook when the MCP client has no raw request method", async () => {
-    const registerLocalTools = vi.fn(async () => ({ registered: ["LOCAL_ECHO"] }));
+    const registerLocalTools = vi.fn(async () => ({
+      registered: ["LOCAL_ECHO"],
+    }));
     const wrapped = wrapMcpClientWithLocalTools({
       client: {
         tools: async () => ({}),
@@ -543,9 +549,7 @@ describe("local MCP tools wrapper", () => {
 
     await expect(
       wrapped.callTool(MULTI_EXECUTE_TOOL_NAME, {
-        invocations: [
-          { tool_name: "REMOTE_ONE", parameters: { q: "remote" } },
-        ],
+        invocations: [{ tool_name: "REMOTE_ONE", parameters: { q: "remote" } }],
       }),
     ).resolves.toEqual({
       results: [
@@ -557,9 +561,7 @@ describe("local MCP tools wrapper", () => {
       ],
     });
     expect(callTool).toHaveBeenCalledWith(MULTI_EXECUTE_TOOL_NAME, {
-      invocations: [
-        { tool_name: "REMOTE_ONE", parameters: { q: "remote" } },
-      ],
+      invocations: [{ tool_name: "REMOTE_ONE", parameters: { q: "remote" } }],
     });
   });
 
@@ -593,10 +595,7 @@ describe("local MCP tools wrapper", () => {
     });
 
     const resultPromise = wrapped.callTool(MULTI_EXECUTE_TOOL_NAME, {
-      invocations: [
-        { tool_name: "LOCAL_ECHO" },
-        { tool_name: "REMOTE_ONE" },
-      ],
+      invocations: [{ tool_name: "LOCAL_ECHO" }, { tool_name: "REMOTE_ONE" }],
     });
     await expect.poll(() => localStarted.mock.calls.length).toBe(1);
     await expect.poll(() => callTool.mock.calls.length).toBe(1);
