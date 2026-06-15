@@ -1,9 +1,4 @@
-import {
-  type Client,
-  type Config,
-  createClient,
-  createConfig,
-} from "@tilde/harness-sdk";
+import { type Client, type Config, createClient } from "@tilde/harness-sdk";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 
 const TildeContext = createContext<Client | null>(null);
@@ -26,7 +21,7 @@ export function TildeProvider({
     if (!config) {
       throw new TypeError("TildeProvider requires client or config");
     }
-    return createClient(createConfig(config));
+    return createClient(config);
   }, [client, config]);
 
   return (

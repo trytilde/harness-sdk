@@ -117,6 +117,39 @@ describe("MCP client", () => {
     });
   });
 
+  it("does not inject bearer auth when x-api-key is explicit", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = new Headers(init?.headers);
+        expect(headers.get("x-api-key")).toBe("test-key");
+        expect(headers.has("Authorization")).toBe(false);
+
+        return Response.json({
+          id: "server_1",
+          name: "Server 1",
+          team_id: "team_123",
+          is_dynamic_tool_discovery: false,
+          tools: [],
+        });
+      },
+    );
+
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      teamId: "team_123",
+      apiKey: "test-key",
+      headers: {
+        "x-api-key": "test-key",
+      },
+      fetch: fetchMock as typeof fetch,
+    });
+
+    await client.mcp.createServer({
+      id: "server_1",
+      name: "Server 1",
+    });
+  });
+
   it("throws ApiError for non-2xx responses", async () => {
     const client = createClient({
       baseUrl: "https://api.example.test",

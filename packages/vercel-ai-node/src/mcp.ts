@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   createMCPClient as createVercelMCPClient,
   type MCPClient,
@@ -70,13 +71,14 @@ function toLocalTool(name: string, value: unknown): LocalMcpTool {
   if (typeof tool.execute !== "function") {
     throw new TypeError(`Local MCP tool requires execute: ${name}`);
   }
+  const execute = tool.execute;
   const localTool: LocalMcpTool = {
     name,
     description: tool.description ?? name,
     inputSchema: tool.inputSchema as JsonObject,
     async execute(input, _context) {
-      return tool.execute?.(input, {
-        toolCallId: `${name}-local`,
+      return execute(input, {
+        toolCallId: `${name}-${randomUUID()}`,
         messages: [],
         abortSignal: new AbortController().signal,
       });

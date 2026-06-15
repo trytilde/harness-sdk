@@ -1,4 +1,5 @@
 import { createClient } from "@tilde/harness-sdk";
+import type { ToolExecutionOptions } from "ai";
 import { jsonSchema, tool } from "ai";
 import { describe, expect, it, vi } from "vitest";
 import { createMCPClient } from "../src";
@@ -71,6 +72,9 @@ describe("createMCPClient", () => {
       teamId: "team_123",
       apiKey: "tilde-key",
     });
+    const execute = vi.fn(async (input: { value?: string }) => ({
+      echoed: input.value,
+    }));
     const example = tool({
       description: "Echo input",
       inputSchema: jsonSchema<{ value?: string }>({
@@ -79,9 +83,7 @@ describe("createMCPClient", () => {
           value: { type: "string" },
         },
       }),
-      async execute(input: { value?: string }) {
-        return { echoed: input.value };
-      },
+      execute,
     });
 
     const mcp = await createMCPClient({
@@ -95,6 +97,17 @@ describe("createMCPClient", () => {
     await expect(mcp.callTool("example", { value: "hello" })).resolves.toEqual({
       echoed: "hello",
     });
+    await expect(mcp.callTool("example", { value: "again" })).resolves.toEqual({
+      echoed: "again",
+    });
+    const calls = execute.mock.calls as unknown as Array<
+      [input: { value?: string }, options: ToolExecutionOptions]
+    >;
+    const firstOptions = calls[0]?.[1];
+    const secondOptions = calls[1]?.[1];
+    expect(firstOptions?.toolCallId).toMatch(/^example-/);
+    expect(secondOptions?.toolCallId).toMatch(/^example-/);
+    expect(firstOptions?.toolCallId).not.toBe(secondOptions?.toolCallId);
     await expect(mcp.tools()).resolves.toMatchObject({
       REMOTE_SEARCH: { description: "Remote search" },
       example: { description: "Echo input" },

@@ -39,7 +39,6 @@ export function createE2EClient(): Client {
     ...env,
     headers: {
       "x-api-key": env.apiKey,
-      Authorization: "",
     },
   });
 }

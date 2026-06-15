@@ -7,6 +7,7 @@ run_id="${TILDE_RUN_ID:-sdk-e2e-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
 run_dir="$api_dir/.tilde-runs/$run_id"
 manifest_path="$run_dir/manifest.json"
 credentials_path="$api_dir/.tilde-test-credentials.json"
+node_extra_ca_certs="$api_dir/dev/certs/public/rootCA.pem"
 backend_pid=""
 
 cleanup() {
@@ -22,11 +23,16 @@ if [[ ! -d "$api_dir" ]]; then
 	echo "Error: TILDE_API_DIR does not exist: $api_dir"
 	exit 1
 fi
+if [[ ! -f "$node_extra_ca_certs" ]]; then
+	echo "Error: dev-agent public root CA not found: $node_extra_ca_certs"
+	echo "Run make dev-certs in $api_dir first."
+	exit 1
+fi
 
 rm -f "$credentials_path"
 
 echo "Starting tilde-api dev-agent with TILDE_RUN_ID=$run_id"
-setsid bash -c 'cd "$1"; TILDE_RUN_ID="$2" make dev-agent' bash "$api_dir" "$run_id" &
+setsid bash -c 'cd "$1"; RUSTC_WRAPPER="${RUSTC_WRAPPER:-}" TILDE_RUN_ID="$2" make dev-agent' bash "$api_dir" "$run_id" &
 backend_pid="$!"
 
 for _ in {1..180}; do
@@ -72,22 +78,16 @@ PY
 	sleep 1
 done
 
-eval "$(
+IFS=$'\t' read -r e2e_org_id e2e_team_id e2e_api_key < <(
 	python3 - "$credentials_path" <<'PY'
 import json
-import shlex
 import sys
 
 with open(sys.argv[1], encoding="utf-8") as f:
     sdk = json.load(f)["sdk_e2e"]
-for key, value in {
-    "TILDE_E2E_ORG_ID": sdk["org_id"],
-    "TILDE_E2E_TEAM_ID": sdk["team_id"],
-    "TILDE_E2E_API_KEY": sdk["api_key"],
-}.items():
-    print(f"export {key}={shlex.quote(value)}")
+print(f"{sdk['org_id']}\t{sdk['team_id']}\t{sdk['api_key']}")
 PY
-)"
+)
 
 echo "Waiting for API readiness at $api_origin"
 for _ in {1..180}; do
@@ -104,8 +104,8 @@ done
 
 TILDE_E2E=1 \
 	TILDE_E2E_BASE_URL="$api_origin" \
-	TILDE_E2E_ORG_ID="$TILDE_E2E_ORG_ID" \
-	TILDE_E2E_TEAM_ID="$TILDE_E2E_TEAM_ID" \
-	TILDE_E2E_API_KEY="$TILDE_E2E_API_KEY" \
-	NODE_TLS_REJECT_UNAUTHORIZED=0 \
+	TILDE_E2E_ORG_ID="$e2e_org_id" \
+	TILDE_E2E_TEAM_ID="$e2e_team_id" \
+	TILDE_E2E_API_KEY="$e2e_api_key" \
+	NODE_EXTRA_CA_CERTS="$node_extra_ca_certs" \
 	pnpm --dir "$repo_root" test:e2e

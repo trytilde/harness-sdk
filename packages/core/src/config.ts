@@ -45,7 +45,8 @@ export function createConfig(input: Config): NormalizedConfig {
 export function configHeaders(config: Config): Headers {
   const headers = new Headers(config.headers);
   const token = config.bearerToken ?? config.apiKey;
-  if (token && !headers.has("Authorization")) {
+  const hasExplicitApiKeyHeader = headers.has("x-api-key");
+  if (token && !headers.has("Authorization") && !hasExplicitApiKeyHeader) {
     headers.set("Authorization", `Bearer ${token}`);
   }
   return headers;
