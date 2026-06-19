@@ -6,6 +6,7 @@ export const maxDuration = 60;
 export const POST = chatKitEndpoint({
   webhookSigningKey: process.env.TILDE_CHATKIT_WEBHOOK_SIGNING_KEY || "",
   async handler(_request, context) {
+    await context.session.history({ pageSize: 25 });
     return runAgent(context.body as AgentRequestBody);
   },
 });

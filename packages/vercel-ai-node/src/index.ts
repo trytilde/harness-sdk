@@ -7,6 +7,9 @@ export {
 export {
   type ChatKitEndpointContext,
   type ChatKitEndpointOptions,
+  type ChatKitSessionClient,
+  type ChatKitSessionHistory,
+  type ChatKitSessionHistoryOptions,
   chatKitEndpoint,
 } from "./handler";
 export {

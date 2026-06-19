@@ -45,4 +45,6 @@ Set `TILDE_MCP_SERVER_ID` to that server id. Set `MODEL_BASE_URL`,
 `MODEL_API_KEY`, and `MODEL_NAME` for your OpenAI-compatible model provider.
 
 Browser chat posts to `/api/chat`. ChatKit should call `/api/chatkit` with
-Tilde webhook signing headers.
+Tilde webhook signing headers. ChatKit route handlers receive a typed
+`context.session` client; call `context.session.history()` to load paginated
+historical messages for the signed session.
