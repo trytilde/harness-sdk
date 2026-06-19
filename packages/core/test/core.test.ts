@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError, createClient, createConfig } from "../src";
 
+const spawnMock = vi.fn(() => ({
+  killed: false,
+  kill: vi.fn(),
+  once: vi.fn(),
+}));
+
+vi.mock("node:child_process", () => ({
+  spawn: spawnMock,
+}));
+
 describe("createConfig", () => {
   it("normalizes trailing slashes", () => {
     const config = createConfig({
@@ -78,6 +88,18 @@ describe("createConfig", () => {
       }),
     ).toThrow("baseUrl must be an absolute URL");
   });
+
+  it("preserves tunnel and cloudflaredPath", () => {
+    const config = createConfig({
+      baseUrl: "https://api.example.test",
+      teamId: "team_123",
+      tunnel: true,
+      cloudflaredPath: "/usr/local/bin/cloudflared",
+    });
+
+    expect(config.tunnel).toBe(true);
+    expect(config.cloudflaredPath).toBe("/usr/local/bin/cloudflared");
+  });
 });
 
 describe("MCP client", () => {
@@ -89,6 +111,44 @@ describe("MCP client", () => {
 
     expect(client.mcp.getServerUrl({ id: "server/1" })).toBe(
       "https://api.example.test/api/v1/team/team%20123/mcp/mcp-server/server%2F1/mcp",
+    );
+  });
+
+  it("starts cloudflared when tunnel is enabled", async () => {
+    spawnMock.mockClear();
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        expect(String(input)).toBe(
+          "https://api.example.test/api/v1/identity/local-runtime/tunnel-connector",
+        );
+        expect(init?.method).toBe("GET");
+        expect(new Headers(init?.headers).get("x-api-key")).toBe("tunnel-key");
+        return Response.json({
+          tunnel_domain: "user-abc.tunnel.trytilde-dev.com",
+          tunnel_origin: "https://user-abc.tunnel.trytilde-dev.com",
+          cloudflared_token: "cloudflare-token",
+        });
+      },
+    );
+
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      teamId: "team_123",
+      apiKey: "tunnel-key",
+      tunnel: true,
+      cloudflaredPath: "cloudflared-test",
+      fetch: fetchMock as typeof fetch,
+    });
+
+    const tunnel = await client.localRuntimeTunnel;
+
+    expect(tunnel?.connector.tunnel_origin).toBe(
+      "https://user-abc.tunnel.trytilde-dev.com",
+    );
+    expect(spawnMock).toHaveBeenCalledWith(
+      "cloudflared-test",
+      ["tunnel", "run", "--token", "cloudflare-token"],
+      { stdio: "inherit" },
     );
   });
 
