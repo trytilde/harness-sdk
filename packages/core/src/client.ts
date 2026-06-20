@@ -20,7 +20,11 @@ export class Client {
     this.mcp = new McpClient(this.config);
     this.chatkit = new ChatKitClient(this.config, this.messages);
     if (this.config.tunnel) {
-      this.localRuntimeTunnel = startLocalRuntimeTunnel(this.config);
+      const localRuntimeTunnel = startLocalRuntimeTunnel(this.config);
+      localRuntimeTunnel.catch((error) => {
+        console.error("Failed to start local runtime tunnel", error);
+      });
+      this.localRuntimeTunnel = localRuntimeTunnel;
     }
   }
 }

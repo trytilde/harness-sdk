@@ -152,6 +152,33 @@ describe("MCP client", () => {
     );
   });
 
+  it("observes tunnel startup rejections when callers do not await the tunnel promise", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const fetchMock = vi.fn(async () =>
+      Response.json({ message: "bad key" }, { status: 401 }),
+    );
+
+    try {
+      const client = createClient({
+        baseUrl: "https://api.example.test",
+        teamId: "team_123",
+        apiKey: "bad-key",
+        tunnel: true,
+        fetch: fetchMock as typeof fetch,
+      });
+
+      await expect(client.localRuntimeTunnel).rejects.toBeInstanceOf(ApiError);
+      expect(consoleError).toHaveBeenCalledWith(
+        "Failed to start local runtime tunnel",
+        expect.any(ApiError),
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("sends createServer request with auth headers", async () => {
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {

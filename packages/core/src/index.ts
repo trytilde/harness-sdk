@@ -28,5 +28,6 @@ export {
 } from "./tools";
 export type {
   LocalRuntimeTunnelConnector,
+  LocalRuntimeTunnelExit,
   LocalRuntimeTunnelProcess,
 } from "./tunnel";

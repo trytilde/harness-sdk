@@ -9,7 +9,13 @@ export type LocalRuntimeTunnelConnector = {
 
 export type LocalRuntimeTunnelProcess = {
   connector: LocalRuntimeTunnelConnector;
+  closed: Promise<LocalRuntimeTunnelExit>;
   stop: () => void;
+};
+
+export type LocalRuntimeTunnelExit = {
+  code: number | null;
+  signal: string | null;
 };
 
 export async function startLocalRuntimeTunnel(
@@ -33,9 +39,15 @@ export async function startLocalRuntimeTunnel(
   child.once("error", (error) => {
     console.error("Failed to start cloudflared tunnel", error);
   });
+  const closed = new Promise<LocalRuntimeTunnelExit>((resolve) => {
+    child.once("close", (code, signal) => {
+      resolve({ code, signal });
+    });
+  });
 
   return {
     connector,
+    closed,
     stop: () => {
       if (!child.killed) {
         child.kill("SIGTERM");
@@ -64,6 +76,6 @@ async function fetchLocalRuntimeTunnelConnector(
 
 function assertNodeRuntime() {
   if (typeof process === "undefined" || !process.versions?.node) {
-    throw new TypeError("tunnelKey requires a Node.js runtime");
+    throw new TypeError("tunnel requires a Node.js runtime");
   }
 }
