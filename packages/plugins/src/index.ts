@@ -8,6 +8,7 @@ export type TildePluginConfig = {
   apiKey?: string;
   accessToken?: string;
   fetch?: typeof fetch;
+  logger?: Pick<NodeJS.WriteStream, "write">;
 };
 
 export type AgentCli = "claude" | "codex" | "cursor" | "opencode" | "gemini";
@@ -148,9 +149,13 @@ export async function selectTildeSessionResources(
   if (input?.interactive === false) {
     return { mcpServers, skillRegistries };
   }
+  const logger = config.logger ?? process.stderr;
+  logger.write(
+    `Discovered ${teams.length} Tilde team${teams.length === 1 ? "" : "s"}, ${mcpServers.length} MCP server${mcpServers.length === 1 ? "" : "s"}, ${skillRegistries.length} skill registr${skillRegistries.length === 1 ? "y" : "ies"}.\n`,
+  );
   return {
-    mcpServers: await multiSelect("Tilde MCP servers", mcpServers),
-    skillRegistries: await multiSelect("Tilde skill registries", skillRegistries),
+    mcpServers: await multiSelect("Tilde MCP servers", mcpServers, logger),
+    skillRegistries: await multiSelect("Tilde skill registries", skillRegistries, logger),
   };
 }
 
@@ -350,8 +355,12 @@ async function tildeJson<T>(config: TildePluginConfig, path: string): Promise<T>
 async function multiSelect<T extends { label: string }>(
   title: string,
   items: T[],
+  logger: Pick<NodeJS.WriteStream, "write"> = process.stderr,
 ): Promise<T[]> {
-  if (items.length === 0) return [];
+  if (items.length === 0) {
+    logger.write(`No ${title.toLowerCase()} found.\n`);
+    return [];
+  }
   return checkbox<T>({
     message: title,
     choices: items.map((item) => ({
