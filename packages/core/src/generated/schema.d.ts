@@ -285,7 +285,7 @@ export interface paths {
         };
         /**
          * Logout
-         * @description Clears soma access and refresh token cookies and redirects to /
+         * @description Clears tilde access and refresh token cookies and redirects to /
          */
         get: operations["route_logout"];
         put?: never;
