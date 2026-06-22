@@ -252,7 +252,7 @@ describe("Tilde plugin helpers", () => {
     await expect(readFile(join(storeDir, "auth.json"), "utf8")).resolves.toContain("new-token");
   });
 
-  test("uses the well-known desktop OAuth client for interactive auth", async () => {
+  test("uses dynamic client registration for interactive auth", async () => {
     const homeDir = await mkdtemp(join(tmpdir(), "tilde-plugin-desktop-auth-"));
     const opened: string[] = [];
     const originalOpen = process.stderr.write;
@@ -273,9 +273,16 @@ describe("Tilde plugin helpers", () => {
           if (path.includes("/identity/auth/whoami")) {
             return new Response("missing", { status: 401 });
           }
+          if (path.includes("/identity/oauth/register")) {
+            expect(init?.method).toBe("POST");
+            const body = JSON.parse(init?.body as string) as { resource: string; redirect_uris: string[] };
+            expect(body.resource).toBe("https://api.test/mcp");
+            expect(body.redirect_uris[0]).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/callback$/);
+            return json({ client_id: "tilde-dcr-test-client" });
+          }
           if (path.includes("/identity/oauth/token")) {
             const body = init?.body as URLSearchParams;
-            expect(body.get("client_id")).toBe("tilde-desktop");
+            expect(body.get("client_id")).toBe("tilde-dcr-test-client");
             return json({
               access_token: "desktop-access-token",
               refresh_token: "desktop-refresh-token",
@@ -287,7 +294,7 @@ describe("Tilde plugin helpers", () => {
       });
       await waitFor(() => opened.length === 1);
       const url = new URL(opened[0]!);
-      expect(url.searchParams.get("client_id")).toBe("tilde-desktop");
+      expect(url.searchParams.get("client_id")).toBe("tilde-dcr-test-client");
       expect(url.searchParams.get("redirect_uri")).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/callback$/);
       await fetch(url.searchParams.get("redirect_uri")! + `?code=test-code&state=${url.searchParams.get("state")}`);
       await expect(auth).resolves.toBe("desktop-access-token");
