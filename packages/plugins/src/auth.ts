@@ -74,7 +74,7 @@ async function runBrowserPkceAuth(options: DesktopAuthOptions): Promise<TokenSet
 }
 
 async function registerOAuthClient(options: DesktopAuthOptions, redirectUri: string): Promise<{ client_id: string }> {
-  const response = await fetchImpl(options)(new URL("/api/v1/identity/oauth/register", options.baseUrl), {
+  const response = await fetchWithNetworkError(options, "/api/v1/identity/oauth/register", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -104,7 +104,7 @@ async function exchangeCode(
     client_id: input.clientId,
     redirect_uri: input.redirectUri,
   });
-  const response = await fetchImpl(options)(new URL("/api/v1/identity/oauth/token", options.baseUrl), {
+  const response = await fetchWithNetworkError(options, "/api/v1/identity/oauth/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body,
@@ -121,7 +121,7 @@ async function exchangeCode(
 }
 
 async function refreshAccessToken(options: DesktopAuthOptions, refreshToken: string): Promise<TokenSet | null> {
-  const response = await fetchImpl(options)(new URL("/api/v1/identity/auth/refresh", options.baseUrl), {
+  const response = await fetchWithNetworkError(options, "/api/v1/identity/auth/refresh", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ refresh_token: refreshToken }),
@@ -136,7 +136,7 @@ async function refreshAccessToken(options: DesktopAuthOptions, refreshToken: str
 }
 
 async function tokenWorks(options: DesktopAuthOptions, accessToken: string): Promise<boolean> {
-  const response = await fetchImpl(options)(new URL("/api/v1/identity/auth/whoami", options.baseUrl), {
+  const response = await fetchWithNetworkError(options, "/api/v1/identity/auth/whoami", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   return response.ok;
@@ -230,4 +230,29 @@ function base64Url(bytes: Buffer): string {
 
 function fetchImpl(options: DesktopAuthOptions): typeof fetch {
   return options.fetch ?? fetch;
+}
+
+async function fetchWithNetworkError(
+  options: DesktopAuthOptions,
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const url = new URL(path, options.baseUrl);
+  try {
+    return await fetchImpl(options)(url, init);
+  } catch (error) {
+    throw new Error(`Tilde auth request failed before HTTP response for ${url.toString()}: ${formatFetchError(error)}`);
+  }
+}
+
+function formatFetchError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = error.cause;
+  if (cause instanceof Error) {
+    const code = "code" in cause ? ` ${(cause as { code?: string }).code}` : "";
+    const address = "address" in cause ? ` ${(cause as { address?: string }).address}` : "";
+    const port = "port" in cause ? `:${(cause as { port?: number }).port}` : "";
+    return `${error.message}; caused by ${cause.message}${code}${address}${port}`;
+  }
+  return error.message;
 }

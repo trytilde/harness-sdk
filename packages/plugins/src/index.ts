@@ -334,7 +334,13 @@ async function tildeJson<T>(config: TildePluginConfig, path: string): Promise<T>
   const init: RequestInit = token
     ? { headers: { Authorization: `Bearer ${token}` } }
     : {};
-  const response = await fetchImpl(new URL(path, config.baseUrl), init);
+  const url = new URL(path, config.baseUrl);
+  let response: Response;
+  try {
+    response = await fetchImpl(url, init);
+  } catch (error) {
+    throw new Error(`Tilde request failed before HTTP response for ${url.toString()}: ${formatFetchError(error)}`);
+  }
   if (!response.ok) {
     throw new Error(`Tilde request failed ${response.status}: ${await response.text()}`);
   }
@@ -364,4 +370,16 @@ function toSkillMarkdown(skill: RawSkill, registry?: TildeSkillRegistryChoice): 
     ? `\n<!-- tilde-registry-id: ${registry.id} -->\n<!-- tilde-registry-label: ${registry.label} -->\n`
     : "";
   return `---\nname: ${skill.name}\ndescription: ${skill.description}\n---\n${metadata}\n${skill.content.trim()}\n`;
+}
+
+function formatFetchError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = error.cause;
+  if (cause instanceof Error) {
+    const code = "code" in cause ? ` ${(cause as { code?: string }).code}` : "";
+    const address = "address" in cause ? ` ${(cause as { address?: string }).address}` : "";
+    const port = "port" in cause ? `:${(cause as { port?: number }).port}` : "";
+    return `${error.message}; caused by ${cause.message}${code}${address}${port}`;
+  }
+  return error.message;
 }
