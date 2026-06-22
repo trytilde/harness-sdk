@@ -1,0 +1,38 @@
+{
+  "name": "@tilde/harness-plugins",
+  "version": "0.0.0",
+  "description": "Plugin/session-start helpers for enabling Tilde MCP servers and skill registries in local coding agents.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "tilde-session": "./dist/cli.js",
+    "tilde-claude": "./dist/cli.js",
+    "tilde-codex": "./dist/cli.js",
+    "tilde-cursor": "./dist/cli.js",
+    "tilde-opencode": "./dist/cli.js",
+    "tilde-gemini": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    ".codex-plugin",
+    ".claude-plugin",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "vite build && chmod +x dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config ../../vitest.config.ts"
+  },
+  "dependencies": {
+    "@inquirer/checkbox": "^5.2.1",
+    "@tilde/harness-sdk": "workspace:*"
+  }
+}

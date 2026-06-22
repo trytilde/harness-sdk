@@ -1,0 +1,14 @@
+{
+  "name": "tilde",
+  "displayName": "Tilde",
+  "description": "Configure Tilde MCP servers and skill registries before starting local agent CLIs.",
+  "version": "0.0.0",
+  "commands": {
+    "session": "tilde-session",
+    "claude": "tilde-claude",
+    "codex": "tilde-codex",
+    "cursor": "tilde-cursor",
+    "opencode": "tilde-opencode",
+    "gemini": "tilde-gemini"
+  }
+}
