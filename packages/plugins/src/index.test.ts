@@ -252,6 +252,50 @@ describe("Tilde plugin helpers", () => {
     await expect(readFile(join(storeDir, "auth.json"), "utf8")).resolves.toContain("new-token");
   });
 
+  test("uses the well-known desktop OAuth client for interactive auth", async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), "tilde-plugin-desktop-auth-"));
+    const opened: string[] = [];
+    const originalOpen = process.stderr.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      const text = chunk.toString();
+      if (text.startsWith("Opening browser for Tilde auth: ")) {
+        opened.push(text.slice("Opening browser for Tilde auth: ".length).trim());
+      }
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      const auth = ensureDesktopAuth({
+        baseUrl: "https://api.test",
+        homeDir,
+        interactive: true,
+        fetch: async (url: URL | RequestInfo, init?: RequestInit) => {
+          const path = url.toString();
+          if (path.includes("/identity/auth/whoami")) {
+            return new Response("missing", { status: 401 });
+          }
+          if (path.includes("/identity/oauth/token")) {
+            const body = init?.body as URLSearchParams;
+            expect(body.get("client_id")).toBe("tilde-desktop");
+            return json({
+              access_token: "desktop-access-token",
+              refresh_token: "desktop-refresh-token",
+              expires_in: 3600,
+            });
+          }
+          throw new Error(`Unexpected request ${path}`);
+        },
+      });
+      await waitFor(() => opened.length === 1);
+      const url = new URL(opened[0]!);
+      expect(url.searchParams.get("client_id")).toBe("tilde-desktop");
+      expect(url.searchParams.get("redirect_uri")).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/callback$/);
+      await fetch(url.searchParams.get("redirect_uri")! + `?code=test-code&state=${url.searchParams.get("state")}`);
+      await expect(auth).resolves.toBe("desktop-access-token");
+    } finally {
+      process.stderr.write = originalOpen;
+    }
+  });
+
   test("parses configure-only and wrapper CLI invocations", () => {
     expect(inferCliFromExecutable("/usr/local/bin/tilde-codex")).toBe("codex");
     expect(defaultCommandForCli("claude")).toBe("claude");
@@ -298,4 +342,12 @@ function json(body: unknown): Response {
     status: 200,
     headers: { "content-type": "application/json" },
   });
+}
+
+async function waitFor(predicate: () => boolean): Promise<void> {
+  const deadline = Date.now() + 1_000;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error("Timed out waiting for predicate");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }

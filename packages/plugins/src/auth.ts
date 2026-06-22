@@ -21,6 +21,8 @@ type TokenStore = {
   tokens?: Record<string, TokenSet>;
 };
 
+const desktopClientId = "tilde-desktop";
+
 export async function ensureDesktopAuth(options: DesktopAuthOptions): Promise<string> {
   const stored = await readToken(options);
   if (stored?.access_token && await tokenWorks(options, stored.access_token)) {
@@ -48,10 +50,9 @@ async function runBrowserPkceAuth(options: DesktopAuthOptions): Promise<TokenSet
   const callback = await createCallbackServer(state);
   const redirectUri = `http://127.0.0.1:${callback.port}/callback`;
   try {
-    const client = await registerOAuthClient(options, redirectUri);
     const authorizeUrl = new URL("/api/v1/identity/oauth/authorize", options.baseUrl);
     authorizeUrl.searchParams.set("response_type", "code");
-    authorizeUrl.searchParams.set("client_id", client.client_id);
+    authorizeUrl.searchParams.set("client_id", desktopClientId);
     authorizeUrl.searchParams.set("redirect_uri", redirectUri);
     authorizeUrl.searchParams.set("scope", "mcp:tools");
     authorizeUrl.searchParams.set("state", state);
@@ -64,33 +65,13 @@ async function runBrowserPkceAuth(options: DesktopAuthOptions): Promise<TokenSet
     const token = await exchangeCode(options, {
       code,
       codeVerifier,
-      clientId: client.client_id,
+      clientId: desktopClientId,
       redirectUri,
     });
     return token;
   } finally {
     await callback.close();
   }
-}
-
-async function registerOAuthClient(options: DesktopAuthOptions, redirectUri: string): Promise<{ client_id: string }> {
-  const response = await fetchWithNetworkError(options, "/api/v1/identity/oauth/register", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      client_name: "Tilde Harness Plugins",
-      redirect_uris: [redirectUri],
-      grant_types: ["authorization_code", "refresh_token"],
-      response_types: ["code"],
-      scope: "mcp:tools",
-      token_endpoint_auth_method: "none",
-      resource: new URL("/mcp", options.baseUrl).toString(),
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(`OAuth client registration failed ${response.status}: ${await response.text()}`);
-  }
-  return response.json() as Promise<{ client_id: string }>;
 }
 
 async function exchangeCode(
