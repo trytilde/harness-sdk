@@ -131,7 +131,7 @@ async function main() {
   );
 
   process.stderr.write(
-    `Tilde session configured for ${options.cli}\nMCP config: ${result.mcpConfigPath}\nSkills installed: ${result.skillFiles.length}\n`,
+    `Tilde session configured for ${options.cli}\nMCP config: ${result.mcpConfigPath}\nMCP servers enabled: ${result.mcpServerCount}\nSkills installed: ${result.skillFiles.length}\n`,
   );
 
   if (!options.launch) return;

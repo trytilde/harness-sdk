@@ -55,10 +55,10 @@ describe("Tilde plugin helpers", () => {
         });
       }
       if (path.includes("/team/team-a/mcp/mcp-server")) {
-        return json({ items: [{ id: "server-a", name: "Main", url: "https://mcp-a.test" }] });
+        return json({ items: [{ id: "server-a", name: "Main" }] });
       }
       if (path.includes("/team/team-b/mcp/mcp-server")) {
-        return json({ items: [{ id: "server-b", name: "Labs", url: "https://mcp-b.test" }] });
+        return json({ items: [{ id: "server-b", name: "Labs" }] });
       }
       if (path.includes("/team/team-a/skill-registry")) {
         return json({ items: [{ id: "registry-a", name: "Core Skills" }] });
@@ -75,8 +75,18 @@ describe("Tilde plugin helpers", () => {
       { teamId: "team-b", teamName: "Research", orgId: "org-a" },
     ]);
     await expect(listTildeMcpServerChoices(config)).resolves.toMatchObject([
-      { id: "server-a", teamId: "team-a", label: "Platform / Main" },
-      { id: "server-b", teamId: "team-b", label: "Research / Labs" },
+      {
+        id: "server-a",
+        teamId: "team-a",
+        label: "Platform / Main",
+        url: "https://api.test/api/v1/team/team-a/mcp/mcp-server/server-a/mcp",
+      },
+      {
+        id: "server-b",
+        teamId: "team-b",
+        label: "Research / Labs",
+        url: "https://api.test/api/v1/team/team-b/mcp/mcp-server/server-b/mcp",
+      },
     ]);
     await expect(listTildeSkillRegistryChoices(config)).resolves.toMatchObject([
       { id: "registry-a", teamId: "team-a", label: "Platform / Core Skills" },
@@ -187,7 +197,7 @@ describe("Tilde plugin helpers", () => {
       const fetch = async (url: URL | RequestInfo) => {
         const path = url.toString();
         if (path.includes("/mcp/mcp-server")) {
-          return json({ items: [{ id: "server-a", name: "Main", url: "https://mcp.test" }] });
+          return json({ items: [{ id: "server-a", name: "Main" }] });
         }
         if (path.includes("/skill-registry?")) {
           return json({ items: [{ id: "registry-a", name: "Skills" }] });
@@ -212,7 +222,9 @@ describe("Tilde plugin helpers", () => {
       });
       expect(result.mcpConfigPath).toBe(cliMcpConfigPath(cli, homeDir));
       expect(result.skillFiles).toHaveLength(1);
-      await expect(readFile(result.mcpConfigPath, "utf8")).resolves.toContain("Platform / Main");
+      const mcpConfig = await readFile(result.mcpConfigPath, "utf8");
+      expect(mcpConfig).toContain("Platform / Main");
+      expect(mcpConfig).toContain("https://api.test/api/v1/team/team-a/mcp/mcp-server/server-a/mcp");
       expect(result.skillFiles[0]).toContain(cliSkillInstallDir(cli, homeDir));
     },
   );

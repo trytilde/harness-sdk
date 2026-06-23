@@ -106,7 +106,7 @@ export async function listTildeMcpServerChoices(
       teamId: team.teamId,
       teamName: team.teamName,
       label: `${team.teamName} / ${server.name}`,
-      ...(server.url ? { url: server.url } : {}),
+      url: server.url ?? mcpServerEndpointUrl(config.baseUrl, team.teamId, server.id),
     }));
   }));
   return results.flat();
@@ -307,7 +307,7 @@ export async function configureTildeSessionForCli(
     mcpServers?: TildeMcpServerChoice[];
     skillRegistries?: TildeSkillRegistryChoice[];
   },
-): Promise<{ mcpConfigPath: string; skillFiles: string[] }> {
+): Promise<{ mcpConfigPath: string; mcpServerCount: number; skillFiles: string[] }> {
   const selected =
     input.mcpServers || input.skillRegistries
       ? {
@@ -330,7 +330,7 @@ export async function configureTildeSessionForCli(
       registries: selected.skillRegistries,
     }),
   ]);
-  return { mcpConfigPath, skillFiles };
+  return { mcpConfigPath, mcpServerCount: selected.mcpServers.length, skillFiles };
 }
 
 async function tildeJson<T>(config: TildePluginConfig, path: string): Promise<T> {
@@ -379,6 +379,14 @@ function toSkillMarkdown(skill: RawSkill, registry?: TildeSkillRegistryChoice): 
     ? `\n<!-- tilde-registry-id: ${registry.id} -->\n<!-- tilde-registry-label: ${registry.label} -->\n`
     : "";
   return `---\nname: ${skill.name}\ndescription: ${skill.description}\n---\n${metadata}\n${skill.content.trim()}\n`;
+}
+
+function mcpServerEndpointUrl(baseUrl: string, teamId: string, serverId: string): string {
+  const url = new URL(
+    `/api/v1/team/${encodeURIComponent(teamId)}/mcp/mcp-server/${encodeURIComponent(serverId)}/mcp`,
+    baseUrl,
+  );
+  return url.toString();
 }
 
 function formatFetchError(error: unknown): string {
