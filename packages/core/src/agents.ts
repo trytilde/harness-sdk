@@ -2,8 +2,7 @@ import type { Config } from "./config";
 import { requestJson } from "./internal/fetch-client";
 import { teamPath } from "./internal/paths";
 
-const HOSTED_AGENT_DEPLOYMENTS_PATH =
-  "/api/v1/team/{team_id}/agent/platform-deployments";
+const VERCEL_DEPLOYMENTS_PATH = "/api/v1/team/{team_id}/deployments/vercel";
 
 export type HostedAgentDefinition = {
   id: string;
@@ -58,6 +57,7 @@ export type HostedAgentsDeployment = {
   projectId: string;
   deploymentId: string;
   deploymentUrl: string;
+  protectionBypass?: string;
   productionDomain?: string;
   agents: HostedAgentEndpoint[];
   customTools: HostedCustomToolEndpoint[];
@@ -67,6 +67,7 @@ type RawHostedAgentsDeployment = {
   project_id: string;
   deployment_id: string;
   deployment_url: string;
+  protection_bypass?: string | null;
   production_domain?: string | null;
   agents: HostedAgentEndpoint[];
   custom_tools?: HostedCustomToolEndpoint[];
@@ -112,7 +113,7 @@ export class AgentsClient {
   ): Promise<HostedAgentsDeployment> {
     const raw = await requestJson<RawHostedAgentsDeployment>(this.#config, {
       method: "POST",
-      path: teamPath(this.#config, HOSTED_AGENT_DEPLOYMENTS_PATH),
+      path: teamPath(this.#config, VERCEL_DEPLOYMENTS_PATH),
       body: {
         project_slug: input.projectSlug,
         deployment_name: input.deploymentName,
@@ -129,6 +130,9 @@ export class AgentsClient {
       agents: raw.agents,
       customTools: raw.custom_tools ?? [],
     };
+    if (raw.protection_bypass) {
+      result.protectionBypass = raw.protection_bypass;
+    }
     if (raw.production_domain) {
       result.productionDomain = raw.production_domain;
     }

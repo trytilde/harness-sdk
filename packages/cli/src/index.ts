@@ -160,6 +160,10 @@ async function deploy(options: DeployOptions): Promise<void> {
   });
   const client = createClient(config);
   let deployment = await client.agents.deployHosted(payload);
+  let deploymentUrl = withVercelProtectionBypass(
+    deployment.deploymentUrl,
+    deployment.protectionBypass,
+  );
   console.log(`Deployed ${projectSlug}`);
   console.log(`Deployment: ${deployment.deploymentUrl}`);
   const deployedCustomTools = deployment.customTools ?? [];
@@ -183,7 +187,7 @@ async function deploy(options: DeployOptions): Promise<void> {
     const registration = await client.mcp.createCustomToolProvider({
       displayName: `${projectSlug} custom tools`,
       description: `Custom tools deployed from ${projectSlug}`,
-      discoveryUrl: `${deployment.deploymentUrl}/api/tilde/tools`,
+      discoveryUrl: appendPath(deploymentUrl, "/api/tilde/tools"),
     });
     customToolProvider = {
       toolGroupInstanceId: registration.toolGroupInstanceId,
@@ -211,7 +215,7 @@ async function deploy(options: DeployOptions): Promise<void> {
       const registration = await client.chatkit.registerHttpVercelAiSdkAgent({
         id: `hosted-${agentEndpoint.id}`,
         displayName: agentEndpoint.id,
-        endpointUrl: `${deployment.deploymentUrl}${agentEndpoint.path}`,
+        endpointUrl: appendPath(deploymentUrl, agentEndpoint.path),
         streaming: false,
         timeoutMs: 15000,
       });
@@ -233,6 +237,10 @@ async function deploy(options: DeployOptions): Promise<void> {
     customToolSecrets,
   );
   deployment = await client.agents.deployHosted(redeployPayload);
+  deploymentUrl = withVercelProtectionBypass(
+    deployment.deploymentUrl,
+    deployment.protectionBypass,
+  );
   console.log(`Redeployed ${projectSlug} with runtime secrets`);
 
   if (options.configureChatkit && defaultAgentInboxId) {
@@ -249,7 +257,7 @@ async function deploy(options: DeployOptions): Promise<void> {
     const agentEndpoint = deployment.agents[0];
     if (agentEndpoint) {
       const response = await invokeHostedAgent({
-        endpointUrl: `${deployment.deploymentUrl}${agentEndpoint.path}`,
+        endpointUrl: appendPath(deploymentUrl, agentEndpoint.path),
         secrets: secrets[agentEndpoint.id],
       });
       console.log(`Invocation response: ${response}`);
@@ -266,6 +274,21 @@ async function deploy(options: DeployOptions): Promise<void> {
       );
     }
   }
+}
+
+function withVercelProtectionBypass(url: string, bypass?: string): string {
+  if (!bypass) {
+    return url;
+  }
+  const parsed = new URL(url);
+  parsed.searchParams.set("x-vercel-protection-bypass", bypass);
+  return parsed.toString();
+}
+
+function appendPath(baseUrl: string, pathName: string): string {
+  const parsed = new URL(baseUrl);
+  parsed.pathname = `${parsed.pathname.replace(/\/$/, "")}/${pathName.replace(/^\//, "")}`;
+  return parsed.toString();
 }
 
 async function findConfig(cwd: string): Promise<string> {
@@ -491,10 +514,15 @@ export function GET(request: Request) {
   if (signingKey && !verifyTildeSignature(request, "", signingKey)) {
     return Response.json({ error: "invalid signature" }, { status: 401 });
   }
-  const origin = new URL(request.url).origin;
+  const requestUrl = new URL(request.url);
+  const invokeUrl = new URL("/api/tilde/tools/invoke", requestUrl.origin);
+  const protectionBypass = requestUrl.searchParams.get("x-vercel-protection-bypass");
+  if (protectionBypass) {
+    invokeUrl.searchParams.set("x-vercel-protection-bypass", protectionBypass);
+  }
   return Response.json({
     provider,
-    invoke_url: \`\${origin}/api/tilde/tools/invoke\`,
+    invoke_url: invokeUrl.toString(),
     tools: tools.map((tool) => {
       const endpoint = toolEndpoints.find((item) => item.id === tool.type_id);
       return { ...tool, endpoint_path: endpoint?.path };
