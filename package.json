@@ -11,7 +11,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:e2e": "pnpm --filter @tilde/harness-sdk build && pnpm --filter @tilde/cli build && vitest run --config vitest.e2e.config.ts",
     "lint": "biome check . && pnpm typecheck",
     "format": "biome check --write .",
     "sync:openapi": "tsx scripts/sync-openapi.ts",

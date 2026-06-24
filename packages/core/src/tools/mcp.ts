@@ -23,6 +23,10 @@ const TOOL_PATH =
   "/api/v1/team/{team_id}/mcp/tool-group/{tool_group_instance_id}/tool/{tool_source_type_id}";
 const TOOL_DEPLOYMENTS_BY_ALIAS_PATH =
   "/api/v1/team/{team_id}/mcp/tool-deployments/{alias}";
+const CUSTOM_TOOL_PROVIDERS_PATH =
+  "/api/v1/team/{team_id}/mcp/custom-tool-providers";
+const CUSTOM_TOOL_INVOKE_PATH =
+  "/api/v1/team/{team_id}/mcp/custom-tool-providers/{tool_group_instance_id}/tools/{tool_source_type_id}/invoke";
 
 export type CreateMcpServerInput = {
   id: string;
@@ -69,6 +73,27 @@ export type EnableMcpToolInput = {
   toolGroupInstanceId: string;
   toolSourceTypeId: string;
   boundParams?: unknown;
+};
+
+export type CreateCustomToolProviderInput = {
+  displayName: string;
+  description?: string;
+  discoveryUrl: string;
+};
+
+export type CustomToolProviderRegistration = {
+  providerId: string;
+  toolGroupInstanceId: string;
+  toolGroupSourceTypeId: string;
+  signingKey: string;
+  discoveredToolCount: number;
+  changed: boolean;
+};
+
+export type InvokeCustomToolInput = {
+  toolGroupInstanceId: string;
+  toolSourceTypeId: string;
+  params?: unknown;
 };
 
 type RawMcpServer = {
@@ -253,6 +278,43 @@ export class McpClient {
     return paginatedUnknown(raw);
   }
 
+  async createCustomToolProvider(
+    input: CreateCustomToolProviderInput,
+  ): Promise<CustomToolProviderRegistration> {
+    const raw = await requestJson<Record<string, unknown>>(this.#config, {
+      method: "POST",
+      path: teamPath(this.#config, CUSTOM_TOOL_PROVIDERS_PATH),
+      body: {
+        display_name: input.displayName,
+        description: input.description ?? "",
+        discovery_url: input.discoveryUrl,
+      },
+    });
+    const provider = objectField(raw, "provider");
+    const instance = objectField(raw, "tool_group_instance");
+    return {
+      providerId: stringField(provider, "id"),
+      toolGroupInstanceId: stringField(instance, "id"),
+      toolGroupSourceTypeId: stringField(instance, "tool_group_source_type_id"),
+      signingKey: stringField(raw, "signing_key"),
+      discoveredToolCount: numberField(raw, "discovered_tool_count"),
+      changed: booleanField(raw, "changed"),
+    };
+  }
+
+  async invokeCustomTool(input: InvokeCustomToolInput): Promise<unknown> {
+    return requestJson<unknown>(this.#config, {
+      method: "POST",
+      path: pathWithParams(teamPath(this.#config, CUSTOM_TOOL_INVOKE_PATH), {
+        tool_group_instance_id: input.toolGroupInstanceId,
+        tool_source_type_id: input.toolSourceTypeId,
+      }),
+      body: {
+        params: input.params ?? {},
+      },
+    });
+  }
+
   getServerUrl(input: { id: string }): string {
     return buildUrl(
       this.#config,
@@ -288,6 +350,41 @@ export class McpClient {
     }
     return server;
   }
+}
+
+function objectField(
+  value: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> {
+  const field = value[key];
+  if (!field || typeof field !== "object" || Array.isArray(field)) {
+    throw new Error(`Response field ${key} is not an object`);
+  }
+  return field as Record<string, unknown>;
+}
+
+function stringField(value: Record<string, unknown>, key: string): string {
+  const field = value[key];
+  if (typeof field !== "string") {
+    throw new Error(`Response field ${key} is not a string`);
+  }
+  return field;
+}
+
+function numberField(value: Record<string, unknown>, key: string): number {
+  const field = value[key];
+  if (typeof field !== "number") {
+    throw new Error(`Response field ${key} is not a number`);
+  }
+  return field;
+}
+
+function booleanField(value: Record<string, unknown>, key: string): boolean {
+  const field = value[key];
+  if (typeof field !== "boolean") {
+    throw new Error(`Response field ${key} is not a boolean`);
+  }
+  return field;
 }
 
 function paginatedUnknown(raw: Paginated<unknown>): {

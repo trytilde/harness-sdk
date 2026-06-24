@@ -1,12 +1,29 @@
+export {
+  AgentsClient,
+  agent,
+  type DeployHostedAgentsInput,
+  defineApp,
+  type HostedAgentDefinition,
+  type HostedAgentDeploymentFile,
+  type HostedAgentEndpoint,
+  type HostedAgentsDeployment,
+  type HostedCustomToolDefinition,
+  type HostedCustomToolEndpoint,
+  type TildeAppDefinition,
+  tool,
+} from "./agents";
 export { ChatKitClient, MessagesClient } from "./chatkit";
 export { Client, createClient } from "./client";
 export { type Config, createConfig, type NormalizedConfig } from "./config";
 export { ApiError } from "./errors";
 export {
   type AddMcpServerFunctionInput,
+  type CreateCustomToolProviderInput,
   type CreateMcpServerInput,
   type CreateToolGroupInput,
+  type CustomToolProviderRegistration,
   GET_TOOL_SCHEMAS_NAME,
+  type InvokeCustomToolInput,
   type JsonObject,
   type LocalMcpTool,
   type LocalMcpToolContext,

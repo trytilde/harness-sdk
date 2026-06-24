@@ -18,8 +18,11 @@ export {
 } from "./local";
 export {
   type AddMcpServerFunctionInput,
+  type CreateCustomToolProviderInput,
   type CreateMcpServerInput,
   type CreateToolGroupInput,
+  type CustomToolProviderRegistration,
+  type InvokeCustomToolInput,
   McpClient,
   type McpServer,
   type UpdateMcpServerInput,
