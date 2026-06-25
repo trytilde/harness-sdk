@@ -4,6 +4,8 @@ export type Config = {
   orgId?: string;
   teamId: string;
   apiKey?: string;
+  tunnel?: boolean;
+  cloudflaredPath?: string;
   bearerToken?: string;
   fetch?: typeof fetch;
   headers?: HeadersInit;

@@ -26,3 +26,8 @@ export {
   type UpdateMcpServerInput,
   wrapMcpClientWithLocalTools,
 } from "./tools";
+export type {
+  LocalRuntimeTunnelConnector,
+  LocalRuntimeTunnelExit,
+  LocalRuntimeTunnelProcess,
+} from "./tunnel";

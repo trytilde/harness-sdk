@@ -24,6 +24,8 @@ const tilde = createClient(createConfig({
   orgId: "org-example",
   teamId: "team_123",
   apiKey: process.env.TILDE_API_KEY,
+  // Optional. Starts cloudflared for local agents/tools using apiKey.
+  tunnel: true,
   // Optional. Defaults to process.env.TILDE_BASE_API_URL or https://api.trytilde.com.
   baseApiUrl: "https://api.trytilde.com"
 }));
