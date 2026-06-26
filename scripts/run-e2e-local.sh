@@ -32,7 +32,7 @@ fi
 rm -f "$credentials_path"
 
 echo "Starting tilde-api dev-agent with TILDE_RUN_ID=$run_id"
-setsid bash -c 'cd "$1"; RUSTC_WRAPPER="${RUSTC_WRAPPER:-}" TILDE_RUN_ID="$2" make dev-agent' bash "$api_dir" "$run_id" &
+setsid bash -c 'cd "$1"; RUSTC_WRAPPER="${RUSTC_WRAPPER:-}" TILDE_RUN_ID="$2" TILDE_API_ONLY=true make dev-agent' bash "$api_dir" "$run_id" &
 backend_pid="$!"
 
 for _ in {1..180}; do
@@ -56,7 +56,8 @@ api_origin="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["a
 credentials_path="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["credentials_path"])' "$manifest_path")"
 
 echo "Waiting for SDK e2e credentials at $credentials_path"
-for _ in {1..180}; do
+credentials_ready=0
+for _ in {1..420}; do
 	if python3 - "$credentials_path" >/dev/null 2>&1 <<'PY'
 import json
 import sys
@@ -68,6 +69,7 @@ if not sdk.get("api_key") or not sdk.get("org_id") or not sdk.get("team_id"):
     raise SystemExit(1)
 PY
 	then
+		credentials_ready=1
 		break
 	fi
 	if ! kill -0 "$backend_pid" >/dev/null 2>&1; then
@@ -77,6 +79,11 @@ PY
 	fi
 	sleep 1
 done
+
+if [[ "$credentials_ready" != "1" ]]; then
+	echo "Error: timed out waiting for SDK e2e credentials at $credentials_path"
+	exit 1
+fi
 
 IFS=$'\t' read -r e2e_org_id e2e_team_id e2e_api_key < <(
 	python3 - "$credentials_path" <<'PY'

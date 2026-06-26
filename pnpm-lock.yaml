@@ -42,6 +42,15 @@ importers:
         specifier: ^4.0.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.1)(happy-dom@20.10.3)(vite@8.0.16(@types/node@24.13.1)(esbuild@0.28.0)(tsx@4.22.4))
 
+  packages/cli:
+    dependencies:
+      '@tilde/harness-sdk':
+        specifier: workspace:*
+        version: link:../core
+      tsx:
+        specifier: ^4.20.6
+        version: 4.22.4
+
   packages/core: {}
 
   packages/react:

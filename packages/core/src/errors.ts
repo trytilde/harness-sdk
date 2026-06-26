@@ -29,6 +29,11 @@ export async function errorFromResponse(response: Response): Promise<ApiError> {
     "msg" in body &&
     typeof body.msg === "string"
       ? body.msg
-      : `Tilde API request failed with status ${response.status}`;
+      : typeof body === "object" &&
+          body !== null &&
+          "message" in body &&
+          typeof body.message === "string"
+        ? body.message
+        : `Tilde API request failed with status ${response.status}`;
   return new ApiError(message, response, body);
 }

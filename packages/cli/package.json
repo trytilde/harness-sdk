@@ -1,0 +1,30 @@
+{
+  "name": "@tilde/cli",
+  "version": "0.0.0",
+  "description": "Tilde command line tools for auth, local client setup, and hosted agent deploys.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "bin": {
+    "tilde": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config ../../vitest.config.ts test"
+  },
+  "dependencies": {
+    "@tilde/harness-sdk": "workspace:*",
+    "tsx": "^4.20.6"
+  }
+}
