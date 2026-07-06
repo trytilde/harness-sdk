@@ -1,8 +1,10 @@
 import {
-  type Client,
-  type Config,
-  createClient,
-} from "./client";
+  type ChatKitContextClient,
+  type ChatKitConvertedMessage,
+  runWithChatKitContext,
+} from "./chatkit-context";
+import { type ChatKitMessage, isChatKitMessage } from "./chatkit-message";
+import { type Client, type Config, createClient } from "./client";
 import {
   type VerifiedWebhookRequest,
   type VerifyWebhookOptions,
@@ -14,13 +16,15 @@ const TILDE_ORG_ID_HEADER = "x-tilde-org-id";
 const TILDE_TEAM_ID_HEADER = "x-tilde-team-id";
 const TILDE_SESSION_ID_HEADER = "x-tilde-session-id";
 
+export type { ChatKitContextClient, ChatKitConvertedMessage };
+
 export type ChatKitSessionHistoryOptions = {
   nextPageToken?: string;
   pageSize?: number;
 };
 
 export type ChatKitSessionHistory = {
-  items: unknown[];
+  items: ChatKitMessage[];
   nextPageToken?: string;
 };
 
@@ -41,6 +45,7 @@ export type ChatKitEndpointContext = {
   sessionId: string;
   client: Client;
   session: ChatKitSessionClient;
+  chatkit: ChatKitContextClient;
 };
 
 export type ChatKitEndpointOptions = VerifyWebhookOptions & {
@@ -93,9 +98,37 @@ export function chatKitEndpoint(
     const client = createClient(
       resolveClientConfig(options.client, orgId.value, teamId.value),
     );
+    const currentRequestMessageIds = messageIdsFromRequestBody(verified.json);
     const session: ChatKitSessionClient = {
       id: sessionId.value,
-      history(historyOptions = {}) {
+      async history(historyOptions = {}) {
+        if (
+          historyOptions.pageSize === undefined &&
+          historyOptions.nextPageToken === undefined
+        ) {
+          const items: unknown[] = [];
+          let nextPageToken: string | undefined;
+          do {
+            const input: {
+              sessionId: string;
+              pageSize: number;
+              nextPageToken?: string;
+            } = {
+              sessionId: sessionId.value,
+              pageSize: 100,
+            };
+            if (nextPageToken !== undefined) {
+              input.nextPageToken = nextPageToken;
+            }
+            const page = await client.chatkit.listMessageHistory(input);
+            items.push(...page.items);
+            nextPageToken = page.nextPageToken;
+          } while (nextPageToken);
+          return {
+            items: normalizeHistoryItems(items, currentRequestMessageIds),
+          };
+        }
+
         const input: {
           sessionId: string;
           pageSize?: number;
@@ -109,7 +142,19 @@ export function chatKitEndpoint(
         if (historyOptions.nextPageToken !== undefined) {
           input.nextPageToken = historyOptions.nextPageToken;
         }
-        return client.chatkit.listMessageHistory(input);
+        const history = await client.chatkit.listMessageHistory(input);
+        return {
+          ...history,
+          items: normalizeHistoryItems(history.items, currentRequestMessageIds),
+        };
+      },
+    };
+    const chatkit: ChatKitContextClient = {
+      cacheConvertedMessages(input) {
+        return client.chatkit.cacheConvertedMessages(input);
+      },
+      hydrateConvertedMessages(input) {
+        return client.chatkit.hydrateConvertedMessages(input);
       },
     };
 
@@ -117,10 +162,11 @@ export function chatKitEndpoint(
       method: request.method,
       headers: request.headers,
       body: verified.rawBody,
+      signal: request.signal,
       duplex: "half",
     } as RequestInit);
 
-    return options.handler(forwarded, {
+    const context: ChatKitEndpointContext = {
       rawBody: verified.rawBody,
       body: verified.json,
       webhookId: verified.webhookId,
@@ -130,7 +176,12 @@ export function chatKitEndpoint(
       sessionId: sessionId.value,
       client,
       session,
-    });
+      chatkit,
+    };
+
+    return runWithChatKitContext(chatkit, () =>
+      options.handler(forwarded, context),
+    );
   };
 }
 
@@ -163,7 +214,11 @@ function resolveClientConfig(
     orgId,
     teamId,
   };
-  assignIfDefined(config, "baseUrl", overrides?.baseUrl ?? env("TILDE_BASE_URL"));
+  assignIfDefined(
+    config,
+    "baseUrl",
+    overrides?.baseUrl ?? env("TILDE_BASE_URL"),
+  );
   assignIfDefined(
     config,
     "baseApiUrl",
@@ -195,4 +250,43 @@ function env(name: string): string | undefined {
     return undefined;
   }
   return process.env[name];
+}
+
+function messageIdsFromRequestBody(body: unknown): Set<string> {
+  if (!isRecord(body) || !Array.isArray(body.messages)) return new Set();
+  const ids = body.messages
+    .map(messageId)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+  return new Set(ids);
+}
+
+function messageId(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  return typeof value.id === "string" ? value.id : null;
+}
+
+function normalizeHistoryItems(
+  items: unknown[],
+  currentRequestMessageIds: Set<string>,
+): ChatKitMessage[] {
+  const normalized = items
+    .filter(isChatKitMessage)
+    .sort(compareChatKitMessagesByCreatedAt);
+  if (currentRequestMessageIds.size === 0) return normalized;
+  return normalized.filter((item) => {
+    const id = messageId(item);
+    return !id || !currentRequestMessageIds.has(id);
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function compareChatKitMessagesByCreatedAt(
+  left: ChatKitMessage,
+  right: ChatKitMessage,
+): number {
+  if (!left.created_at || !right.created_at) return 0;
+  return left.created_at.localeCompare(right.created_at);
 }
