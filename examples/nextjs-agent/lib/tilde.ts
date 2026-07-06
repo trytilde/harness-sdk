@@ -12,7 +12,7 @@ function requireEnv(name: string): string {
 export const tilde = createClient(
   createConfig({
     baseUrl: requireEnv("TILDE_BASE_URL"),
-    teamId: requireEnv("TILDE_TEAM_ID"),
+    teamId: process.env.TILDE_TEAM_ID || "daniels-workspace",
     apiKey: requireEnv("TILDE_API_KEY"),
   }),
 );

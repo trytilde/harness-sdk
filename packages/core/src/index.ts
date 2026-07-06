@@ -1,6 +1,11 @@
 export { ChatKitClient, MessagesClient } from "./chatkit";
 export { Client, createClient } from "./client";
-export { type Config, createConfig, type NormalizedConfig } from "./config";
+export {
+  type Config,
+  configHeaders,
+  createConfig,
+  type NormalizedConfig,
+} from "./config";
 export { ApiError } from "./errors";
 export {
   type AddMcpServerFunctionInput,
@@ -26,8 +31,3 @@ export {
   type UpdateMcpServerInput,
   wrapMcpClientWithLocalTools,
 } from "./tools";
-export type {
-  LocalRuntimeTunnelConnector,
-  LocalRuntimeTunnelExit,
-  LocalRuntimeTunnelProcess,
-} from "./tunnel";

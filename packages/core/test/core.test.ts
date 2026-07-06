@@ -1,16 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError, createClient, createConfig } from "../src";
 
-const spawnMock = vi.fn(() => ({
-  killed: false,
-  kill: vi.fn(),
-  once: vi.fn(),
-}));
-
-vi.mock("node:child_process", () => ({
-  spawn: spawnMock,
-}));
-
 describe("createConfig", () => {
   it("normalizes trailing slashes", () => {
     const config = createConfig({
@@ -38,6 +28,26 @@ describe("createConfig", () => {
     });
 
     expect(config.baseUrl).toBe("https://org-example.api.staging.trytilde.com");
+  });
+
+  it("injects orgId into an explicitly configured neutral baseUrl", () => {
+    const config = createConfig({
+      baseUrl: "https://api.example.test",
+      orgId: "org-example",
+      teamId: "team_123",
+    });
+
+    expect(config.baseUrl).toBe("https://org-example.api.example.test");
+  });
+
+  it("does not inject orgId twice into an org-scoped baseUrl", () => {
+    const config = createConfig({
+      baseUrl: "https://org-example.api.example.test",
+      orgId: "org-example",
+      teamId: "team_123",
+    });
+
+    expect(config.baseUrl).toBe("https://org-example.api.example.test");
   });
 
   it("rejects orgId values that cannot be used as a hostname label", () => {
@@ -89,17 +99,6 @@ describe("createConfig", () => {
     ).toThrow("baseUrl must be an absolute URL");
   });
 
-  it("preserves tunnel and cloudflaredPath", () => {
-    const config = createConfig({
-      baseUrl: "https://api.example.test",
-      teamId: "team_123",
-      tunnel: true,
-      cloudflaredPath: "/usr/local/bin/cloudflared",
-    });
-
-    expect(config.tunnel).toBe(true);
-    expect(config.cloudflaredPath).toBe("/usr/local/bin/cloudflared");
-  });
 });
 
 describe("MCP client", () => {
@@ -112,71 +111,6 @@ describe("MCP client", () => {
     expect(client.mcp.getServerUrl({ id: "server/1" })).toBe(
       "https://api.example.test/api/v1/team/team%20123/mcp/mcp-server/server%2F1/mcp",
     );
-  });
-
-  it("starts cloudflared when tunnel is enabled", async () => {
-    spawnMock.mockClear();
-    const fetchMock = vi.fn(
-      async (input: RequestInfo | URL, init?: RequestInit) => {
-        expect(String(input)).toBe(
-          "https://api.example.test/api/v1/identity/local-runtime/tunnel-connector",
-        );
-        expect(init?.method).toBe("GET");
-        expect(new Headers(init?.headers).get("x-api-key")).toBe("tunnel-key");
-        return Response.json({
-          tunnel_domain: "user-abc.tunnel.trytilde-dev.com",
-          tunnel_origin: "https://user-abc.tunnel.trytilde-dev.com",
-          cloudflared_token: "cloudflare-token",
-        });
-      },
-    );
-
-    const client = createClient({
-      baseUrl: "https://api.example.test",
-      teamId: "team_123",
-      apiKey: "tunnel-key",
-      tunnel: true,
-      cloudflaredPath: "cloudflared-test",
-      fetch: fetchMock as typeof fetch,
-    });
-
-    const tunnel = await client.localRuntimeTunnel;
-
-    expect(tunnel?.connector.tunnel_origin).toBe(
-      "https://user-abc.tunnel.trytilde-dev.com",
-    );
-    expect(spawnMock).toHaveBeenCalledWith(
-      "cloudflared-test",
-      ["tunnel", "run", "--token", "cloudflare-token"],
-      { stdio: "inherit" },
-    );
-  });
-
-  it("observes tunnel startup rejections when callers do not await the tunnel promise", async () => {
-    const consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
-    const fetchMock = vi.fn(async () =>
-      Response.json({ message: "bad key" }, { status: 401 }),
-    );
-
-    try {
-      const client = createClient({
-        baseUrl: "https://api.example.test",
-        teamId: "team_123",
-        apiKey: "bad-key",
-        tunnel: true,
-        fetch: fetchMock as typeof fetch,
-      });
-
-      await expect(client.localRuntimeTunnel).rejects.toBeInstanceOf(ApiError);
-      expect(consoleError).toHaveBeenCalledWith(
-        "Failed to start local runtime tunnel",
-        expect.any(ApiError),
-      );
-    } finally {
-      consoleError.mockRestore();
-    }
   });
 
   it("sends createServer request with auth headers", async () => {
@@ -456,6 +390,97 @@ describe("MCP client", () => {
 });
 
 describe("ChatKit client", () => {
+  it("lists message history through the canonical ChatKit sessions route", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(
+        "https://org-123.api.example.test/api/v1/team/team_123/chatkit/sessions/session_1/messages?page_size=10&next_page_token=next",
+      );
+      expect(new Headers(init?.headers).has("x-tilde-org-id")).toBe(false);
+      return Response.json({
+        items: [{ id: "msg_1" }],
+        next_page_token: "older",
+      });
+    });
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      orgId: "org-123",
+      teamId: "team_123",
+      fetch: fetchMock as typeof fetch,
+    });
+
+    await expect(
+      client.chatkit.listMessageHistory({
+        sessionId: "session_1",
+        pageSize: 10,
+        nextPageToken: "next",
+      }),
+    ).resolves.toEqual({
+      items: [{ id: "msg_1" }],
+      nextPageToken: "older",
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("caches and hydrates converted ChatKit messages", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/chatkit/messages/converted-cache")) {
+        expect(init?.method).toBe("POST");
+        expect(await new Response(init?.body).json()).toEqual({
+          messages: [
+            {
+              chatkit_message_id: "msg_1",
+              message: { id: "msg_1", role: "user", parts: [] },
+            },
+          ],
+        });
+        return Response.json({ success: true });
+      }
+      expect(String(input)).toBe(
+        "https://org-123.api.example.test/api/v1/team/team_123/chatkit/messages/converted-cache/hydrate",
+      );
+      expect(init?.method).toBe("POST");
+      expect(await new Response(init?.body).json()).toEqual({
+        message_ids: ["msg_1"],
+      });
+      return Response.json({
+        messages: [
+          {
+            chatkit_message_id: "msg_1",
+            message: { id: "msg_1", role: "user", parts: [] },
+          },
+        ],
+      });
+    });
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      orgId: "org-123",
+      teamId: "team_123",
+      fetch: fetchMock as typeof fetch,
+    });
+
+    await expect(
+      client.chatkit.cacheConvertedMessages({
+        messages: [
+          {
+            chatKitMessageId: "msg_1",
+            message: { id: "msg_1", role: "user", parts: [] },
+          },
+        ],
+      }),
+    ).resolves.toEqual({ success: true });
+    await expect(
+      client.chatkit.hydrateConvertedMessages({ messageIds: ["msg_1"] }),
+    ).resolves.toEqual({
+      messages: [
+        {
+          chatKitMessageId: "msg_1",
+          message: { id: "msg_1", role: "user", parts: [] },
+        },
+      ],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("constructs provider-mounted Vercel UI endpoints", () => {
     const client = createClient({
       baseUrl: "https://api.example.test",

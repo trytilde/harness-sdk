@@ -12,7 +12,7 @@ This example shows a Next.js agent that uses:
 pnpm -C ../.. build
 pnpm install
 cp .env.example .env.local
-pnpm dev
+pnpm tunnel
 ```
 
 Before running the app, create or reuse:
@@ -44,5 +44,18 @@ await tilde.mcp.addFunction({
 Set `TILDE_MCP_SERVER_ID` to that server id. Set `MODEL_BASE_URL`,
 `MODEL_API_KEY`, and `MODEL_NAME` for your OpenAI-compatible model provider.
 
-Browser chat posts to `/api/chat`. ChatKit should call `/api/chatkit` with
-Tilde webhook signing headers.
+ChatKit should call `/chatkit/agents` with Tilde webhook signing headers. The
+same signed handler is also mounted at `/api/chatkit` for framework-style
+deployments. ChatKit route handlers receive a typed `context.session` client;
+call `context.session.history()` to load paginated historical messages for the
+signed session.
+
+Use `pnpm tunnel` for local ChatKit testing. It runs:
+
+```bash
+harness-sdk tunnel -- next dev --webpack -p '$TUNNEL_PORT'
+```
+
+The tunnel runner starts Cloudflare tunnel connectivity, picks a local app port
+starting at `3000` unless `-p` is supplied, sets `PORT` and `TUNNEL_PORT`, and
+proxies the managed Cloudflare ingress port to the spawned app process.

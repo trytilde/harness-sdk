@@ -9,4 +9,5 @@ examples/*/node_modules/
 secrets.yaml
 .env.e2e
 .env.secrets.e2e
+examples/*/.env.local
 .tilde-e2e-runs/
