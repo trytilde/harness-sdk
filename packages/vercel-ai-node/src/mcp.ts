@@ -8,26 +8,26 @@ import type { Client, JsonObject, LocalMcpTool } from "@tilde/harness-sdk";
 import { wrapMcpClientWithLocalTools } from "@tilde/harness-sdk";
 import type { ToolExecutionOptions, ToolSet } from "ai";
 
-export type CreateMCPClientOptions<TTools extends ToolSet = ToolSet> = Omit<
-  MCPClientConfig,
-  "transport"
-> & {
+export type CreateMCPClientOptions<
+  TTools extends Record<string, unknown> = ToolSet,
+> = Omit<MCPClientConfig, "transport"> & {
   client: Client;
   serverId: string;
   tools?: TTools;
   headers?: Record<string, string>;
 };
 
-export type TildeMCPClient<TTools extends ToolSet = ToolSet> = MCPClient & {
-  readonly serverId: string;
-  readonly localTools: readonly LocalMcpTool[];
-  callTool(name: string, input?: JsonObject): Promise<unknown>;
-  tools(): Promise<TTools & Awaited<ReturnType<MCPClient["tools"]>>>;
-};
+export type TildeMCPClient<TTools extends Record<string, unknown> = ToolSet> =
+  Omit<MCPClient, "tools"> & {
+    readonly serverId: string;
+    readonly localTools: readonly LocalMcpTool[];
+    callTool(name: string, input?: JsonObject): Promise<unknown>;
+    tools(): Promise<Record<string, unknown> & TTools>;
+  };
 
-export async function createMCPClient<TTools extends ToolSet = ToolSet>(
-  options: CreateMCPClientOptions<TTools>,
-): Promise<TildeMCPClient<TTools>> {
+export async function createMCPClient<
+  TTools extends Record<string, unknown> = ToolSet,
+>(options: CreateMCPClientOptions<TTools>): Promise<TildeMCPClient<TTools>> {
   const apiKey = options.client.config.apiKey;
   if (!apiKey) {
     throw new TypeError("createMCPClient requires client config apiKey");
@@ -51,7 +51,7 @@ export async function createMCPClient<TTools extends ToolSet = ToolSet>(
   return wrapMcpClientWithLocalTools({
     client: remoteClient,
     serverId: options.serverId,
-    tools: toLocalTools(options.tools ?? ({} as TTools)),
+    tools: toLocalTools((options.tools ?? {}) as ToolSet),
   }) as TildeMCPClient<TTools>;
 }
 
