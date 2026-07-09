@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
     }
   },
   "files": [
@@ -19,6 +23,9 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config ../../vitest.config.ts"
+  },
+  "dependencies": {
+    "@tilde/api-client": "workspace:*"
   },
   "devDependencies": {}
 }

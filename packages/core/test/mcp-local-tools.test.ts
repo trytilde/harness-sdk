@@ -748,6 +748,7 @@ describe("local MCP tools wrapper", () => {
     const client = createClient({
       baseUrl: "https://api.example.test",
       teamId: "team_123",
+      apiKey: "test-key",
     });
     const wrapped = client.mcp.withLocalTools({
       client: {},

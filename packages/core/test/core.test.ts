@@ -1,5 +1,25 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, createClient, createConfig } from "../src";
+
+const spawnMock = vi.fn(() => ({
+  killed: false,
+  kill: vi.fn(),
+  once: vi.fn(),
+}));
+
+vi.mock("node:child_process", () => ({
+  spawn: spawnMock,
+}));
+
+const savedEnv = { ...process.env };
+
+beforeEach(() => {
+  process.env = { ...savedEnv, TILDE_API_KEY: "env-test-key" };
+});
+
+afterEach(() => {
+  process.env = { ...savedEnv };
+});
 
 describe("createConfig", () => {
   it("normalizes trailing slashes", () => {
@@ -17,7 +37,7 @@ describe("createConfig", () => {
       teamId: "team_123",
     });
 
-    expect(config.baseUrl).toBe("https://org-example.api.trytilde.com");
+    expect(config.baseUrl).toBe("https://org-example.api.trytilde.ai");
   });
 
   it("derives org baseUrl from configured baseApiUrl", () => {
@@ -90,6 +110,72 @@ describe("createConfig", () => {
     }
   });
 
+  it("uses default production API base URL when no baseUrl is configured", () => {
+    const config = createConfig({
+      teamId: "team_123",
+    });
+
+    expect(config.baseUrl).toBe("https://api.trytilde.ai");
+  });
+
+  it("allows createClient with no args when required values are in the environment", () => {
+    process.env.TILDE_BASE_URL = "https://api.env.test";
+    process.env.TILDE_TEAM_ID = "team_env";
+    process.env.TILDE_API_KEY = "key_env";
+
+    const client = createClient();
+
+    expect(client.config).toMatchObject({
+      baseUrl: "https://api.env.test",
+      teamId: "team_env",
+      apiKey: "key_env",
+    });
+  });
+
+  it("lets explicit constructor values take precedence over environment values", () => {
+    process.env.TILDE_BASE_URL = "https://api.env.test";
+    process.env.TILDE_TEAM_ID = "team_env";
+    process.env.TILDE_API_KEY = "key_env";
+
+    const client = createClient({
+      baseUrl: "https://api.explicit.test",
+      teamId: "team_explicit",
+      apiKey: "key_explicit",
+    });
+
+    expect(client.config).toMatchObject({
+      baseUrl: "https://api.explicit.test",
+      teamId: "team_explicit",
+      apiKey: "key_explicit",
+    });
+  });
+
+  it("throws when teamId is absent from both constructor and environment", () => {
+    delete process.env.TILDE_TEAM_ID;
+
+    expect(() => createConfig()).toThrow("teamId is required");
+  });
+
+  it("throws when auth is absent from constructor, headers, and environment", () => {
+    process.env.TILDE_TEAM_ID = "team_123";
+    delete process.env.TILDE_API_KEY;
+    delete process.env.TILDE_BEARER_TOKEN;
+
+    expect(() => createConfig()).toThrow("apiKey or bearerToken is required");
+  });
+
+  it("accepts explicit auth headers instead of apiKey or bearerToken", () => {
+    process.env.TILDE_TEAM_ID = "team_123";
+    delete process.env.TILDE_API_KEY;
+    delete process.env.TILDE_BEARER_TOKEN;
+
+    const config = createConfig({
+      headers: { Authorization: "Bearer header-key" },
+    });
+
+    expect(config.baseUrl).toBe("https://api.trytilde.ai");
+  });
+
   it("rejects relative baseUrl", () => {
     expect(() =>
       createConfig({
@@ -98,7 +184,6 @@ describe("createConfig", () => {
       }),
     ).toThrow("baseUrl must be an absolute URL");
   });
-
 });
 
 describe("MCP client", () => {
@@ -391,16 +476,18 @@ describe("MCP client", () => {
 
 describe("ChatKit client", () => {
   it("lists message history through the canonical ChatKit sessions route", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe(
-        "https://org-123.api.example.test/api/v1/team/team_123/chatkit/sessions/session_1/messages?page_size=10&next_page_token=next",
-      );
-      expect(new Headers(init?.headers).has("x-tilde-org-id")).toBe(false);
-      return Response.json({
-        items: [{ id: "msg_1" }],
-        next_page_token: "older",
-      });
-    });
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        expect(String(input)).toBe(
+          "https://org-123.api.example.test/api/v1/team/team_123/chatkit/sessions/session_1/messages?page_size=10&next_page_token=next",
+        );
+        expect(new Headers(init?.headers).has("x-tilde-org-id")).toBe(false);
+        return Response.json({
+          items: [{ id: "msg_1" }],
+          next_page_token: "older",
+        });
+      },
+    );
     const client = createClient({
       baseUrl: "https://api.example.test",
       orgId: "org-123",
@@ -422,10 +509,28 @@ describe("ChatKit client", () => {
   });
 
   it("caches and hydrates converted ChatKit messages", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).endsWith("/chatkit/messages/converted-cache")) {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).endsWith("/chatkit/messages/converted-cache")) {
+          expect(init?.method).toBe("POST");
+          expect(await new Response(init?.body).json()).toEqual({
+            messages: [
+              {
+                chatkit_message_id: "msg_1",
+                message: { id: "msg_1", role: "user", parts: [] },
+              },
+            ],
+          });
+          return Response.json({ success: true });
+        }
+        expect(String(input)).toBe(
+          "https://org-123.api.example.test/api/v1/team/team_123/chatkit/messages/converted-cache/hydrate",
+        );
         expect(init?.method).toBe("POST");
         expect(await new Response(init?.body).json()).toEqual({
+          message_ids: ["msg_1"],
+        });
+        return Response.json({
           messages: [
             {
               chatkit_message_id: "msg_1",
@@ -433,24 +538,8 @@ describe("ChatKit client", () => {
             },
           ],
         });
-        return Response.json({ success: true });
-      }
-      expect(String(input)).toBe(
-        "https://org-123.api.example.test/api/v1/team/team_123/chatkit/messages/converted-cache/hydrate",
-      );
-      expect(init?.method).toBe("POST");
-      expect(await new Response(init?.body).json()).toEqual({
-        message_ids: ["msg_1"],
-      });
-      return Response.json({
-        messages: [
-          {
-            chatkit_message_id: "msg_1",
-            message: { id: "msg_1", role: "user", parts: [] },
-          },
-        ],
-      });
-    });
+      },
+    );
     const client = createClient({
       baseUrl: "https://api.example.test",
       orgId: "org-123",

@@ -88,6 +88,9 @@ describe("chatKitEndpoint", () => {
 
     const endpoint = chatKitEndpoint({
       webhookSigningKey: key,
+      client: {
+        apiKey: "test-key",
+      },
       handler,
     });
 

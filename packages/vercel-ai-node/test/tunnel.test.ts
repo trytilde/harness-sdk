@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@tilde/harness-sdk";
+import { describe, expect, it, vi } from "vitest";
 import { runLocalRuntimeTunnelCommand, startLocalRuntimeTunnel } from "../src";
 
 const { spawnMock } = vi.hoisted(() => ({
@@ -49,8 +49,11 @@ describe("startLocalRuntimeTunnel", () => {
     expect(tunnel.connector.local_service_url).toBe("http://localhost:17654");
     expect(spawnMock).toHaveBeenCalledWith(
       "cloudflared-test",
-      ["tunnel", "run", "--token", "cloudflare-token"],
+      ["tunnel", "run"],
       expect.objectContaining({
+        env: expect.objectContaining({
+          TUNNEL_TOKEN: "cloudflare-token",
+        }),
         stdio: "inherit",
       }),
     );
@@ -108,7 +111,8 @@ describe("startLocalRuntimeTunnel", () => {
             TILDE_TUNNEL_PORT: "3100",
             TILDE_LOCAL_RUNTIME_TUNNEL_ORIGIN:
               "https://user-abc.tunnel.trytilde-dev.com",
-            TILDE_LOCAL_RUNTIME_TUNNEL_DOMAIN: "user-abc.tunnel.trytilde-dev.com",
+            TILDE_LOCAL_RUNTIME_TUNNEL_DOMAIN:
+              "user-abc.tunnel.trytilde-dev.com",
           }),
           stdio: "inherit",
         }),
@@ -117,10 +121,10 @@ describe("startLocalRuntimeTunnel", () => {
       const childSpawnOptions = childSpawnCall?.[2] as
         | { env?: NodeJS.ProcessEnv }
         | undefined;
-      const childEnv = childSpawnOptions?.env as
-        | NodeJS.ProcessEnv
-        | undefined;
-      expect(childEnv?.TILDE_CHATKIT_WEBHOOK_SIGNING_KEY).toBe("webhook-secret");
+      const childEnv = childSpawnOptions?.env as NodeJS.ProcessEnv | undefined;
+      expect(childEnv?.TILDE_CHATKIT_WEBHOOK_SIGNING_KEY).toBe(
+        "webhook-secret",
+      );
     } finally {
       if (previousWebhookSigningKey === undefined) {
         delete process.env.TILDE_CHATKIT_WEBHOOK_SIGNING_KEY;

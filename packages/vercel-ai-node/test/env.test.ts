@@ -76,12 +76,14 @@ describe("dotenv loading", () => {
 
   it("parses quoted dotenv values", () => {
     expect(
-      parseDotenv([
-        "PLAIN=value # comment",
-        "SINGLE='quoted value'",
-        'DOUBLE="line\\nvalue"',
-        "export EXPORTED=value",
-      ].join("\n")),
+      parseDotenv(
+        [
+          "PLAIN=value # comment",
+          "SINGLE='quoted value'",
+          'DOUBLE="line\\nvalue"',
+          "export EXPORTED=value",
+        ].join("\n"),
+      ),
     ).toEqual({
       PLAIN: "value",
       SINGLE: "quoted value",

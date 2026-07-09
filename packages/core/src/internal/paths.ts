@@ -1,7 +1,10 @@
-import type { Config } from "../config";
+import { teamPath as tildeTeamPath } from "@tilde/api-client";
+import type { NormalizedConfig } from "../config";
 
-export function teamPath(config: Config, path: string): string {
-  return path.replace("{team_id}", encodeURIComponent(config.teamId));
+export function teamPath(config: NormalizedConfig, path: string): string {
+  return path.includes("{team_id}")
+    ? path.replace("{team_id}", encodeURIComponent(config.teamId))
+    : tildeTeamPath({ teamId: config.teamId }, path);
 }
 
 export function pathWithParams(
@@ -16,7 +19,7 @@ export function pathWithParams(
 }
 
 export function buildUrl(
-  config: Config,
+  config: NormalizedConfig,
   path: string,
   query?: Record<string, string | number | boolean | null | undefined>,
 ): string {

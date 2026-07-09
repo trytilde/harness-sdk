@@ -7,17 +7,12 @@ import {
   scryptSync,
   timingSafeEqual,
 } from "node:crypto";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import { homedir, hostname, tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
-import { ApiError, createConfig, type Config } from "@tilde/harness-sdk";
+import { ApiError, type Config } from "@tilde/harness-sdk";
 
 const AUTH_VERSION = 1;
 const TOKEN_EXPIRY_SKEW_SECONDS = 60;
@@ -67,10 +62,15 @@ type OAuthCallbackResult =
   | { status: "success"; code: string; state?: string }
   | { status: "error"; error: string; errorDescription?: string };
 
+type AuthConfig = {
+  baseUrl: string;
+  fetch?: typeof fetch;
+};
+
 export async function ensureHarnessAuth(
   options: EnsureHarnessAuthOptions,
 ): Promise<HarnessAuthTokens> {
-  const config = createConfig(options);
+  const config = createAuthConfig(options);
   const cached = readStoredTokens(config.baseUrl, options.configDir);
   if (cached) {
     const refreshed = await refreshOrUseCachedTokens(config, cached);
@@ -87,6 +87,32 @@ export async function ensureHarnessAuth(
   return tokens;
 }
 
+function createAuthConfig(options: EnsureHarnessAuthOptions): AuthConfig {
+  const baseUrlInput =
+    options.baseUrl ?? env("TILDE_BASE_URL") ?? "https://api.trytilde.ai";
+  let url: URL;
+  try {
+    url = new URL(baseUrlInput);
+  } catch {
+    throw new TypeError("baseUrl must be an absolute URL");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new TypeError("baseUrl must use http or https");
+  }
+  return {
+    baseUrl: baseUrlInput.replace(/\/+$/, ""),
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  };
+}
+
+function env(name: string): string | undefined {
+  if (typeof process === "undefined") {
+    return undefined;
+  }
+  const value = process.env[name];
+  return value && value.trim().length > 0 ? value : undefined;
+}
+
 type DeviceCodeResponse = {
   device_code: string;
   user_code: string;
@@ -97,7 +123,7 @@ type DeviceCodeResponse = {
 };
 
 async function loginWithDeviceCode(
-  config: ReturnType<typeof createConfig>,
+  config: AuthConfig,
 ): Promise<HarnessAuthTokens> {
   const device = await startDeviceCode(config);
   console.log(`Open this URL to sign in: ${device.verification_uri_complete}`);
@@ -124,7 +150,7 @@ async function loginWithDeviceCode(
 }
 
 async function startDeviceCode(
-  config: ReturnType<typeof createConfig>,
+  config: AuthConfig,
 ): Promise<DeviceCodeResponse> {
   const response = await (config.fetch ?? fetch)(
     `${config.baseUrl}/api/v1/identity/oauth/device/code`,
@@ -141,7 +167,7 @@ async function startDeviceCode(
 }
 
 async function exchangeDeviceCode(
-  config: ReturnType<typeof createConfig>,
+  config: AuthConfig,
   deviceCode: string,
 ): Promise<HarnessAuthTokens> {
   const body = new URLSearchParams({
@@ -164,7 +190,7 @@ async function exchangeDeviceCode(
 }
 
 async function refreshOrUseCachedTokens(
-  config: ReturnType<typeof createConfig>,
+  config: AuthConfig,
   tokens: HarnessAuthTokens,
 ): Promise<HarnessAuthTokens | undefined> {
   if (!isExpired(tokens)) {
@@ -188,7 +214,7 @@ async function refreshOrUseCachedTokens(
 }
 
 async function loginWithBrowser(
-  config: ReturnType<typeof createConfig>,
+  config: AuthConfig,
   options: HarnessAuthOptions,
 ): Promise<HarnessAuthTokens> {
   const callbackPort = await findAvailableAuthPort(14550);
@@ -198,7 +224,9 @@ async function loginWithBrowser(
   const state = base64Url(randomBytes(24));
 
   const callback = waitForOAuthCallback(callbackPort);
-  const authorizeUrl = new URL(`${config.baseUrl}/api/v1/identity/oauth/authorize`);
+  const authorizeUrl = new URL(
+    `${config.baseUrl}/api/v1/identity/oauth/authorize`,
+  );
   authorizeUrl.searchParams.set("client_id", HARNESS_SDK_CLI_CLIENT_ID);
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("response_type", "code");
@@ -231,7 +259,7 @@ async function loginWithBrowser(
 }
 
 async function exchangeOAuthCode(
-  config: ReturnType<typeof createConfig>,
+  config: AuthConfig,
   params: {
     code: string;
     codeVerifier: string;
@@ -261,7 +289,7 @@ async function exchangeOAuthCode(
 }
 
 async function refreshTokens(
-  config: ReturnType<typeof createConfig>,
+  config: AuthConfig,
   refreshToken: string,
 ): Promise<HarnessAuthTokens> {
   const response = await (config.fetch ?? fetch)(
@@ -279,7 +307,7 @@ async function refreshTokens(
 }
 
 async function whoami(
-  config: ReturnType<typeof createConfig>,
+  config: AuthConfig,
   accessToken: string,
 ): Promise<boolean> {
   const response = await (config.fetch ?? fetch)(
@@ -304,17 +332,26 @@ function normalizeTokenResponse(response: TokenResponse): HarnessAuthTokens {
 }
 
 function isExpired(tokens: HarnessAuthTokens): boolean {
-  return tokens.expiresAt <= Math.floor(Date.now() / 1000) + TOKEN_EXPIRY_SKEW_SECONDS;
+  return (
+    tokens.expiresAt <=
+    Math.floor(Date.now() / 1000) + TOKEN_EXPIRY_SKEW_SECONDS
+  );
 }
 
 function waitForOAuthCallback(port: number): Promise<OAuthCallbackResult> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      server.close();
-      reject(new Error("Timed out waiting for Tilde sign-in callback"));
-    }, 5 * 60 * 1000);
+    const timeout = setTimeout(
+      () => {
+        server.close();
+        reject(new Error("Timed out waiting for Tilde sign-in callback"));
+      },
+      5 * 60 * 1000,
+    );
     const server = http.createServer((request, response) => {
-      const requestUrl = new URL(request.url ?? "/", `http://localhost:${port}`);
+      const requestUrl = new URL(
+        request.url ?? "/",
+        `http://localhost:${port}`,
+      );
       if (requestUrl.pathname !== "/auth/callback") {
         response.writeHead(404, { "Content-Type": "text/plain" });
         response.end("Not found");
@@ -324,7 +361,8 @@ function waitForOAuthCallback(port: number): Promise<OAuthCallbackResult> {
       const error = requestUrl.searchParams.get("error");
       let result: OAuthCallbackResult;
       if (error) {
-        const errorDescription = requestUrl.searchParams.get("error_description");
+        const errorDescription =
+          requestUrl.searchParams.get("error_description");
         result = errorDescription
           ? { status: "error", error, errorDescription }
           : { status: "error", error };
@@ -342,7 +380,9 @@ function waitForOAuthCallback(port: number): Promise<OAuthCallbackResult> {
             };
       }
       response.writeHead(200, { "Content-Type": "text/html" });
-      response.end("<!doctype html><title>Tilde</title>Signed in. You can close this tab.");
+      response.end(
+        "<!doctype html><title>Tilde</title>Signed in. You can close this tab.",
+      );
       server.close(() => resolve(result));
     });
     server.once("error", (error) => {
@@ -361,9 +401,7 @@ async function openBrowser(url: string): Promise<void> {
         ? "cmd"
         : "xdg-open";
   const args =
-    process.platform === "win32"
-      ? ["/c", "start", '""', url]
-      : [url];
+    process.platform === "win32" ? ["/c", "start", '""', url] : [url];
 
   await new Promise<void>((resolve) => {
     const child = spawn(command, args, { detached: true, stdio: "ignore" });
@@ -407,8 +445,13 @@ function readStoredTokens(
     return undefined;
   }
   try {
-    const stored = JSON.parse(readFileSync(filePath, "utf8")) as StoredHarnessAuth;
-    if (stored.version !== AUTH_VERSION || stored.baseUrl !== normalizeBaseUrl(baseUrl)) {
+    const stored = JSON.parse(
+      readFileSync(filePath, "utf8"),
+    ) as StoredHarnessAuth;
+    if (
+      stored.version !== AUTH_VERSION ||
+      stored.baseUrl !== normalizeBaseUrl(baseUrl)
+    ) {
       return undefined;
     }
     return {
@@ -437,9 +480,13 @@ export function writeStoredTokens(
     expiresAt: tokens.expiresAt,
     tokenType: tokens.tokenType,
   };
-  writeFileSync(authFilePath(baseUrl, configDir), `${JSON.stringify(stored, null, 2)}\n`, {
-    mode: 0o600,
-  });
+  writeFileSync(
+    authFilePath(baseUrl, configDir),
+    `${JSON.stringify(stored, null, 2)}\n`,
+    {
+      mode: 0o600,
+    },
+  );
 }
 
 function authFilePath(baseUrl: string, configDir?: string): string {
@@ -447,7 +494,11 @@ function authFilePath(baseUrl: string, configDir?: string): string {
 }
 
 function authHostDir(baseUrl: string, configDir?: string): string {
-  return join(authRootDir(configDir), "hosts", base64Url(Buffer.from(normalizeBaseUrl(baseUrl))));
+  return join(
+    authRootDir(configDir),
+    "hosts",
+    base64Url(Buffer.from(normalizeBaseUrl(baseUrl))),
+  );
 }
 
 function authRootDir(configDir?: string): string {
@@ -470,7 +521,10 @@ function encryptValue(value: string): EncryptedValue {
   const iv = randomBytes(12);
   const key = encryptionKey(salt);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const ciphertext = Buffer.concat([
+    cipher.update(value, "utf8"),
+    cipher.final(),
+  ]);
   return {
     algorithm: "aes-256-gcm",
     salt: salt.toString("base64url"),
@@ -521,7 +575,10 @@ async function delay(milliseconds: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-async function apiError(response: Response, fallback: string): Promise<ApiError> {
+async function apiError(
+  response: Response,
+  fallback: string,
+): Promise<ApiError> {
   const body = await response.text();
   let message = fallback;
   if (body) {

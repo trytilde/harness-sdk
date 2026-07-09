@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import http, { type Server } from "node:http";
 import net from "node:net";
 import {
@@ -29,14 +29,15 @@ export type LocalRuntimeTunnelExit = {
 
 export type StartLocalRuntimeTunnelOptions = Config &
   HarnessAuthOptions & {
-  cloudflaredPath?: string;
-};
+    cloudflaredPath?: string;
+  };
 
-export type RunLocalRuntimeTunnelCommandOptions = StartLocalRuntimeTunnelOptions & {
-  command: string[];
-  port?: number;
-  portStart?: number;
-};
+export type RunLocalRuntimeTunnelCommandOptions =
+  StartLocalRuntimeTunnelOptions & {
+    command: string[];
+    port?: number;
+    portStart?: number;
+  };
 
 export type LocalRuntimeTunnelCommandProcess = LocalRuntimeTunnelProcess & {
   command: ChildProcess;
@@ -56,9 +57,12 @@ export async function startLocalRuntimeTunnel(
   const connector = await fetchLocalRuntimeTunnelConnector(config);
   const child = spawn(
     options.cloudflaredPath ?? "cloudflared",
-    ["tunnel", "run", "--token", connector.cloudflared_token],
+    ["tunnel", "run"],
     {
-      env: childEnvironment(),
+      env: {
+        ...childEnvironment(),
+        TUNNEL_TOKEN: connector.cloudflared_token,
+      },
       stdio: "inherit",
     },
   );
@@ -89,13 +93,20 @@ export async function runLocalRuntimeTunnelCommand(
   if (options.command.length === 0) {
     throw new TypeError("command is required");
   }
+  const [commandName, ...commandArgs] = options.command;
+  if (!commandName) {
+    throw new TypeError("command is required");
+  }
   const tunnel = await startLocalRuntimeTunnel(options);
   const proxyUrl = new URL(
     tunnel.connector.local_service_url ?? "http://localhost:17654",
   );
-  const proxyPort = Number(proxyUrl.port || (proxyUrl.protocol === "https:" ? 443 : 80));
+  const proxyPort = Number(
+    proxyUrl.port || (proxyUrl.protocol === "https:" ? 443 : 80),
+  );
   const proxyHost = loopbackHost(proxyUrl.hostname);
-  const localPort = options.port ?? await findAvailablePort(options.portStart ?? 3000);
+  const localPort =
+    options.port ?? (await findAvailablePort(options.portStart ?? 3000));
   const proxy =
     proxyPort === localPort
       ? undefined
@@ -106,8 +117,8 @@ export async function runLocalRuntimeTunnelCommand(
         });
 
   const command = spawn(
-    options.command[0]!,
-    options.command.slice(1).map((arg) => arg.replaceAll("$TUNNEL_PORT", String(localPort))),
+    commandName,
+    commandArgs.map((arg) => arg.replaceAll("$TUNNEL_PORT", String(localPort))),
     {
       env: {
         ...childEnvironment(),
@@ -170,7 +181,10 @@ async function fetchLocalRuntimeTunnelConnector(
     let message = `Tilde API request failed with status ${response.status}`;
     if (body) {
       try {
-        const parsed = JSON.parse(body) as { message?: unknown; error?: unknown };
+        const parsed = JSON.parse(body) as {
+          message?: unknown;
+          error?: unknown;
+        };
         const parsedMessage = parsed.message ?? parsed.error;
         if (typeof parsedMessage === "string" && parsedMessage.trim()) {
           message = parsedMessage;
@@ -217,7 +231,10 @@ async function startHttpProxy(options: {
         headers: incoming.headers,
       },
       (proxyResponse) => {
-        outgoing.writeHead(proxyResponse.statusCode ?? 502, proxyResponse.headers);
+        outgoing.writeHead(
+          proxyResponse.statusCode ?? 502,
+          proxyResponse.headers,
+        );
         proxyResponse.pipe(outgoing);
       },
     );
