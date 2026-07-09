@@ -6,6 +6,8 @@ import { pathToFileURL } from "node:url";
 import { ensureDesktopAuth } from "./auth";
 import { type AgentCli, configureTildeSessionForCli } from "./index";
 
+const DEFAULT_TILDE_API_BASE_URL = "https://api.trytilde.ai";
+
 type CliOptions = {
   cli?: AgentCli;
   baseUrl: string;
@@ -49,7 +51,7 @@ export function parseCliArgs(
 ): CliOptions {
   const inferredCli = inferCliFromExecutable(executable);
   const options: CliOptions = {
-    baseUrl: process.env.TILDE_API_BASE_URL ?? "https://api.tilde.test",
+    baseUrl: process.env.TILDE_API_BASE_URL ?? DEFAULT_TILDE_API_BASE_URL,
     homeDir: process.env.TILDE_AGENT_HOME ?? homedir(),
     interactive: process.env.CI !== "true",
     launch: inferredCli !== undefined,
@@ -194,7 +196,7 @@ function printHelp() {
   tilde-claude [options] -- <claude args>
 
 Options:
-  --base-url <url>       Tilde API base URL. Default: TILDE_API_BASE_URL or https://api.tilde.test
+  --base-url <url>       Tilde API base URL. Default: TILDE_API_BASE_URL or ${DEFAULT_TILDE_API_BASE_URL}
   --team-id <id>         Optional team filter. Default: discover all teams from whoami
   --team-name <name>     Display name used in selector labels. Default: TILDE_TEAM_NAME or team ID
   --api-key <key>        API key sent as Authorization: Bearer. Default: TILDE_API_KEY

@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { describe, expect, test } from "vitest";
 import { ensureDesktopAuth } from "./auth";
 import {
@@ -190,7 +190,63 @@ describe("Tilde plugin helpers", () => {
       throw new Error("Expected downloadSkillRegistry to write one file");
     }
     await expect(readFile(path, "utf8")).resolves.toContain(
-      "name: creating-useful-skill",
+      'name: "creating-useful-skill"',
+    );
+  });
+
+  test("sanitizes registry and skill filesystem paths and escapes frontmatter", async () => {
+    const fetch = async (url: URL | RequestInfo) => {
+      const path = requestUrl(url);
+      if (path.includes("/skill-summary")) {
+        return json({
+          items: [{ id: "skill-a", name: "../outside\nskill" }],
+        });
+      }
+      return json({
+        id: "skill-a",
+        name: "../outside\nskill",
+        description: "description\n---\ninjected: true",
+        content: "# Body",
+      });
+    };
+    const homeDir = await mkdtemp(join(tmpdir(), "tilde-plugin-safe-paths-"));
+    const files = await installSkillRegistriesForCli(
+      "claude",
+      {
+        baseUrl: "https://api.test",
+        teamId: "team-a",
+        fetch,
+      },
+      {
+        homeDir,
+        registries: [
+          {
+            id: "registry-a",
+            label: "Platform / ../Registry\nLabel",
+            teamId: "team-a",
+            teamName: "Platform",
+            registryName: "../Registry\nName",
+          },
+        ],
+      },
+    );
+
+    expect(files).toHaveLength(1);
+    const [file] = files;
+    if (!file) {
+      throw new Error("Expected one installed skill file");
+    }
+    const root = cliSkillInstallDir("claude", homeDir);
+    const relativeFile = relative(root, file);
+    expect(relativeFile.startsWith("..")).toBe(false);
+    expect(relativeFile).not.toContain("..");
+    expect(relativeFile).toContain("Registry-Name-registry-a");
+    expect(relativeFile).toContain("outside-skill-skill-a");
+    await expect(readFile(file, "utf8")).resolves.toContain(
+      'name: "../outside\\nskill"',
+    );
+    await expect(readFile(file, "utf8")).resolves.toContain(
+      'description: "description\\n---\\ninjected: true"',
     );
   });
 
@@ -275,6 +331,50 @@ describe("Tilde plugin helpers", () => {
       },
     );
     expect(files[0]).toContain(cliSkillInstallDir("claude", homeDir));
+  });
+
+  test("merges MCP config without deleting existing user entries", async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), "tilde-plugin-mcp-merge-"));
+    const configPath = cliMcpConfigPath("codex", homeDir);
+    await mkdir(join(configPath, ".."), { recursive: true });
+    await writeFile(
+      configPath,
+      `${JSON.stringify(
+        {
+          mcp_servers: {
+            "User / Existing": {
+              transport: "streamable_http",
+              url: "https://existing.test/mcp",
+            },
+          },
+          unrelated: { keep: true },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    await writeMcpConfigForCli("codex", {
+      homeDir,
+      servers: [
+        {
+          id: "server-a",
+          label: "Platform / Main",
+          teamId: "team-a",
+          teamName: "Platform",
+          serverName: "Main",
+          url: "https://mcp.test",
+        },
+      ],
+    });
+
+    const document = JSON.parse(await readFile(configPath, "utf8")) as {
+      mcp_servers: Record<string, unknown>;
+      unrelated: Record<string, unknown>;
+    };
+    expect(document.unrelated).toEqual({ keep: true });
+    expect(document.mcp_servers).toHaveProperty("User / Existing");
+    expect(document.mcp_servers).toHaveProperty("Platform / Main");
   });
 
   test.each([
@@ -442,6 +542,28 @@ describe("Tilde plugin helpers", () => {
     }
   });
 
+  test("times out abandoned interactive auth callbacks", async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), "tilde-plugin-auth-timeout-"));
+    await expect(
+      ensureDesktopAuth({
+        baseUrl: "https://api.test",
+        homeDir,
+        interactive: true,
+        callbackTimeoutMs: 1,
+        fetch: async (url: URL | RequestInfo) => {
+          const path = requestUrl(url);
+          if (path.includes("/identity/auth/whoami")) {
+            return new Response("missing", { status: 401 });
+          }
+          if (path.includes("/identity/oauth/register")) {
+            return json({ client_id: "tilde-dcr-test-client" });
+          }
+          throw new Error(`Unexpected request ${path}`);
+        },
+      }),
+    ).rejects.toThrow("Timed out waiting for Tilde OAuth callback");
+  });
+
   test("parses configure-only and wrapper CLI invocations", () => {
     expect(inferCliFromExecutable("/usr/local/bin/tilde-codex")).toBe("codex");
     expect(defaultCommandForCli("claude")).toBe("claude");
@@ -477,6 +599,7 @@ describe("Tilde plugin helpers", () => {
     expect(wrapper).toMatchObject({
       cli: "claude",
       teamId: "team-a",
+      baseUrl: "https://api.trytilde.ai",
       launch: true,
       passthrough: ["--dangerously-skip-permissions"],
     });

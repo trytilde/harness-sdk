@@ -1,7 +1,7 @@
 import type { UIMessage } from "ai";
 import {
-  type ChatKitConvertedMessage,
   type ChatKitContextClient,
+  type ChatKitConvertedMessage,
   currentChatKitContext,
 } from "./chatkit-context";
 
@@ -70,7 +70,7 @@ export type ConvertToAiSdkFileUploadHandler = (input: {
 export type ConvertToAiSdkCacheHandler = (input: {
   message: ChatKitMessage;
   convertedMessage: UIMessage;
-}) => Awaitable<ChatKitConvertedMessage | null | void>;
+}) => Awaitable<ChatKitConvertedMessage | null | undefined>;
 
 export type ConvertToAiSdkHydrateHandler = (input: {
   message: ChatKitMessage;
@@ -134,7 +134,9 @@ async function convertToAiSdkMessageInternal(
   const chatKitOptions = {
     ...options,
     message,
-  } satisfies InternalConvertToAiSdkMessageOptions & { message: ChatKitMessage };
+  } satisfies InternalConvertToAiSdkMessageOptions & {
+    message: ChatKitMessage;
+  };
   const hydrated = await hydrateCachedMessage(chatKitOptions);
   if (hydrated) return hydrated;
 
@@ -212,7 +214,10 @@ async function convertPartToAiSdkPart(
   options: ConvertToAiSdkMessageOptions & { message: ChatKitMessage },
 ): Promise<UIMessage["parts"][number] | null> {
   if (part.type === "text") {
-    return { type: "text", text: part.text ?? "" } as UIMessage["parts"][number];
+    return {
+      type: "text",
+      text: part.text ?? "",
+    } as UIMessage["parts"][number];
   }
   if (part.type === "reasoning") {
     return {
@@ -233,7 +238,9 @@ async function convertUiMessageToAiSdkMessage(
     ...message,
     parts: (
       await Promise.all(
-        message.parts.map((part) => convertUiPartToAiSdkPart(message, part, options)),
+        message.parts.map((part) =>
+          convertUiPartToAiSdkPart(message, part, options),
+        ),
       )
     ).filter((part): part is UIMessage["parts"][number] => part !== null),
   } as UIMessage;
@@ -244,7 +251,11 @@ async function convertUiPartToAiSdkPart(
   part: UIMessage["parts"][number],
   options: ConvertToAiSdkMessageOptions,
 ): Promise<UIMessage["parts"][number] | null> {
-  if (isRecord(part) && part.type === "file" && options.onUnprocessedFileUpload) {
+  if (
+    isRecord(part) &&
+    part.type === "file" &&
+    options.onUnprocessedFileUpload
+  ) {
     return options.onUnprocessedFileUpload({
       message,
       part: part as unknown as ChatKitUiFilePart,
@@ -299,7 +310,11 @@ function aiSdkMetadata(message: ChatKitMessage): Record<string, unknown> {
 function isChatKitUiPart(value: unknown): value is ChatKitUiPart {
   if (!isRecord(value) || typeof value.type !== "string") return false;
   if (value.type === "text" || value.type === "reasoning") {
-    return value.text === undefined || value.text === null || typeof value.text === "string";
+    return (
+      value.text === undefined ||
+      value.text === null ||
+      typeof value.text === "string"
+    );
   }
   if (value.type === "file") return typeof value.url === "string";
   return false;

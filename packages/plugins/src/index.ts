@@ -1,4 +1,4 @@
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import checkbox from "@inquirer/checkbox";
 import {
@@ -191,7 +191,10 @@ export async function downloadSkillRegistry(
         path: { team_id: teamId, id: input.registryId, skill_id: summary.id },
       }),
     );
-    const skillDir = join(input.outputDir, skill.name);
+    const skillDir = join(
+      input.outputDir,
+      resourcePathSegment(skill.name, skill.id ?? summary.id),
+    );
     await mkdir(skillDir, { recursive: true });
     const path = join(skillDir, "SKILL.md");
     await writeFile(path, toSkillMarkdown(skill, input.metadata), "utf8");
@@ -278,11 +281,9 @@ export async function writeMcpConfigForCli(
 ): Promise<string> {
   const path = cliMcpConfigPath(cli, input.homeDir);
   await mkdir(join(path, ".."), { recursive: true });
-  await writeFile(
-    path,
-    `${JSON.stringify(mcpConfigDocumentForCli(cli, input.servers), null, 2)}\n`,
-    "utf8",
-  );
+  const existing = await readJsonConfig(path);
+  const document = mergeMcpConfigDocumentForCli(cli, existing, input.servers);
+  await writeFile(path, `${JSON.stringify(document, null, 2)}\n`, "utf8");
   return path;
 }
 
@@ -297,7 +298,10 @@ export async function installSkillRegistriesForCli(
   await mkdir(tmp, { recursive: true });
   const written: string[] = [];
   for (const registry of input.registries) {
-    const registryDir = join(tmp, registry.registryName);
+    const registryDir = join(
+      tmp,
+      resourcePathSegment(registry.registryName, registry.id),
+    );
     written.push(
       ...(await downloadSkillRegistry(config, {
         registryId: registry.id,
@@ -413,9 +417,93 @@ function toSkillMarkdown(
   registry?: TildeSkillRegistryChoice,
 ): string {
   const metadata = registry
-    ? `\n<!-- tilde-registry-id: ${registry.id} -->\n<!-- tilde-registry-label: ${registry.label} -->\n`
+    ? `\n<!-- tilde-registry-id: ${htmlCommentValue(registry.id)} -->\n<!-- tilde-registry-label: ${htmlCommentValue(registry.label)} -->\n`
     : "";
-  return `---\nname: ${skill.name}\ndescription: ${skill.description}\n---\n${metadata}\n${skill.content.trim()}\n`;
+  return `---\nname: ${yamlString(skill.name)}\ndescription: ${yamlString(skill.description)}\n---\n${metadata}\n${skill.content.trim()}\n`;
+}
+
+async function readJsonConfig(path: string): Promise<Record<string, unknown>> {
+  let contents: string;
+  try {
+    contents = await readFile(path, "utf8");
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") return {};
+    throw error;
+  }
+  if (contents.trim().length === 0) return {};
+  const parsed = JSON.parse(contents) as unknown;
+  if (!isRecord(parsed)) {
+    throw new Error(`Existing MCP config at ${path} must be a JSON object`);
+  }
+  return parsed;
+}
+
+function mergeMcpConfigDocumentForCli(
+  cli: AgentCli,
+  existing: Record<string, unknown>,
+  servers: TildeMcpServerChoice[],
+): Record<string, unknown> {
+  const key = mcpConfigServerKeyForCli(cli);
+  const generated = mcpConfigDocumentForCli(cli, servers);
+  const existingServers = isRecord(existing[key]) ? existing[key] : {};
+  const generatedServers = isRecord(generated[key]) ? generated[key] : {};
+  return {
+    ...existing,
+    [key]: {
+      ...existingServers,
+      ...generatedServers,
+    },
+  };
+}
+
+function mcpConfigServerKeyForCli(
+  cli: AgentCli,
+): "mcp" | "mcpServers" | "mcp_servers" {
+  switch (cli) {
+    case "codex":
+      return "mcp_servers";
+    case "opencode":
+      return "mcp";
+    case "claude":
+    case "cursor":
+    case "gemini":
+      return "mcpServers";
+  }
+}
+
+function resourcePathSegment(displayName: string, id: string): string {
+  const nameSegment = safePathSegment(displayName, "resource").slice(0, 80);
+  const idSegment = safePathSegment(id, "id").slice(0, 36);
+  return `${nameSegment}-${idSegment}`;
+}
+
+function safePathSegment(value: string, fallback: string): string {
+  const sanitized = value
+    .trim()
+    .replace(/[\\/]+/g, "-")
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+  if (!sanitized || sanitized === "." || sanitized === "..") {
+    return fallback;
+  }
+  return sanitized;
+}
+
+function yamlString(value: string): string {
+  return JSON.stringify(value);
+}
+
+function htmlCommentValue(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").replaceAll("--", "- -");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }
 
 function formatFetchError(error: unknown): string {

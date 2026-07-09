@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { loadDotenvFiles } from "./env";
 import { ensureHarnessAuth } from "./auth";
-import { runLocalRuntimeTunnelCommand } from "./tunnel";
+import { loadDotenvFiles } from "./env";
 import type { RunLocalRuntimeTunnelCommandOptions } from "./tunnel";
+import { runLocalRuntimeTunnelCommand } from "./tunnel";
 
 type ParsedArgs = {
   commandName: "login" | "tunnel";
@@ -27,7 +27,8 @@ async function main() {
     throw new Error("Usage: harness-sdk tunnel [-p PORT] -- <command>");
   }
 
-  const baseUrl = args.baseUrl ?? env("TILDE_BASE_URL") ?? requiredEnv("TILDE_BASE_API_URL");
+  const baseUrl =
+    args.baseUrl ?? env("TILDE_BASE_URL") ?? requiredEnv("TILDE_BASE_API_URL");
   configureLocalDevTls(baseUrl);
   const options: RunLocalRuntimeTunnelCommandOptions = {
     baseUrl,
@@ -68,9 +69,11 @@ async function main() {
 }
 
 async function runLogin(args: ParsedArgs): Promise<void> {
-  const baseUrl = args.baseUrl ?? env("TILDE_BASE_URL") ?? requiredEnv("TILDE_BASE_API_URL");
+  const baseUrl =
+    args.baseUrl ?? env("TILDE_BASE_URL") ?? requiredEnv("TILDE_BASE_API_URL");
   configureLocalDevTls(baseUrl);
-  const teamId = args.teamId ?? process.env.TILDE_TEAM_ID ?? "daniels-workspace";
+  const teamId =
+    args.teamId ?? process.env.TILDE_TEAM_ID ?? "daniels-workspace";
   const options = {
     baseUrl,
     teamId,

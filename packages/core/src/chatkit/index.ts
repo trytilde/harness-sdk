@@ -172,10 +172,13 @@ export class ChatKitClient {
       download_url: string;
       expires_at: string;
     }>(this.#config, {
-      path: pathWithParams(teamPath(this.#config, ATTACHMENT_DOWNLOAD_URL_PATH), {
-        session_id: input.sessionId,
-        attachment_id: input.attachmentId,
-      }),
+      path: pathWithParams(
+        teamPath(this.#config, ATTACHMENT_DOWNLOAD_URL_PATH),
+        {
+          session_id: input.sessionId,
+          attachment_id: input.attachmentId,
+        },
+      ),
     });
     return {
       attachment: raw.attachment,

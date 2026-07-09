@@ -65,9 +65,6 @@ importers:
       '@inquirer/checkbox':
         specifier: ^5.2.1
         version: 5.2.1(@types/node@24.13.1)
-      '@tilde/api-client':
-        specifier: workspace:*
-        version: link:../api-client
       '@tilde/harness-sdk':
         specifier: workspace:*
         version: link:../core

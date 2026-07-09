@@ -92,7 +92,10 @@ function baseUrlFromOrgId(
   return apiUrl.toString();
 }
 
-function canonicalizeBaseUrlForOrg(baseUrl: string, orgId: string | undefined): string {
+function canonicalizeBaseUrlForOrg(
+  baseUrl: string,
+  orgId: string | undefined,
+): string {
   const trimmedBaseUrl = baseUrl.replace(/\/+$/, "");
   if (!orgId || orgId.trim().length === 0) {
     return trimmedBaseUrl;
@@ -104,7 +107,10 @@ function canonicalizeBaseUrlForOrg(baseUrl: string, orgId: string | undefined): 
     );
   }
   const url = new URL(trimmedBaseUrl);
-  if (url.hostname === normalizedOrgId || url.hostname.startsWith(`${normalizedOrgId}.`)) {
+  if (
+    url.hostname === normalizedOrgId ||
+    url.hostname.startsWith(`${normalizedOrgId}.`)
+  ) {
     return url.toString().replace(/\/+$/, "");
   }
   url.hostname = `${normalizedOrgId}.${url.hostname}`;

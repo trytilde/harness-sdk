@@ -1,5 +1,5 @@
-import type { UIMessage } from "ai";
 import { configHeaders } from "@tilde/harness-sdk";
+import type { UIMessage } from "ai";
 import type {
   ChatKitUiFilePart,
   ConvertToAiSdkFileUploadHandler,

@@ -108,7 +108,8 @@ describe("harness auth cache", () => {
         return Response.json({
           device_code: "device-1",
           user_code: "ABCD-EFGH",
-          verification_uri: "https://api.example.test/api/v1/identity/oauth/device/authorize",
+          verification_uri:
+            "https://api.example.test/api/v1/identity/oauth/device/authorize",
           verification_uri_complete:
             "https://api.example.test/api/v1/identity/oauth/device/authorize?user_code=ABCD-EFGH",
           expires_in: 600,

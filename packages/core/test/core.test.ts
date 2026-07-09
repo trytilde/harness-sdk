@@ -184,7 +184,6 @@ describe("createConfig", () => {
       }),
     ).toThrow("baseUrl must be an absolute URL");
   });
-
 });
 
 describe("MCP client", () => {
@@ -477,16 +476,18 @@ describe("MCP client", () => {
 
 describe("ChatKit client", () => {
   it("lists message history through the canonical ChatKit sessions route", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe(
-        "https://org-123.api.example.test/api/v1/team/team_123/chatkit/sessions/session_1/messages?page_size=10&next_page_token=next",
-      );
-      expect(new Headers(init?.headers).has("x-tilde-org-id")).toBe(false);
-      return Response.json({
-        items: [{ id: "msg_1" }],
-        next_page_token: "older",
-      });
-    });
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        expect(String(input)).toBe(
+          "https://org-123.api.example.test/api/v1/team/team_123/chatkit/sessions/session_1/messages?page_size=10&next_page_token=next",
+        );
+        expect(new Headers(init?.headers).has("x-tilde-org-id")).toBe(false);
+        return Response.json({
+          items: [{ id: "msg_1" }],
+          next_page_token: "older",
+        });
+      },
+    );
     const client = createClient({
       baseUrl: "https://api.example.test",
       orgId: "org-123",
@@ -508,10 +509,28 @@ describe("ChatKit client", () => {
   });
 
   it("caches and hydrates converted ChatKit messages", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).endsWith("/chatkit/messages/converted-cache")) {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).endsWith("/chatkit/messages/converted-cache")) {
+          expect(init?.method).toBe("POST");
+          expect(await new Response(init?.body).json()).toEqual({
+            messages: [
+              {
+                chatkit_message_id: "msg_1",
+                message: { id: "msg_1", role: "user", parts: [] },
+              },
+            ],
+          });
+          return Response.json({ success: true });
+        }
+        expect(String(input)).toBe(
+          "https://org-123.api.example.test/api/v1/team/team_123/chatkit/messages/converted-cache/hydrate",
+        );
         expect(init?.method).toBe("POST");
         expect(await new Response(init?.body).json()).toEqual({
+          message_ids: ["msg_1"],
+        });
+        return Response.json({
           messages: [
             {
               chatkit_message_id: "msg_1",
@@ -519,24 +538,8 @@ describe("ChatKit client", () => {
             },
           ],
         });
-        return Response.json({ success: true });
-      }
-      expect(String(input)).toBe(
-        "https://org-123.api.example.test/api/v1/team/team_123/chatkit/messages/converted-cache/hydrate",
-      );
-      expect(init?.method).toBe("POST");
-      expect(await new Response(init?.body).json()).toEqual({
-        message_ids: ["msg_1"],
-      });
-      return Response.json({
-        messages: [
-          {
-            chatkit_message_id: "msg_1",
-            message: { id: "msg_1", role: "user", parts: [] },
-          },
-        ],
-      });
-    });
+      },
+    );
     const client = createClient({
       baseUrl: "https://api.example.test",
       orgId: "org-123",

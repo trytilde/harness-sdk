@@ -8,6 +8,7 @@ export type DesktopAuthOptions = {
   baseUrl: string;
   homeDir: string;
   interactive: boolean;
+  callbackTimeoutMs?: number;
   fetch?: typeof fetch;
 };
 
@@ -76,7 +77,11 @@ async function runBrowserPkceAuth(
       `Opening browser for Tilde auth: ${authorizeUrl.toString()}\n`,
     );
     openBrowser(authorizeUrl.toString());
-    const code = await callback.code;
+    const code = await withTimeout(
+      callback.code,
+      options.callbackTimeoutMs ?? 5 * 60_000,
+      "Timed out waiting for Tilde OAuth callback",
+    );
     const token = await exchangeCode(options, {
       code,
       codeVerifier,
@@ -295,6 +300,24 @@ function openBrowser(url: string): void {
     process.stderr.write(`Open this URL to authenticate: ${url}\n`);
   });
   child.unref();
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  if (timeoutMs <= 0) return promise;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<T>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    if (typeof timer === "object" && "unref" in timer) {
+      timer.unref();
+    }
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 function base64Url(bytes: Buffer): string {
