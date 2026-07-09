@@ -3,14 +3,20 @@ import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
+const apiDir = process.env.TILDE_API_DIR ?? resolve(root, "../tilde-api");
 const source =
-  process.env.TILDE_OPENAPI_PATH ?? "/root/tilde-api/openapi.cloud.json";
+  process.env.TILDE_OPENAPI_PATH ?? resolve(apiDir, "openapi.cloud.json");
+const rootSpecTarget = resolve(root, "openapi.cloud.json");
 const specTarget = resolve(root, "specs/openapi.cloud.json");
 const typeTarget = resolve(root, "packages/core/src/generated/schema.d.ts");
 
+await mkdir(dirname(rootSpecTarget), { recursive: true });
 await mkdir(dirname(specTarget), { recursive: true });
 await mkdir(dirname(typeTarget), { recursive: true });
+await copyFile(source, rootSpecTarget);
 await copyFile(source, specTarget);
+
+await run("pnpm", ["exec", "openapi-ts"]);
 
 await run("pnpm", [
   "exec",

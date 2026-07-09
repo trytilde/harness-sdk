@@ -1,6 +1,7 @@
-import type { Config } from "../config";
+import { mcpServerUrl } from "@tilde/api-client";
+import type { NormalizedConfig } from "../config";
 import { requestJson } from "../internal/fetch-client";
-import { buildUrl, pathWithParams, teamPath } from "../internal/paths";
+import { pathWithParams, teamPath } from "../internal/paths";
 import {
   type LocalMcpTool,
   type LocalMcpToolsClient,
@@ -11,8 +12,6 @@ import {
 const MCP_SERVER_PATH = "/api/v1/team/{team_id}/mcp/mcp-server";
 const MCP_SERVER_INSTANCE_PATH =
   "/api/v1/team/{team_id}/mcp/mcp-server/{mcp_server_instance_id}";
-const MCP_PROTOCOL_PATH =
-  "/api/v1/team/{team_id}/mcp/mcp-server/{mcp_server_instance_id}/mcp";
 const AVAILABLE_TOOL_GROUPS_PATH =
   "/api/v1/team/{team_id}/mcp/available-tool-groups";
 const CREATE_TOOL_GROUP_PATH =
@@ -86,9 +85,9 @@ type Paginated<T> = {
 };
 
 export class McpClient {
-  readonly #config: Config;
+  readonly #config: NormalizedConfig;
 
-  constructor(config: Config) {
+  constructor(config: NormalizedConfig) {
     this.#config = config;
   }
 
@@ -254,12 +253,14 @@ export class McpClient {
   }
 
   getServerUrl(input: { id: string }): string {
-    return buildUrl(
-      this.#config,
-      pathWithParams(teamPath(this.#config, MCP_PROTOCOL_PATH), {
-        mcp_server_instance_id: input.id,
-      }),
-    );
+    if (!this.#config.baseUrl) {
+      throw new TypeError("baseUrl is required to build an MCP server URL");
+    }
+    return mcpServerUrl({
+      baseUrl: this.#config.baseUrl,
+      teamId: this.#config.teamId,
+      serverId: input.id,
+    });
   }
 
   withLocalTools<TClient extends object>(input: {

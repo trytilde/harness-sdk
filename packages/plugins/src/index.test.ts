@@ -1,50 +1,100 @@
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { ensureDesktopAuth } from "./auth";
+import {
+  defaultCommandForCli,
+  inferCliFromExecutable,
+  parseCliArgs,
+} from "./cli";
 import {
   cliMcpConfigPath,
   cliSkillInstallDir,
   configureTildeSessionForCli,
   downloadSkillRegistry,
   installSkillRegistriesForCli,
-  listTildeTeamChoices,
   listTildeMcpServerChoices,
   listTildeSkillRegistryChoices,
+  listTildeTeamChoices,
   mcpConfigDocumentForCli,
   mcpServerConfigForCli,
   writeMcpConfigForCli,
 } from "./index";
-import {
-  defaultCommandForCli,
-  inferCliFromExecutable,
-  parseCliArgs,
-} from "./cli";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+
+function requestUrl(input: URL | RequestInfo): string {
+  return input instanceof Request ? input.url : input.toString();
+}
+
+function requestHeaders(input: URL | RequestInfo, init?: RequestInit): Headers {
+  return new Headers(
+    init?.headers ?? (input instanceof Request ? input.headers : undefined),
+  );
+}
+
+function requestMethod(input: URL | RequestInfo, init?: RequestInit): string {
+  return init?.method ?? (input instanceof Request ? input.method : "GET");
+}
+
+async function requestBodyText(
+  input: URL | RequestInfo,
+  init?: RequestInit,
+): Promise<string> {
+  if (typeof init?.body === "string") {
+    return init.body;
+  }
+  if (init?.body instanceof URLSearchParams) {
+    return init.body.toString();
+  }
+  if (init?.body !== undefined && init.body !== null) {
+    return String(init.body);
+  }
+  if (input instanceof Request) {
+    return input.clone().text();
+  }
+  return "";
+}
+
+async function requestJsonBody<T>(
+  input: URL | RequestInfo,
+  init?: RequestInit,
+): Promise<T> {
+  return JSON.parse(await requestBodyText(input, init)) as T;
+}
 
 describe("Tilde plugin helpers", () => {
   test("renders team/name labels for MCP servers and registries", async () => {
     const fetch = async (url: URL | RequestInfo) => {
-      const path = url.toString();
+      const path = requestUrl(url);
       if (path.includes("/mcp/mcp-server")) {
-        return json({ items: [{ id: "server-a", name: "Default MCP", url: "https://mcp.test" }] });
+        return json({
+          items: [
+            { id: "server-a", name: "Default MCP", url: "https://mcp.test" },
+          ],
+        });
       }
-      return json({ items: [{ id: "registry-a", name: "Default Skills", description: "Core" }] });
+      return json({
+        items: [
+          { id: "registry-a", name: "Default Skills", description: "Core" },
+        ],
+      });
     };
     const config = { baseUrl: "https://api.test", teamId: "team-a", fetch };
-    await expect(listTildeMcpServerChoices(config, { teamName: "Platform" })).resolves.toMatchObject([
-      { label: "Platform / Default MCP" },
-    ]);
-    await expect(listTildeSkillRegistryChoices(config, { teamName: "Platform" })).resolves.toMatchObject([
-      { label: "Platform / Default Skills" },
-    ]);
+    await expect(
+      listTildeMcpServerChoices(config, { teamName: "Platform" }),
+    ).resolves.toMatchObject([{ label: "Platform / Default MCP" }]);
+    await expect(
+      listTildeSkillRegistryChoices(config, { teamName: "Platform" }),
+    ).resolves.toMatchObject([{ label: "Platform / Default Skills" }]);
   });
 
   test("discovers teams from whoami and lists resources across each team", async () => {
     const seen: string[] = [];
     const fetch = async (url: URL | RequestInfo, init?: RequestInit) => {
-      expect(init?.headers).toMatchObject({ Authorization: "Bearer access-token" });
-      const path = url.toString();
+      expect(requestHeaders(url, init).get("Authorization")).toBe(
+        "Bearer access-token",
+      );
+      const path = requestUrl(url);
       seen.push(path);
       if (path.includes("/identity/auth/whoami")) {
         return json({
@@ -68,7 +118,11 @@ describe("Tilde plugin helpers", () => {
       }
       throw new Error(`Unexpected request ${path}`);
     };
-    const config = { baseUrl: "https://api.test", accessToken: "access-token", fetch };
+    const config = {
+      baseUrl: "https://api.test",
+      accessToken: "access-token",
+      fetch,
+    };
 
     await expect(listTildeTeamChoices(config)).resolves.toMatchObject([
       { teamId: "team-a", teamName: "Platform", orgId: "org-a" },
@@ -90,21 +144,29 @@ describe("Tilde plugin helpers", () => {
     ]);
     await expect(listTildeSkillRegistryChoices(config)).resolves.toMatchObject([
       { id: "registry-a", teamId: "team-a", label: "Platform / Core Skills" },
-      { id: "registry-b", teamId: "team-b", label: "Research / Research Skills" },
+      {
+        id: "registry-b",
+        teamId: "team-b",
+        label: "Research / Research Skills",
+      },
     ]);
-    expect(seen).toEqual(expect.arrayContaining([
-      "https://api.test/api/v1/team/team-a/mcp/mcp-server?page_size=100",
-      "https://api.test/api/v1/team/team-b/mcp/mcp-server?page_size=100",
-      "https://api.test/api/v1/team/team-a/skill-registry?page_size=100",
-      "https://api.test/api/v1/team/team-b/skill-registry?page_size=100",
-    ]));
+    expect(seen).toEqual(
+      expect.arrayContaining([
+        "https://api.test/api/v1/team/team-a/mcp/mcp-server?page_size=100",
+        "https://api.test/api/v1/team/team-b/mcp/mcp-server?page_size=100",
+        "https://api.test/api/v1/team/team-a/skill-registry?page_size=100",
+        "https://api.test/api/v1/team/team-b/skill-registry?page_size=100",
+      ]),
+    );
   });
 
   test("writes registry skills as SKILL.md files", async () => {
     const fetch = async (url: URL | RequestInfo) => {
-      const path = url.toString();
+      const path = requestUrl(url);
       if (path.includes("/skill-summary")) {
-        return json({ items: [{ id: "skill-a", name: "creating-useful-skill" }] });
+        return json({
+          items: [{ id: "skill-a", name: "creating-useful-skill" }],
+        });
       }
       expect(path).toContain("/skill-registry/registry-a/skill/skill-a");
       return json({
@@ -114,15 +176,22 @@ describe("Tilde plugin helpers", () => {
       });
     };
     const outputDir = await mkdtemp(join(tmpdir(), "tilde-skills-"));
-    const written = await downloadSkillRegistry({
-      baseUrl: "https://api.test",
-      teamId: "team-a",
-      fetch,
-    }, { registryId: "registry-a", outputDir });
+    const written = await downloadSkillRegistry(
+      {
+        baseUrl: "https://api.test",
+        teamId: "team-a",
+        fetch,
+      },
+      { registryId: "registry-a", outputDir },
+    );
     expect(written).toHaveLength(1);
     const [path] = written;
-    expect(path).toBeDefined();
-    await expect(readFile(path!, "utf8")).resolves.toContain("name: creating-useful-skill");
+    if (!path) {
+      throw new Error("Expected downloadSkillRegistry to write one file");
+    }
+    await expect(readFile(path, "utf8")).resolves.toContain(
+      "name: creating-useful-skill",
+    );
   });
 
   test("creates MCP config documents for supported CLIs", () => {
@@ -138,11 +207,19 @@ describe("Tilde plugin helpers", () => {
       transport: "streamable_http",
       url: "https://mcp.test",
     });
-    expect(mcpConfigDocumentForCli("claude", [server])).toHaveProperty("mcpServers");
-    expect(mcpConfigDocumentForCli("codex", [server])).toHaveProperty("mcp_servers");
-    expect(mcpConfigDocumentForCli("cursor", [server])).toHaveProperty("mcpServers");
+    expect(mcpConfigDocumentForCli("claude", [server])).toHaveProperty(
+      "mcpServers",
+    );
+    expect(mcpConfigDocumentForCli("codex", [server])).toHaveProperty(
+      "mcp_servers",
+    );
+    expect(mcpConfigDocumentForCli("cursor", [server])).toHaveProperty(
+      "mcpServers",
+    );
     expect(mcpConfigDocumentForCli("opencode", [server])).toHaveProperty("mcp");
-    expect(mcpConfigDocumentForCli("gemini", [server])).toHaveProperty("mcpServers");
+    expect(mcpConfigDocumentForCli("gemini", [server])).toHaveProperty(
+      "mcpServers",
+    );
   });
 
   test("writes CLI config and installs registries atomically", async () => {
@@ -160,12 +237,16 @@ describe("Tilde plugin helpers", () => {
       servers: [server],
     });
     expect(configPath).toBe(cliMcpConfigPath("claude", homeDir));
-    await expect(readFile(configPath, "utf8")).resolves.toContain("Platform / Main");
+    await expect(readFile(configPath, "utf8")).resolves.toContain(
+      "Platform / Main",
+    );
 
     const fetch = async (url: URL | RequestInfo) => {
-      const path = url.toString();
+      const path = requestUrl(url);
       if (path.includes("/skill-summary")) {
-        return json({ items: [{ id: "skill-a", name: "creating-useful-skill" }] });
+        return json({
+          items: [{ id: "skill-a", name: "creating-useful-skill" }],
+        });
       }
       return json({
         name: "creating-useful-skill",
@@ -173,95 +254,123 @@ describe("Tilde plugin helpers", () => {
         content: "# Body",
       });
     };
-    const files = await installSkillRegistriesForCli("claude", {
-      baseUrl: "https://api.test",
-      teamId: "team-a",
-      fetch,
-    }, {
-      homeDir,
-      registries: [{
-        id: "registry-a",
-        label: "Platform / Skills",
-        teamId: "team-a",
-        teamName: "Platform",
-        registryName: "Skills",
-      }],
-    });
-    expect(files[0]).toContain(cliSkillInstallDir("claude", homeDir));
-  });
-
-  test.each(["claude", "codex", "cursor", "opencode", "gemini"] as const)(
-    "configures a non-interactive session for %s",
-    async (cli) => {
-      const homeDir = await mkdtemp(join(tmpdir(), `tilde-plugin-session-${cli}-`));
-      const fetch = async (url: URL | RequestInfo) => {
-        const path = url.toString();
-        if (path.includes("/mcp/mcp-server")) {
-          return json({ items: [{ id: "server-a", name: "Main" }] });
-        }
-        if (path.includes("/skill-registry?")) {
-          return json({ items: [{ id: "registry-a", name: "Skills" }] });
-        }
-        if (path.includes("/skill-summary")) {
-          return json({ items: [{ id: "skill-a", name: "creating-useful-skill" }] });
-        }
-        return json({
-          name: "creating-useful-skill",
-          description: "Creates useful skills",
-          content: "# Body",
-        });
-      };
-      const result = await configureTildeSessionForCli(cli, {
+    const files = await installSkillRegistriesForCli(
+      "claude",
+      {
         baseUrl: "https://api.test",
         teamId: "team-a",
         fetch,
-      }, {
+      },
+      {
+        homeDir,
+        registries: [
+          {
+            id: "registry-a",
+            label: "Platform / Skills",
+            teamId: "team-a",
+            teamName: "Platform",
+            registryName: "Skills",
+          },
+        ],
+      },
+    );
+    expect(files[0]).toContain(cliSkillInstallDir("claude", homeDir));
+  });
+
+  test.each([
+    "claude",
+    "codex",
+    "cursor",
+    "opencode",
+    "gemini",
+  ] as const)("configures a non-interactive session for %s", async (cli) => {
+    const homeDir = await mkdtemp(
+      join(tmpdir(), `tilde-plugin-session-${cli}-`),
+    );
+    const fetch = async (url: URL | RequestInfo) => {
+      const path = requestUrl(url);
+      if (path.includes("/mcp/mcp-server")) {
+        return json({ items: [{ id: "server-a", name: "Main" }] });
+      }
+      if (path.includes("/skill-registry?")) {
+        return json({ items: [{ id: "registry-a", name: "Skills" }] });
+      }
+      if (path.includes("/skill-summary")) {
+        return json({
+          items: [{ id: "skill-a", name: "creating-useful-skill" }],
+        });
+      }
+      return json({
+        name: "creating-useful-skill",
+        description: "Creates useful skills",
+        content: "# Body",
+      });
+    };
+    const result = await configureTildeSessionForCli(
+      cli,
+      {
+        baseUrl: "https://api.test",
+        teamId: "team-a",
+        fetch,
+      },
+      {
         homeDir,
         teamName: "Platform",
         interactive: false,
-      });
-      expect(result.mcpConfigPath).toBe(cliMcpConfigPath(cli, homeDir));
-      expect(result.skillFiles).toHaveLength(1);
-      const mcpConfig = await readFile(result.mcpConfigPath, "utf8");
-      expect(mcpConfig).toContain("Platform / Main");
-      expect(mcpConfig).toContain("https://api.test/api/v1/team/team-a/mcp/mcp-server/server-a/mcp");
-      expect(result.skillFiles[0]).toContain(cliSkillInstallDir(cli, homeDir));
-    },
-  );
+      },
+    );
+    expect(result.mcpConfigPath).toBe(cliMcpConfigPath(cli, homeDir));
+    expect(result.skillFiles).toHaveLength(1);
+    const mcpConfig = await readFile(result.mcpConfigPath, "utf8");
+    expect(mcpConfig).toContain("Platform / Main");
+    expect(mcpConfig).toContain(
+      "https://api.test/api/v1/team/team-a/mcp/mcp-server/server-a/mcp",
+    );
+    expect(result.skillFiles[0]).toContain(cliSkillInstallDir(cli, homeDir));
+  });
 
   test("refreshes stored desktop auth tokens in non-interactive mode", async () => {
     const homeDir = await mkdtemp(join(tmpdir(), "tilde-plugin-auth-"));
     const storeDir = join(homeDir, ".tilde", "harness-plugins");
     await mkdir(storeDir, { recursive: true });
-    await writeFile(join(storeDir, "auth.json"), JSON.stringify({
-      tokens: {
-        "https://api.test": {
-          access_token: "old-token",
-          refresh_token: "refresh-token",
+    await writeFile(
+      join(storeDir, "auth.json"),
+      JSON.stringify({
+        tokens: {
+          "https://api.test": {
+            access_token: "old-token",
+            refresh_token: "refresh-token",
+          },
         },
-      },
-    }));
+      }),
+    );
 
     const fetch = async (url: URL | RequestInfo, init?: RequestInit) => {
-      const path = url.toString();
+      const path = requestUrl(url);
       if (path.includes("/identity/auth/whoami")) {
-        expect(init?.headers).toMatchObject({ Authorization: "Bearer old-token" });
+        expect(requestHeaders(url, init).get("Authorization")).toBe(
+          "Bearer old-token",
+        );
         return new Response("expired", { status: 401 });
       }
       if (path.includes("/identity/auth/refresh")) {
-        expect(init?.method).toBe("POST");
+        expect(requestMethod(url, init)).toBe("POST");
         return json({ access_token: "new-token", expires_in: 3600 });
       }
       throw new Error(`Unexpected request ${path}`);
     };
 
-    await expect(ensureDesktopAuth({
-      baseUrl: "https://api.test",
-      homeDir,
-      interactive: false,
-      fetch,
-    })).resolves.toBe("new-token");
-    await expect(readFile(join(storeDir, "auth.json"), "utf8")).resolves.toContain("new-token");
+    await expect(
+      ensureDesktopAuth({
+        baseUrl: "https://api.test",
+        homeDir,
+        interactive: false,
+        fetch,
+      }),
+    ).resolves.toBe("new-token");
+    await expect(
+      readFile(join(storeDir, "auth.json"), "utf8"),
+    ).resolves.toContain("new-token");
   });
 
   test("uses dynamic client registration for interactive auth", async () => {
@@ -271,7 +380,9 @@ describe("Tilde plugin helpers", () => {
     process.stderr.write = ((chunk: string | Uint8Array) => {
       const text = chunk.toString();
       if (text.startsWith("Opening browser for Tilde auth: ")) {
-        opened.push(text.slice("Opening browser for Tilde auth: ".length).trim());
+        opened.push(
+          text.slice("Opening browser for Tilde auth: ".length).trim(),
+        );
       }
       return true;
     }) as typeof process.stderr.write;
@@ -281,19 +392,24 @@ describe("Tilde plugin helpers", () => {
         homeDir,
         interactive: true,
         fetch: async (url: URL | RequestInfo, init?: RequestInit) => {
-          const path = url.toString();
+          const path = requestUrl(url);
           if (path.includes("/identity/auth/whoami")) {
             return new Response("missing", { status: 401 });
           }
           if (path.includes("/identity/oauth/register")) {
-            expect(init?.method).toBe("POST");
-            const body = JSON.parse(init?.body as string) as { resource: string; redirect_uris: string[] };
+            expect(requestMethod(url, init)).toBe("POST");
+            const body = await requestJsonBody<{
+              resource: string;
+              redirect_uris: string[];
+            }>(url, init);
             expect(body.resource).toBe("https://api.test/mcp");
-            expect(body.redirect_uris[0]).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/callback$/);
+            expect(body.redirect_uris[0]).toMatch(
+              /^http:\/\/127\.0\.0\.1:\d+\/callback$/,
+            );
             return json({ client_id: "tilde-dcr-test-client" });
           }
           if (path.includes("/identity/oauth/token")) {
-            const body = init?.body as URLSearchParams;
+            const body = new URLSearchParams(await requestBodyText(url, init));
             expect(body.get("client_id")).toBe("tilde-dcr-test-client");
             return json({
               access_token: "desktop-access-token",
@@ -305,10 +421,21 @@ describe("Tilde plugin helpers", () => {
         },
       });
       await waitFor(() => opened.length === 1);
-      const url = new URL(opened[0]!);
+      const openedUrl = opened.at(0);
+      if (!openedUrl) {
+        throw new Error("Expected desktop auth to open an authorization URL");
+      }
+      const url = new URL(openedUrl);
       expect(url.searchParams.get("client_id")).toBe("tilde-dcr-test-client");
-      expect(url.searchParams.get("redirect_uri")).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/callback$/);
-      await fetch(url.searchParams.get("redirect_uri")! + `?code=test-code&state=${url.searchParams.get("state")}`);
+      const redirectUri = url.searchParams.get("redirect_uri");
+      const state = url.searchParams.get("state");
+      expect(redirectUri).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/callback$/);
+      if (!redirectUri || !state) {
+        throw new Error(
+          "Expected desktop auth URL to include redirect_uri and state",
+        );
+      }
+      await fetch(`${redirectUri}?code=test-code&state=${state}`);
       await expect(auth).resolves.toBe("desktop-access-token");
     } finally {
       process.stderr.write = originalOpen;
@@ -366,7 +493,8 @@ function json(body: unknown): Response {
 async function waitFor(predicate: () => boolean): Promise<void> {
   const deadline = Date.now() + 1_000;
   while (!predicate()) {
-    if (Date.now() > deadline) throw new Error("Timed out waiting for predicate");
+    if (Date.now() > deadline)
+      throw new Error("Timed out waiting for predicate");
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }

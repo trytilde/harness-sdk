@@ -1,4 +1,4 @@
-import type { Config } from "../config";
+import type { NormalizedConfig } from "../config";
 import { requestJson } from "../internal/fetch-client";
 import { pathWithParams, teamPath } from "../internal/paths";
 
@@ -13,9 +13,9 @@ type Paginated<T> = {
 };
 
 export class MessagesClient {
-  readonly #config: Config;
+  readonly #config: NormalizedConfig;
 
-  constructor(config: Config) {
+  constructor(config: NormalizedConfig) {
     this.#config = config;
   }
 

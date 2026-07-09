@@ -1,6 +1,7 @@
-import type { Config } from "../config";
+import type { NormalizedConfig } from "../config";
 import { requestJson } from "../internal/fetch-client";
 import { buildUrl, pathWithParams, teamPath } from "../internal/paths";
+import { MessagesClient } from "./messages";
 
 const REGISTER_HTTP_AGENT_PATH =
   "/api/v1/team/{team_id}/chatkit/agents/http-vercel-ai-sdk";
@@ -26,10 +27,12 @@ export type ConvertedChatKitMessage = {
 };
 
 export class ChatKitClient {
-  readonly #config: Config;
+  readonly #config: NormalizedConfig;
+  readonly #messages: MessagesClient;
 
-  constructor(config: Config) {
+  constructor(config: NormalizedConfig, messages = new MessagesClient(config)) {
     this.#config = config;
+    this.#messages = messages;
   }
 
   async registerHttpVercelAiSdkAgent(input: {
@@ -89,25 +92,32 @@ export class ChatKitClient {
     participantInboxId?: string;
     externalUserId?: string;
   }): Promise<{ items: unknown[]; nextPageToken?: string }> {
-    const raw = await requestJson<Paginated<unknown>>(this.#config, {
-      path: pathWithParams(teamPath(this.#config, MESSAGE_HISTORY_PATH), {
-        session_id: input.sessionId,
-      }),
-      query: {
-        page_size: input.pageSize ?? 100,
-        next_page_token: input.nextPageToken,
-        channel_id: input.channelId,
-        participant_inbox_id: input.participantInboxId,
-        user_external_id: input.externalUserId,
-      },
-    });
-    const result: { items: unknown[]; nextPageToken?: string } = {
-      items: raw.items,
-    };
-    if (raw.next_page_token) {
-      result.nextPageToken = raw.next_page_token;
+    try {
+      const raw = await requestJson<Paginated<unknown>>(this.#config, {
+        path: pathWithParams(teamPath(this.#config, MESSAGE_HISTORY_PATH), {
+          session_id: input.sessionId,
+        }),
+        query: {
+          page_size: input.pageSize ?? 100,
+          next_page_token: input.nextPageToken,
+          channel_id: input.channelId,
+          participant_inbox_id: input.participantInboxId,
+          user_external_id: input.externalUserId,
+        },
+      });
+      const result: { items: unknown[]; nextPageToken?: string } = {
+        items: raw.items,
+      };
+      if (raw.next_page_token) {
+        result.nextPageToken = raw.next_page_token;
+      }
+      return result;
+    } catch (error) {
+      if (isMissingChatKitRoute(error)) {
+        return this.#messages.list(input);
+      }
+      throw error;
     }
-    return result;
   }
 
   async cacheConvertedMessages(input: {
@@ -189,3 +199,12 @@ export class ChatKitClient {
 }
 
 export { MessagesClient } from "./messages";
+
+function isMissingChatKitRoute(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    (error.status === 404 || error.status === 405)
+  );
+}

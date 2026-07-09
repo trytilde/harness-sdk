@@ -31,6 +31,7 @@ describe("TildeProvider", () => {
         config={{
           baseUrl: "https://api.example.test",
           teamId: "team 123",
+          apiKey: "test-key",
         }}
       >
         <Probe />
@@ -69,6 +70,7 @@ describe("ChatKit hooks", () => {
         config={{
           baseUrl: "https://api.example.test",
           teamId: "team_123",
+          apiKey: "test-key",
           fetch: fetchMock as typeof fetch,
         }}
       >
@@ -108,6 +110,7 @@ describe("ChatKit hooks", () => {
         config={{
           baseUrl: "https://api.example.test",
           teamId: "team_123",
+          apiKey: "test-key",
           fetch: fetchMock as typeof fetch,
         }}
       >

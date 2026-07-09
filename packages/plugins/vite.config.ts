@@ -18,6 +18,7 @@ export default defineConfig({
         ...builtinModules.map((name) => `node:${name}`),
         "@inquirer/checkbox",
         "@tilde/harness-sdk",
+        "@tilde/harness-sdk/api",
       ],
     },
     sourcemap: true,

@@ -2,28 +2,35 @@ export type Config = {
   baseUrl?: string;
   baseApiUrl?: string;
   orgId?: string;
-  teamId: string;
+  teamId?: string;
   apiKey?: string;
+  tunnel?: boolean;
+  cloudflaredPath?: string;
   bearerToken?: string;
   fetch?: typeof fetch;
   headers?: HeadersInit;
 };
 
-export type NormalizedConfig = Config & {
+export type NormalizedConfig = Omit<Config, "baseUrl" | "teamId"> & {
   baseUrl: string;
+  teamId: string;
 };
 
-export function createConfig(input: Config): NormalizedConfig {
-  const baseUrlInput = baseUrlWithOrgId(
-    input.baseUrl,
-    input.orgId,
-    input.baseApiUrl,
-  );
-  if (!baseUrlInput || baseUrlInput.trim().length === 0) {
-    throw new TypeError("baseUrl or orgId is required");
-  }
-  if (!input.teamId || input.teamId.trim().length === 0) {
+export function createConfig(input: Config = {}): NormalizedConfig {
+  const headers = new Headers(input.headers);
+  const baseUrlInput =
+    input.baseUrl ??
+    baseUrlFromOrgId(input.orgId ?? env("TILDE_ORG_ID"), input.baseApiUrl) ??
+    env("TILDE_BASE_URL") ??
+    "https://api.trytilde.ai";
+  const teamId = input.teamId ?? env("TILDE_TEAM_ID");
+  if (!teamId || teamId.trim().length === 0) {
     throw new TypeError("teamId is required");
+  }
+  const bearerToken = input.bearerToken ?? env("TILDE_BEARER_TOKEN");
+  const apiKey = input.apiKey ?? env("TILDE_API_KEY");
+  if (!bearerToken && !apiKey && !hasAuthHeader(headers)) {
+    throw new TypeError("apiKey or bearerToken is required");
   }
 
   let url: URL;
@@ -41,7 +48,9 @@ export function createConfig(input: Config): NormalizedConfig {
   return {
     ...input,
     baseUrl,
-    teamId: input.teamId.trim(),
+    teamId: teamId.trim(),
+    ...(apiKey ? { apiKey } : {}),
+    ...(bearerToken ? { bearerToken } : {}),
   };
 }
 
@@ -83,17 +92,6 @@ function baseUrlFromOrgId(
   return apiUrl.toString();
 }
 
-function baseUrlWithOrgId(
-  configuredBaseUrl: string | undefined,
-  orgId: string | undefined,
-  configuredBaseApiUrl: string | undefined,
-): string | undefined {
-  if (configuredBaseUrl) {
-    return configuredBaseUrl;
-  }
-  return baseUrlFromOrgId(orgId, configuredBaseApiUrl);
-}
-
 function canonicalizeBaseUrlForOrg(baseUrl: string, orgId: string | undefined): string {
   const trimmedBaseUrl = baseUrl.replace(/\/+$/, "");
   if (!orgId || orgId.trim().length === 0) {
@@ -121,12 +119,21 @@ function isValidHostnameLabel(value: string): boolean {
 }
 
 function baseApiUrl(configuredBaseApiUrl: string | undefined): string {
-  return configuredBaseApiUrl ?? envBaseApiUrl() ?? "https://api.trytilde.com";
+  return (
+    configuredBaseApiUrl ??
+    env("TILDE_BASE_API_URL") ??
+    "https://api.trytilde.ai"
+  );
 }
 
-function envBaseApiUrl(): string | undefined {
+function env(name: string): string | undefined {
   if (typeof process === "undefined") {
     return undefined;
   }
-  return process.env.TILDE_BASE_API_URL;
+  const value = process.env[name];
+  return value && value.trim().length > 0 ? value : undefined;
+}
+
+function hasAuthHeader(headers: Headers): boolean {
+  return headers.has("Authorization") || headers.has("x-api-key");
 }

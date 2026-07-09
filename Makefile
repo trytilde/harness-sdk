@@ -4,7 +4,10 @@ export BASH_ENV := $(HOME)/.bashrc
 SOPS_KMS_ARN ?= arn:aws:kms:us-east-1:914788356809:alias/tilde-app-dev-sops
 TILDE_API_DIR ?= /root/tilde-api
 
-.PHONY: load-secrets sops-decrypt sops-encrypt test-e2e test-e2e-local
+.PHONY: generate-openapi load-secrets sops-decrypt sops-encrypt test-e2e test-e2e-local
+
+generate-openapi:
+	pnpm sync:openapi
 
 load-secrets:
 	./scripts/load-secrets.sh

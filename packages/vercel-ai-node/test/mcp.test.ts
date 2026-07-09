@@ -118,6 +118,7 @@ describe("createMCPClient", () => {
     const client = createClient({
       baseUrl: "https://api.example.test",
       teamId: "team_123",
+      bearerToken: "tilde-bearer",
     });
 
     await expect(

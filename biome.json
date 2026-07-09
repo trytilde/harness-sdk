@@ -5,7 +5,9 @@
       "**",
       "!**/dist",
       "!**/node_modules",
+      "!openapi.cloud.json",
       "!specs/openapi.cloud.json",
+      "!packages/api-client/src/generated",
       "!packages/core/src/generated/schema.d.ts"
     ]
   },

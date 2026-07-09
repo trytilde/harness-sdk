@@ -1,4 +1,4 @@
-import type { Config } from "../config";
+import type { NormalizedConfig } from "../config";
 import { configFetch, configHeaders } from "../config";
 import { errorFromResponse } from "../errors";
 import { buildUrl } from "./paths";
@@ -12,7 +12,7 @@ export type RequestOptions = {
 };
 
 export async function requestJson<T>(
-  config: Config,
+  config: NormalizedConfig,
   options: RequestOptions,
 ): Promise<T> {
   const headers = configHeaders(config);

@@ -1,5 +1,25 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, createClient, createConfig } from "../src";
+
+const spawnMock = vi.fn(() => ({
+  killed: false,
+  kill: vi.fn(),
+  once: vi.fn(),
+}));
+
+vi.mock("node:child_process", () => ({
+  spawn: spawnMock,
+}));
+
+const savedEnv = { ...process.env };
+
+beforeEach(() => {
+  process.env = { ...savedEnv, TILDE_API_KEY: "env-test-key" };
+});
+
+afterEach(() => {
+  process.env = { ...savedEnv };
+});
 
 describe("createConfig", () => {
   it("normalizes trailing slashes", () => {
@@ -17,7 +37,7 @@ describe("createConfig", () => {
       teamId: "team_123",
     });
 
-    expect(config.baseUrl).toBe("https://org-example.api.trytilde.com");
+    expect(config.baseUrl).toBe("https://org-example.api.trytilde.ai");
   });
 
   it("derives org baseUrl from configured baseApiUrl", () => {
@@ -88,6 +108,72 @@ describe("createConfig", () => {
         process.env.TILDE_BASE_API_URL = previous;
       }
     }
+  });
+
+  it("uses default production API base URL when no baseUrl is configured", () => {
+    const config = createConfig({
+      teamId: "team_123",
+    });
+
+    expect(config.baseUrl).toBe("https://api.trytilde.ai");
+  });
+
+  it("allows createClient with no args when required values are in the environment", () => {
+    process.env.TILDE_BASE_URL = "https://api.env.test";
+    process.env.TILDE_TEAM_ID = "team_env";
+    process.env.TILDE_API_KEY = "key_env";
+
+    const client = createClient();
+
+    expect(client.config).toMatchObject({
+      baseUrl: "https://api.env.test",
+      teamId: "team_env",
+      apiKey: "key_env",
+    });
+  });
+
+  it("lets explicit constructor values take precedence over environment values", () => {
+    process.env.TILDE_BASE_URL = "https://api.env.test";
+    process.env.TILDE_TEAM_ID = "team_env";
+    process.env.TILDE_API_KEY = "key_env";
+
+    const client = createClient({
+      baseUrl: "https://api.explicit.test",
+      teamId: "team_explicit",
+      apiKey: "key_explicit",
+    });
+
+    expect(client.config).toMatchObject({
+      baseUrl: "https://api.explicit.test",
+      teamId: "team_explicit",
+      apiKey: "key_explicit",
+    });
+  });
+
+  it("throws when teamId is absent from both constructor and environment", () => {
+    delete process.env.TILDE_TEAM_ID;
+
+    expect(() => createConfig()).toThrow("teamId is required");
+  });
+
+  it("throws when auth is absent from constructor, headers, and environment", () => {
+    process.env.TILDE_TEAM_ID = "team_123";
+    delete process.env.TILDE_API_KEY;
+    delete process.env.TILDE_BEARER_TOKEN;
+
+    expect(() => createConfig()).toThrow("apiKey or bearerToken is required");
+  });
+
+  it("accepts explicit auth headers instead of apiKey or bearerToken", () => {
+    process.env.TILDE_TEAM_ID = "team_123";
+    delete process.env.TILDE_API_KEY;
+    delete process.env.TILDE_BEARER_TOKEN;
+
+    const config = createConfig({
+      headers: { Authorization: "Bearer header-key" },
+    });
+
+    expect(config.baseUrl).toBe("https://api.trytilde.ai");
   });
 
   it("rejects relative baseUrl", () => {

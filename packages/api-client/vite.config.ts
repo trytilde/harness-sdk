@@ -4,15 +4,12 @@ import dts from "vite-plugin-dts";
 export default defineConfig({
   build: {
     lib: {
-      entry: {
-        index: "src/index.ts",
-        api: "src/api.ts",
-      },
+      entry: "src/index.ts",
       formats: ["es"],
-      fileName: (_, entryName) => `${entryName}.js`,
+      fileName: () => "index.js",
     },
     rollupOptions: {
-      external: [],
+      external: ["@hey-api/client-fetch"],
     },
     sourcemap: true,
     target: "es2022",

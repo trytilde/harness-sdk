@@ -22,6 +22,7 @@ describe("useChatKitVercelUiEndpoint", () => {
         config={{
           baseUrl: "https://api.example.test",
           teamId: "team 123",
+          apiKey: "test-key",
         }}
       >
         <Probe />

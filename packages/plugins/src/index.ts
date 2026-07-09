@@ -1,6 +1,21 @@
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import checkbox from "@inquirer/checkbox";
+import {
+  type Client,
+  type CloudWhoamiResponse,
+  createTildeApiClient,
+  getSkillRegistrySkill,
+  listMcpServerInstances,
+  listSkillRegistries,
+  listSkillRegistrySkillSummaries,
+  type McpServerInstanceSerializedWithFunctionsPaginatedResponse,
+  mcpServerUrl,
+  type Skill,
+  type SkillRegistryPaginatedResponse,
+  type SkillSummaryPaginatedResponse,
+  whoami,
+} from "@tilde/harness-sdk/api";
 
 export type TildePluginConfig = {
   baseUrl: string;
@@ -37,52 +52,20 @@ export type TildeTeamChoice = {
   orgId?: string;
 };
 
-type Paginated<T> = {
-  items: T[];
-};
-
-type RawMcpServer = {
-  id: string;
-  name: string;
-  url?: string;
-};
-
-type RawSkillRegistry = {
-  id: string;
-  name: string;
-  description?: string;
-};
-
-type RawSkillSummary = {
-  id: string;
-  name: string;
-};
-
-type RawSkill = {
-  name: string;
-  description: string;
-  content: string;
-};
-
-type RawWhoami = {
-  teams: Array<{
-    team_id: string;
-    name?: string | null;
-    org_id?: string;
-  }>;
-};
-
 export async function listTildeTeamChoices(
   config: TildePluginConfig,
   input?: { teamName?: string },
 ): Promise<TildeTeamChoice[]> {
   if (config.teamId) {
-    return [{
-      teamId: config.teamId,
-      teamName: input?.teamName ?? config.teamId,
-    }];
+    return [
+      {
+        teamId: config.teamId,
+        teamName: input?.teamName ?? config.teamId,
+      },
+    ];
   }
-  const response = await tildeJson<RawWhoami>(config, "/api/v1/identity/auth/whoami");
+  const api = createPluginApiClient(config);
+  const response = await apiCall<CloudWhoamiResponse>(whoami({ client: api }));
   return response.teams.map((team) => ({
     teamId: team.team_id,
     teamName: team.name ?? team.team_id,
@@ -94,21 +77,32 @@ export async function listTildeMcpServerChoices(
   config: TildePluginConfig,
   input?: { teamName?: string; teams?: TildeTeamChoice[] },
 ): Promise<TildeMcpServerChoice[]> {
-  const teams = input?.teams ?? await listTildeTeamChoices(config, input);
-  const results = await Promise.all(teams.map(async (team) => {
-    const response = await tildeJson<Paginated<RawMcpServer>>(
-      config,
-      `/api/v1/team/${encodeURIComponent(team.teamId)}/mcp/mcp-server?page_size=100`,
-    );
-    return response.items.map((server) => ({
-      id: server.id,
-      serverName: server.name,
-      teamId: team.teamId,
-      teamName: team.teamName,
-      label: `${team.teamName} / ${server.name}`,
-      url: server.url ?? mcpServerEndpointUrl(config.baseUrl, team.teamId, server.id),
-    }));
-  }));
+  const teams = input?.teams ?? (await listTildeTeamChoices(config, input));
+  const api = createPluginApiClient(config);
+  const results = await Promise.all(
+    teams.map(async (team) => {
+      const response =
+        await apiCall<McpServerInstanceSerializedWithFunctionsPaginatedResponse>(
+          listMcpServerInstances({
+            client: api,
+            path: { team_id: team.teamId },
+            query: { page_size: 100 },
+          }),
+        );
+      return response.items.map((server) => ({
+        id: server.id,
+        serverName: server.name,
+        teamId: team.teamId,
+        teamName: team.teamName,
+        label: `${team.teamName} / ${server.name}`,
+        url: mcpServerUrl({
+          baseUrl: config.baseUrl,
+          teamId: team.teamId,
+          serverId: server.id,
+        }),
+      }));
+    }),
+  );
   return results.flat();
 }
 
@@ -116,21 +110,27 @@ export async function listTildeSkillRegistryChoices(
   config: TildePluginConfig,
   input?: { teamName?: string; teams?: TildeTeamChoice[] },
 ): Promise<TildeSkillRegistryChoice[]> {
-  const teams = input?.teams ?? await listTildeTeamChoices(config, input);
-  const results = await Promise.all(teams.map(async (team) => {
-    const response = await tildeJson<Paginated<RawSkillRegistry>>(
-      config,
-      `/api/v1/team/${encodeURIComponent(team.teamId)}/skill-registry?page_size=100`,
-    );
-    return response.items.map((registry) => ({
-      id: registry.id,
-      registryName: registry.name,
-      teamId: team.teamId,
-      teamName: team.teamName,
-      label: `${team.teamName} / ${registry.name}`,
-      ...(registry.description ? { description: registry.description } : {}),
-    }));
-  }));
+  const teams = input?.teams ?? (await listTildeTeamChoices(config, input));
+  const api = createPluginApiClient(config);
+  const results = await Promise.all(
+    teams.map(async (team) => {
+      const response = await apiCall<SkillRegistryPaginatedResponse>(
+        listSkillRegistries({
+          client: api,
+          path: { team_id: team.teamId },
+          query: { page_size: 100 },
+        }),
+      );
+      return response.items.map((registry) => ({
+        id: registry.id,
+        registryName: registry.name,
+        teamId: team.teamId,
+        teamName: team.teamName,
+        label: `${team.teamName} / ${registry.name}`,
+        ...(registry.description ? { description: registry.description } : {}),
+      }));
+    }),
+  );
   return results.flat();
 }
 
@@ -155,27 +155,41 @@ export async function selectTildeSessionResources(
   );
   return {
     mcpServers: await multiSelect("Tilde MCP servers", mcpServers, logger),
-    skillRegistries: await multiSelect("Tilde skill registries", skillRegistries, logger),
+    skillRegistries: await multiSelect(
+      "Tilde skill registries",
+      skillRegistries,
+      logger,
+    ),
   };
 }
 
 export async function downloadSkillRegistry(
   config: TildePluginConfig,
-  input: { registryId: string; outputDir: string; metadata?: TildeSkillRegistryChoice },
+  input: {
+    registryId: string;
+    outputDir: string;
+    metadata?: TildeSkillRegistryChoice;
+  },
 ): Promise<string[]> {
   const teamId = input.metadata?.teamId ?? config.teamId;
   if (!teamId) {
     throw new Error("Cannot download skill registry without a team id");
   }
-  const summaries = await tildeJson<Paginated<RawSkillSummary>>(
-    config,
-    `/api/v1/team/${encodeURIComponent(teamId)}/skill-registry/${encodeURIComponent(input.registryId)}/skill-summary?page_size=100`,
+  const api = createPluginApiClient(config);
+  const summaries = await apiCall<SkillSummaryPaginatedResponse>(
+    listSkillRegistrySkillSummaries({
+      client: api,
+      path: { team_id: teamId, id: input.registryId },
+      query: { page_size: 100 },
+    }),
   );
   const written: string[] = [];
   for (const summary of summaries.items) {
-    const skill = await tildeJson<RawSkill>(
-      config,
-      `/api/v1/team/${encodeURIComponent(teamId)}/skill-registry/${encodeURIComponent(input.registryId)}/skill/${encodeURIComponent(summary.id)}`,
+    const skill = await apiCall<Skill>(
+      getSkillRegistrySkill({
+        client: api,
+        path: { team_id: teamId, id: input.registryId, skill_id: summary.id },
+      }),
     );
     const skillDir = join(input.outputDir, skill.name);
     await mkdir(skillDir, { recursive: true });
@@ -307,7 +321,11 @@ export async function configureTildeSessionForCli(
     mcpServers?: TildeMcpServerChoice[];
     skillRegistries?: TildeSkillRegistryChoice[];
   },
-): Promise<{ mcpConfigPath: string; mcpServerCount: number; skillFiles: string[] }> {
+): Promise<{
+  mcpConfigPath: string;
+  mcpServerCount: number;
+  skillFiles: string[];
+}> {
   const selected =
     input.mcpServers || input.skillRegistries
       ? {
@@ -330,26 +348,42 @@ export async function configureTildeSessionForCli(
       registries: selected.skillRegistries,
     }),
   ]);
-  return { mcpConfigPath, mcpServerCount: selected.mcpServers.length, skillFiles };
+  return {
+    mcpConfigPath,
+    mcpServerCount: selected.mcpServers.length,
+    skillFiles,
+  };
 }
 
-async function tildeJson<T>(config: TildePluginConfig, path: string): Promise<T> {
-  const fetchImpl = config.fetch ?? fetch;
+function createPluginApiClient(config: TildePluginConfig): Client {
+  const options = {
+    baseUrl: config.baseUrl,
+  };
   const token = config.apiKey ?? config.accessToken;
-  const init: RequestInit = token
-    ? { headers: { Authorization: `Bearer ${token}` } }
-    : {};
-  const url = new URL(path, config.baseUrl);
-  let response: Response;
+  return createTildeApiClient({
+    ...options,
+    ...(token ? { bearerToken: token } : {}),
+    ...(config.fetch ? { fetch: config.fetch } : {}),
+  });
+}
+
+async function apiCall<T>(
+  promise: Promise<{
+    data?: T | undefined;
+    error?: unknown;
+    response?: Response;
+  }>,
+): Promise<T> {
   try {
-    response = await fetchImpl(url, init);
+    const result = await promise;
+    if (result.error !== undefined) throw result.error;
+    if (result.data === undefined) {
+      throw new Error("Tilde response did not include data");
+    }
+    return result.data as T;
   } catch (error) {
-    throw new Error(`Tilde request failed before HTTP response for ${url.toString()}: ${formatFetchError(error)}`);
+    throw new Error(`Tilde request failed: ${formatFetchError(error)}`);
   }
-  if (!response.ok) {
-    throw new Error(`Tilde request failed ${response.status}: ${await response.text()}`);
-  }
-  return (await response.json()) as T;
 }
 
 async function multiSelect<T extends { label: string }>(
@@ -374,19 +408,14 @@ async function multiSelect<T extends { label: string }>(
   });
 }
 
-function toSkillMarkdown(skill: RawSkill, registry?: TildeSkillRegistryChoice): string {
+function toSkillMarkdown(
+  skill: Skill,
+  registry?: TildeSkillRegistryChoice,
+): string {
   const metadata = registry
     ? `\n<!-- tilde-registry-id: ${registry.id} -->\n<!-- tilde-registry-label: ${registry.label} -->\n`
     : "";
   return `---\nname: ${skill.name}\ndescription: ${skill.description}\n---\n${metadata}\n${skill.content.trim()}\n`;
-}
-
-function mcpServerEndpointUrl(baseUrl: string, teamId: string, serverId: string): string {
-  const url = new URL(
-    `/api/v1/team/${encodeURIComponent(teamId)}/mcp/mcp-server/${encodeURIComponent(serverId)}/mcp`,
-    baseUrl,
-  );
-  return url.toString();
 }
 
 function formatFetchError(error: unknown): string {
@@ -394,7 +423,8 @@ function formatFetchError(error: unknown): string {
   const cause = error.cause;
   if (cause instanceof Error) {
     const code = "code" in cause ? ` ${(cause as { code?: string }).code}` : "";
-    const address = "address" in cause ? ` ${(cause as { address?: string }).address}` : "";
+    const address =
+      "address" in cause ? ` ${(cause as { address?: string }).address}` : "";
     const port = "port" in cause ? `:${(cause as { port?: number }).port}` : "";
     return `${error.message}; caused by ${cause.message}${code}${address}${port}`;
   }

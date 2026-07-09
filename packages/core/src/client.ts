@@ -9,7 +9,7 @@ export class Client {
   readonly chatkit: ChatKitClient;
   readonly messages: MessagesClient;
 
-  constructor(config: Config) {
+  constructor(config: Config = {}) {
     this.config = createConfig(config);
     this.messages = new MessagesClient(this.config);
     this.mcp = new McpClient(this.config);
@@ -17,6 +17,6 @@ export class Client {
   }
 }
 
-export function createClient(config: Config): Client {
+export function createClient(config: Config = {}): Client {
   return new Client(config);
 }

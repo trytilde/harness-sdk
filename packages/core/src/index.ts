@@ -1,3 +1,12 @@
+export {
+  type McpServerUrlInput,
+  mcpServerUrl,
+  type ReverseProxyUrlInput,
+  reverseProxyPath,
+  reverseProxyUrl,
+  type TeamPathInput,
+  teamPath,
+} from "@tilde/api-client";
 export { ChatKitClient, MessagesClient } from "./chatkit";
 export { Client, createClient } from "./client";
 export {

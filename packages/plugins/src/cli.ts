@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { homedir } from "node:os";
 import { basename } from "node:path";
 import { pathToFileURL } from "node:url";
-import { homedir } from "node:os";
-import {
-  type AgentCli,
-  configureTildeSessionForCli,
-} from "./index";
 import { ensureDesktopAuth } from "./auth";
+import { type AgentCli, configureTildeSessionForCli } from "./index";
 
 type CliOptions = {
   cli?: AgentCli;
@@ -22,19 +19,34 @@ type CliOptions = {
   passthrough: string[];
 };
 
-const supportedClis = new Set<AgentCli>(["claude", "codex", "cursor", "opencode", "gemini"]);
+const supportedClis = new Set<AgentCli>([
+  "claude",
+  "codex",
+  "cursor",
+  "opencode",
+  "gemini",
+]);
 
-export function inferCliFromExecutable(executable: string): AgentCli | undefined {
+export function inferCliFromExecutable(
+  executable: string,
+): AgentCli | undefined {
   const name = basename(executable).replace(/\.(cjs|mjs|js|cmd|exe)$/i, "");
-  const inferred = name.startsWith("tilde-") ? name.slice("tilde-".length) : undefined;
-  return inferred && supportedClis.has(inferred as AgentCli) ? (inferred as AgentCli) : undefined;
+  const inferred = name.startsWith("tilde-")
+    ? name.slice("tilde-".length)
+    : undefined;
+  return inferred && supportedClis.has(inferred as AgentCli)
+    ? (inferred as AgentCli)
+    : undefined;
 }
 
 export function defaultCommandForCli(cli: AgentCli): string {
   return cli;
 }
 
-export function parseCliArgs(argv: string[], executable = argv[1] ?? "tilde-session"): CliOptions {
+export function parseCliArgs(
+  argv: string[],
+  executable = argv[1] ?? "tilde-session",
+): CliOptions {
   const inferredCli = inferCliFromExecutable(executable);
   const options: CliOptions = {
     baseUrl: process.env.TILDE_API_BASE_URL ?? "https://api.tilde.test",
@@ -45,7 +57,8 @@ export function parseCliArgs(argv: string[], executable = argv[1] ?? "tilde-sess
   };
   if (inferredCli) options.cli = inferredCli;
   if (process.env.TILDE_TEAM_ID) options.teamId = process.env.TILDE_TEAM_ID;
-  if (process.env.TILDE_TEAM_NAME) options.teamName = process.env.TILDE_TEAM_NAME;
+  if (process.env.TILDE_TEAM_NAME)
+    options.teamName = process.env.TILDE_TEAM_NAME;
   if (process.env.TILDE_API_KEY) options.apiKey = process.env.TILDE_API_KEY;
 
   const args = argv.slice(2);
@@ -94,6 +107,7 @@ export function parseCliArgs(argv: string[], executable = argv[1] ?? "tilde-sess
       case "-h":
         printHelp();
         process.exit(0);
+        return options;
       default:
         throw new Error(`Unknown argument: ${arg}`);
     }
@@ -105,7 +119,9 @@ export function parseCliArgs(argv: string[], executable = argv[1] ?? "tilde-sess
 async function main() {
   const options = parseCliArgs(process.argv);
   if (!options.cli) {
-    throw new Error("Missing --cli. Expected one of: claude, codex, cursor, opencode, gemini.");
+    throw new Error(
+      "Missing --cli. Expected one of: claude, codex, cursor, opencode, gemini.",
+    );
   }
   const accessToken = options.apiKey
     ? undefined
@@ -191,9 +207,14 @@ Options:
 `);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   main().catch((error: unknown) => {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.stderr.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    );
     process.exit(1);
   });
 }
