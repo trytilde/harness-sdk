@@ -1,4 +1,5 @@
 import { configHeaders } from "@tilde/harness-sdk";
+import type { JsonObject } from "@tilde/harness-sdk";
 import type { UIMessage } from "ai";
 import type {
   ChatKitUiFilePart,
@@ -185,13 +186,13 @@ function isModelSupportedFileMediaType(mediaType: string): boolean {
 }
 
 function stringField(
-  value: Record<string, unknown>,
+  value: JsonObject,
   key: string,
 ): string | undefined {
   const field = value[key];
   return typeof field === "string" && field.length > 0 ? field : undefined;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null;
 }

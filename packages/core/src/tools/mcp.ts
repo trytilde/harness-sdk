@@ -6,6 +6,9 @@ import {
   type LocalMcpTool,
   type LocalMcpToolsClient,
   type RegisterLocalMcpToolsRequest,
+  type JsonObject,
+  type JsonValue,
+  type ToolResult,
   wrapMcpClientWithLocalTools,
 } from "./local";
 
@@ -36,7 +39,35 @@ export type McpServer = {
   orgId?: string;
   isDynamicToolDiscovery: boolean;
   url: string;
-  tools: unknown[];
+  tools: McpToolDefinition[];
+};
+
+export type McpToolDefinition = JsonObject & {
+  name?: string;
+  description?: string;
+  input_schema?: JsonObject;
+  inputSchema?: JsonObject;
+  output_schema?: JsonObject;
+  outputSchema?: JsonObject;
+};
+
+export type AvailableToolGroup = JsonObject & {
+  id?: string;
+  name?: string;
+  display_name?: string;
+  source_type_id?: string;
+};
+
+export type ToolGroupInstance = JsonObject & {
+  id?: string;
+  tool_group_instance_id?: string;
+  display_name?: string;
+};
+
+export type ToolDeployment = JsonObject & {
+  id?: string;
+  alias?: string;
+  name?: string;
 };
 
 export type AddMcpServerFunctionInput = {
@@ -61,13 +92,13 @@ export type CreateToolGroupInput = {
   toolGroupInstanceId?: string | null;
   resourceServerCredentialId?: string | null;
   userCredentialId?: string | null;
-  returnOnSuccessfulBrokering?: unknown;
+  returnOnSuccessfulBrokering?: JsonValue;
 };
 
 export type EnableMcpToolInput = {
   toolGroupInstanceId: string;
   toolSourceTypeId: string;
-  boundParams?: unknown;
+  boundParams?: JsonValue;
 };
 
 type RawMcpServer = {
@@ -76,7 +107,7 @@ type RawMcpServer = {
   org_id?: string;
   team_id?: string;
   is_dynamic_tool_discovery?: boolean;
-  tools?: unknown[];
+  tools?: McpToolDefinition[];
 };
 
 type Paginated<T> = {
@@ -181,8 +212,8 @@ export class McpClient {
     deploymentAlias?: string;
     pageSize?: number;
     nextPageToken?: string;
-  }): Promise<{ items: unknown[]; nextPageToken?: string }> {
-    const raw = await requestJson<Paginated<unknown>>(this.#config, {
+  }): Promise<{ items: AvailableToolGroup[]; nextPageToken?: string }> {
+    const raw = await requestJson<Paginated<AvailableToolGroup>>(this.#config, {
       path: teamPath(this.#config, AVAILABLE_TOOL_GROUPS_PATH),
       query: {
         page_size: input?.pageSize ?? 100,
@@ -190,11 +221,13 @@ export class McpClient {
         deployment_alias: input?.deploymentAlias ?? "latest",
       },
     });
-    return paginatedUnknown(raw);
+    return paginated(raw);
   }
 
-  async createToolGroup(input: CreateToolGroupInput): Promise<unknown> {
-    return requestJson<unknown>(this.#config, {
+  async createToolGroup<TResult extends ToolGroupInstance = ToolGroupInstance>(
+    input: CreateToolGroupInput,
+  ): Promise<TResult> {
+    return requestJson<TResult>(this.#config, {
       method: "POST",
       path: pathWithParams(teamPath(this.#config, CREATE_TOOL_GROUP_PATH), {
         tool_group_source_type_id: input.toolGroupSourceTypeId,
@@ -219,8 +252,10 @@ export class McpClient {
     });
   }
 
-  async enableTool(input: EnableMcpToolInput): Promise<unknown> {
-    return requestJson<unknown>(this.#config, {
+  async enableTool<TResult extends JsonObject = JsonObject>(
+    input: EnableMcpToolInput,
+  ): Promise<TResult> {
+    return requestJson<TResult>(this.#config, {
       method: "POST",
       path: `${pathWithParams(teamPath(this.#config, TOOL_PATH), {
         tool_group_instance_id: input.toolGroupInstanceId,
@@ -236,8 +271,8 @@ export class McpClient {
     alias: string;
     pageSize?: number;
     nextPageToken?: string;
-  }): Promise<{ items: unknown[]; nextPageToken?: string }> {
-    const raw = await requestJson<Paginated<unknown>>(this.#config, {
+  }): Promise<{ items: ToolDeployment[]; nextPageToken?: string }> {
+    const raw = await requestJson<Paginated<ToolDeployment>>(this.#config, {
       path: pathWithParams(
         teamPath(this.#config, TOOL_DEPLOYMENTS_BY_ALIAS_PATH),
         {
@@ -249,7 +284,7 @@ export class McpClient {
         next_page_token: input.nextPageToken,
       },
     });
-    return paginatedUnknown(raw);
+    return paginated(raw);
   }
 
   getServerUrl(input: { id: string }): string {
@@ -270,7 +305,7 @@ export class McpClient {
     registerWithServer?: boolean;
     registerLocalTools?: (
       request: RegisterLocalMcpToolsRequest,
-    ) => Promise<unknown>;
+    ) => Promise<ToolResult>;
   }): LocalMcpToolsClient<TClient> {
     return wrapMcpClientWithLocalTools(input);
   }
@@ -291,11 +326,11 @@ export class McpClient {
   }
 }
 
-function paginatedUnknown(raw: Paginated<unknown>): {
-  items: unknown[];
+function paginated<TItem>(raw: Paginated<TItem>): {
+  items: TItem[];
   nextPageToken?: string;
 } {
-  const result: { items: unknown[]; nextPageToken?: string } = {
+  const result: { items: TItem[]; nextPageToken?: string } = {
     items: raw.items,
   };
   if (raw.next_page_token) {

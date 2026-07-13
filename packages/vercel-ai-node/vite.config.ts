@@ -4,12 +4,9 @@ import dts from "vite-plugin-dts";
 export default defineConfig({
   build: {
     lib: {
-      entry: {
-        index: "src/index.ts",
-        cli: "src/cli.ts",
-      },
+      entry: "src/index.ts",
       formats: ["es"],
-      fileName: (_format, entryName) => `${entryName}.js`,
+      fileName: () => "index.js",
     },
     rollupOptions: {
       external: [
@@ -24,6 +21,7 @@ export default defineConfig({
         "node:net",
         "node:os",
         "node:path",
+        "node:readline",
       ],
     },
     sourcemap: true,

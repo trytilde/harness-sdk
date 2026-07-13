@@ -1,6 +1,7 @@
 import type { NormalizedConfig } from "../config";
 import { requestJson } from "../internal/fetch-client";
 import { pathWithParams, teamPath } from "../internal/paths";
+import type { JsonObject, JsonValue } from "../tools";
 
 const MESSAGE_PATH =
   "/api/v1/team/{team_id}/inbox/session/{session_id}/message";
@@ -19,12 +20,12 @@ export class MessagesClient {
     this.#config = config;
   }
 
-  async list(input: {
+  async list<TMessage extends JsonValue = JsonObject>(input: {
     sessionId: string;
     pageSize?: number;
     nextPageToken?: string;
-  }): Promise<{ items: unknown[]; nextPageToken?: string }> {
-    const raw = await requestJson<Paginated<unknown>>(this.#config, {
+  }): Promise<{ items: TMessage[]; nextPageToken?: string }> {
+    const raw = await requestJson<Paginated<TMessage>>(this.#config, {
       path: pathWithParams(teamPath(this.#config, MESSAGE_PATH), {
         session_id: input.sessionId,
       }),
@@ -33,7 +34,7 @@ export class MessagesClient {
         next_page_token: input.nextPageToken,
       },
     });
-    const result: { items: unknown[]; nextPageToken?: string } = {
+    const result: { items: TMessage[]; nextPageToken?: string } = {
       items: raw.items,
     };
     if (raw.next_page_token) {
@@ -42,13 +43,13 @@ export class MessagesClient {
     return result;
   }
 
-  async eventHistory(input: {
+  async eventHistory<TEvent extends JsonValue = JsonObject>(input: {
     sessionId: string;
     pageSize?: number;
     nextPageToken?: string;
     includeChildSessions?: boolean;
-  }): Promise<{ items: unknown[]; nextPageToken?: string }> {
-    const raw = await requestJson<Paginated<unknown>>(this.#config, {
+  }): Promise<{ items: TEvent[]; nextPageToken?: string }> {
+    const raw = await requestJson<Paginated<TEvent>>(this.#config, {
       path: pathWithParams(teamPath(this.#config, EVENT_HISTORY_PATH), {
         session_id: input.sessionId,
       }),
@@ -58,7 +59,7 @@ export class MessagesClient {
         include_child_sessions: input.includeChildSessions,
       },
     });
-    const result: { items: unknown[]; nextPageToken?: string } = {
+    const result: { items: TEvent[]; nextPageToken?: string } = {
       items: raw.items,
     };
     if (raw.next_page_token) {

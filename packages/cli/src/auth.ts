@@ -7,12 +7,18 @@ import {
   scryptSync,
   timingSafeEqual,
 } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import { homedir, hostname, tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
-import { ApiError, type Config } from "@tilde/harness-sdk";
+import { ApiError, type Config, type JsonObject } from "@tilde/harness-sdk";
 
 const AUTH_VERSION = 1;
 const TOKEN_EXPIRY_SKEW_SECONDS = 60;
@@ -40,6 +46,8 @@ type StoredHarnessAuth = {
   refreshToken: EncryptedValue;
   expiresAt: number;
   tokenType: string;
+  selectedTeamId?: string;
+  selectedOrgId?: string;
 };
 
 type EncryptedValue = {
@@ -440,20 +448,11 @@ function readStoredTokens(
   baseUrl: string,
   configDir?: string,
 ): HarnessAuthTokens | undefined {
-  const filePath = authFilePath(baseUrl, configDir);
-  if (!existsSync(filePath)) {
+  const stored = readStoredAuth(baseUrl, configDir);
+  if (!stored) {
     return undefined;
   }
   try {
-    const stored = JSON.parse(
-      readFileSync(filePath, "utf8"),
-    ) as StoredHarnessAuth;
-    if (
-      stored.version !== AUTH_VERSION ||
-      stored.baseUrl !== normalizeBaseUrl(baseUrl)
-    ) {
-      return undefined;
-    }
     return {
       accessToken: decryptValue(stored.accessToken),
       refreshToken: decryptValue(stored.refreshToken),
@@ -473,6 +472,7 @@ export function writeStoredTokens(
   const dir = authHostDir(baseUrl, configDir);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const stored: StoredHarnessAuth = {
+    ...readStoredAuth(baseUrl, configDir),
     version: AUTH_VERSION,
     baseUrl: normalizeBaseUrl(baseUrl),
     accessToken: encryptValue(tokens.accessToken),
@@ -487,6 +487,77 @@ export function writeStoredTokens(
       mode: 0o600,
     },
   );
+}
+
+export function readSelectedTeamId(
+  baseUrl: string,
+  configDir?: string,
+): string | undefined {
+  return readStoredAuth(baseUrl, configDir)?.selectedTeamId;
+}
+
+export function readSelectedOrgId(
+  baseUrl: string,
+  configDir?: string,
+): string | undefined {
+  return readStoredAuth(baseUrl, configDir)?.selectedOrgId;
+}
+
+export function writeSelectedTeamId(
+  baseUrl: string,
+  teamId: string,
+  orgId?: string,
+  configDir?: string,
+): void {
+  const stored = readStoredAuth(baseUrl, configDir);
+  if (!stored) {
+    throw new Error("Sign in before selecting a Tilde team.");
+  }
+  const dir = authHostDir(baseUrl, configDir);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  writeFileSync(
+    authFilePath(baseUrl, configDir),
+    `${JSON.stringify(
+      {
+        ...stored,
+        selectedTeamId: teamId,
+        ...(orgId ? { selectedOrgId: orgId } : {}),
+      },
+      null,
+      2,
+    )}\n`,
+    {
+      mode: 0o600,
+    },
+  );
+}
+
+export function deleteStoredAuth(baseUrl: string, configDir?: string): void {
+  rmSync(authHostDir(baseUrl, configDir), { force: true, recursive: true });
+}
+
+function readStoredAuth(
+  baseUrl: string,
+  configDir?: string,
+): StoredHarnessAuth | undefined {
+  const filePath = authFilePath(baseUrl, configDir);
+  if (!existsSync(filePath)) {
+    return undefined;
+  }
+  try {
+    const stored = JSON.parse(
+      readFileSync(filePath, "utf8"),
+    ) as StoredHarnessAuth;
+    if (
+      stored.version !== AUTH_VERSION ||
+      stored.baseUrl !== normalizeBaseUrl(baseUrl)
+    ) {
+      return undefined;
+    }
+    return stored;
+  } catch {
+    return undefined;
+  }
 }
 
 function authFilePath(baseUrl: string, configDir?: string): string {
@@ -583,7 +654,7 @@ async function apiError(
   let message = fallback;
   if (body) {
     try {
-      const parsed = JSON.parse(body) as { message?: unknown; error?: unknown };
+      const parsed = JSON.parse(body) as JsonObject;
       const parsedMessage = parsed.message ?? parsed.error;
       if (typeof parsedMessage === "string" && parsedMessage.trim()) {
         message = parsedMessage;

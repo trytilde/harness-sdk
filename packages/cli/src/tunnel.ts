@@ -6,6 +6,7 @@ import {
   type Config,
   configHeaders,
   createConfig,
+  type JsonObject,
 } from "@tilde/harness-sdk";
 import { ensureHarnessAuth, type HarnessAuthOptions } from "./auth";
 
@@ -48,11 +49,12 @@ export type LocalRuntimeTunnelCommandProcess = LocalRuntimeTunnelProcess & {
 export async function startLocalRuntimeTunnel(
   options: StartLocalRuntimeTunnelOptions,
 ): Promise<LocalRuntimeTunnelProcess> {
-  let config = createConfig(options);
-  if (!config.apiKey && !config.bearerToken) {
+  let configOptions: StartLocalRuntimeTunnelOptions = options;
+  if (!options.apiKey && !options.bearerToken) {
     const tokens = await ensureHarnessAuth(options);
-    config = createConfig({ ...options, bearerToken: tokens.accessToken });
+    configOptions = { ...options, bearerToken: tokens.accessToken };
   }
+  const config = createConfig(configOptions);
 
   const connector = await fetchLocalRuntimeTunnelConnector(config);
   const child = spawn(
@@ -181,10 +183,7 @@ async function fetchLocalRuntimeTunnelConnector(
     let message = `Tilde API request failed with status ${response.status}`;
     if (body) {
       try {
-        const parsed = JSON.parse(body) as {
-          message?: unknown;
-          error?: unknown;
-        };
+        const parsed = JSON.parse(body) as JsonObject;
         const parsedMessage = parsed.message ?? parsed.error;
         if (typeof parsedMessage === "string" && parsedMessage.trim()) {
           message = parsedMessage;

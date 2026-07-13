@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createClient,
   GET_TOOL_SCHEMAS_NAME,
+  type JsonObject,
   type LocalMcpTool,
   MULTI_EXECUTE_TOOL_NAME,
   REGISTER_LOCAL_TOOLS_METHOD,
   SEARCH_TOOLS_NAME,
+  type ToolRegistry,
   wrapMcpClientWithLocalTools,
 } from "../src";
 
@@ -37,7 +39,7 @@ describe("local MCP tools wrapper", () => {
       tools: [localEchoTool()],
     });
 
-    const tools: Record<string, unknown> = await wrapped.tools();
+    const tools: ToolRegistry = await wrapped.tools();
 
     expect(Object.keys(tools)).toEqual(["REMOTE_SEARCH", "LOCAL_ECHO"]);
     expect(tools.LOCAL_ECHO).toMatchObject({
@@ -85,7 +87,7 @@ describe("local MCP tools wrapper", () => {
   });
 
   it("executes direct local tool calls in-process", async () => {
-    const execute = vi.fn(async (input: Record<string, unknown>) => ({
+    const execute = vi.fn(async (input: JsonObject) => ({
       local: input.value,
     }));
     const wrapped = wrapMcpClientWithLocalTools({

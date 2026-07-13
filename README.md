@@ -8,12 +8,28 @@ TypeScript SDK packages for Tilde Harness APIs.
 - `@tilde/harness-sdk-react`: React provider and ChatKit hooks.
 - `@tilde/harness-sdk-vercel-ai-node`: ChatKit webhook verification and Vercel AI SDK route helpers.
 - `@tilde/harness-sdk-vercel-ai-react`: React helpers for Vercel AI SDK ChatKit UIs.
+- `@trytilde/cli`: Tilde terminal CLI, published with `tilde` and `t` binaries.
 
 ## Install
 
 ```bash
 pnpm add @tilde/harness-sdk @tilde/harness-sdk-react @tilde/harness-sdk-vercel-ai-node @tilde/harness-sdk-vercel-ai-react
+pnpm add -D @trytilde/cli
 ```
+
+## CLI
+
+```bash
+tilde auth login
+tilde auth whoami
+tilde auth set-team
+tilde state import ./tilde-state.yaml ./tilde-import-output.json
+tilde state import ./tilde-state.yaml ./tilde-import-output.json --auto-apply
+tilde state export ./tilde-state.yaml
+```
+
+The CLI can also be invoked as `t`. Running `tilde` or `t` with no command checks
+auth state and starts sign-in if needed.
 
 ## Core Config
 

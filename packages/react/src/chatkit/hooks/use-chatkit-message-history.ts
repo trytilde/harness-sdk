@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
 import { useChatKit } from "./use-chatkit";
 
 export type UseChatKitMessageHistoryOptions = {
@@ -11,19 +12,19 @@ export type UseChatKitMessageHistoryOptions = {
   enabled?: boolean;
 };
 
-export type UseChatKitMessageHistoryResult = {
-  items: unknown[];
+export type UseChatKitMessageHistoryResult<TMessage extends JsonValue = JsonObject> = {
+  items: TMessage[];
   nextPageToken: string | undefined;
   isLoading: boolean;
   error: Error | null;
   reload(): Promise<void>;
 };
 
-export function useChatKitMessageHistory(
+export function useChatKitMessageHistory<TMessage extends JsonValue = JsonObject>(
   options: UseChatKitMessageHistoryOptions,
-): UseChatKitMessageHistoryResult {
+): UseChatKitMessageHistoryResult<TMessage> {
   const chatkit = useChatKit();
-  const [items, setItems] = useState<unknown[]>([]);
+  const [items, setItems] = useState<TMessage[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -54,7 +55,7 @@ export function useChatKitMessageHistory(
       if (options.externalUserId !== undefined) {
         input.externalUserId = options.externalUserId;
       }
-      const result = await chatkit.listMessageHistory(input);
+      const result = await chatkit.listMessageHistory<TMessage>(input);
       setItems(result.items);
       setNextPageToken(result.nextPageToken);
     } catch (caught) {

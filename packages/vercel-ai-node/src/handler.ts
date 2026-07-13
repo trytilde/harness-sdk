@@ -4,6 +4,7 @@ import {
   runWithChatKitContext,
 } from "./chatkit-context";
 import { type ChatKitMessage, isChatKitMessage } from "./chatkit-message";
+import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
 import { type Client, type Config, createClient } from "./client";
 import {
   type VerifiedWebhookRequest,
@@ -37,7 +38,7 @@ export type ChatKitSessionClient = {
 
 export type ChatKitEndpointContext = {
   rawBody: Uint8Array;
-  body: unknown;
+  body: JsonValue;
   webhookId: string;
   timestamp: number;
   orgId: string;
@@ -50,25 +51,56 @@ export type ChatKitEndpointContext = {
 
 export type ChatKitEndpointOptions = VerifyWebhookOptions & {
   client?: Partial<Config>;
+  logger?: ChatKitEndpointLogger | false;
   handler: (
     request: Request,
     context: ChatKitEndpointContext,
   ) => Response | Promise<Response>;
 };
 
+export type ChatKitEndpointLogLevel = "info" | "warn" | "error";
+
+export type ChatKitEndpointLogger = (
+  level: ChatKitEndpointLogLevel,
+  message: string,
+  fields: JsonObject,
+) => void;
+
 export function chatKitEndpoint(
   options: ChatKitEndpointOptions,
 ): (request: Request) => Promise<Response> {
   return async (request: Request): Promise<Response> => {
+    const requestId = crypto.randomUUID();
+    const startedAt = Date.now();
+    const log = endpointLogger(options.logger);
+    const baseFields = {
+      requestId,
+      method: request.method,
+      url: request.url,
+    };
+    log("info", "request received", baseFields);
+
     let verified: VerifiedWebhookRequest;
     try {
       verified = await verifyWebhookRequest(request.clone(), options);
+      log("info", "webhook verified", {
+        ...baseFields,
+        webhookId: verified.webhookId,
+        timestamp: verified.timestamp,
+        elapsedMs: elapsedMs(startedAt),
+      });
     } catch (error) {
       const status =
         error instanceof WebhookVerificationError &&
         error.message === "Invalid JSON body"
           ? 400
           : 401;
+      log("warn", "webhook verification failed", {
+        ...baseFields,
+        status,
+        elapsedMs: elapsedMs(startedAt),
+        error: error instanceof Error ? error.message : "Invalid webhook",
+      });
       return new Response(
         JSON.stringify({
           error: error instanceof Error ? error.message : "Invalid webhook",
@@ -86,14 +118,45 @@ export function chatKitEndpoint(
     const teamId = requiredHeader(request.headers, TILDE_TEAM_ID_HEADER);
     const sessionId = requiredHeader(request.headers, TILDE_SESSION_ID_HEADER);
     if (!orgId.ok) {
+      log("warn", "request rejected", {
+        ...baseFields,
+        status: 400,
+        error: orgId.error,
+        elapsedMs: elapsedMs(startedAt),
+      });
       return jsonError(400, orgId.error);
     }
     if (!teamId.ok) {
+      log("warn", "request rejected", {
+        ...baseFields,
+        status: 400,
+        error: teamId.error,
+        elapsedMs: elapsedMs(startedAt),
+      });
       return jsonError(400, teamId.error);
     }
     if (!sessionId.ok) {
+      log("warn", "request rejected", {
+        ...baseFields,
+        status: 400,
+        error: sessionId.error,
+        elapsedMs: elapsedMs(startedAt),
+      });
       return jsonError(400, sessionId.error);
     }
+
+    const requestFields = {
+      ...baseFields,
+      webhookId: verified.webhookId,
+      orgId: orgId.value,
+      teamId: teamId.value,
+      sessionId: sessionId.value,
+    };
+    log("info", "context resolved", {
+      ...requestFields,
+      requestMessageCount: requestMessageCount(verified.json),
+      requestMessageIds: messageIdsFromRequestBody(verified.json).size,
+    });
 
     const client = createClient(
       resolveClientConfig(options.client, orgId.value, teamId.value),
@@ -106,9 +169,10 @@ export function chatKitEndpoint(
           historyOptions.pageSize === undefined &&
           historyOptions.nextPageToken === undefined
         ) {
-          const items: unknown[] = [];
+          const items: JsonValue[] = [];
           let nextPageToken: string | undefined;
           do {
+            const historyStartedAt = Date.now();
             const input: {
               sessionId: string;
               pageSize: number;
@@ -120,15 +184,34 @@ export function chatKitEndpoint(
             if (nextPageToken !== undefined) {
               input.nextPageToken = nextPageToken;
             }
-            const page = await client.chatkit.listMessageHistory(input);
+            log("info", "session history page requested", {
+              ...requestFields,
+              pageSize: input.pageSize,
+              hasNextPageToken: Boolean(input.nextPageToken),
+            });
+            const page = await client.chatkit.listMessageHistory<JsonValue>(input);
             items.push(...page.items);
             nextPageToken = page.nextPageToken;
+            log("info", "session history page received", {
+              ...requestFields,
+              pageItemCount: page.items.length,
+              totalItemCount: items.length,
+              hasNextPage: Boolean(nextPageToken),
+              elapsedMs: elapsedMs(historyStartedAt),
+            });
           } while (nextPageToken);
+          const normalized = normalizeHistoryItems(items, currentRequestMessageIds);
+          log("info", "session history completed", {
+            ...requestFields,
+            rawItemCount: items.length,
+            normalizedItemCount: normalized.length,
+          });
           return {
-            items: normalizeHistoryItems(items, currentRequestMessageIds),
+            items: normalized,
           };
         }
 
+        const historyStartedAt = Date.now();
         const input: {
           sessionId: string;
           pageSize?: number;
@@ -142,10 +225,23 @@ export function chatKitEndpoint(
         if (historyOptions.nextPageToken !== undefined) {
           input.nextPageToken = historyOptions.nextPageToken;
         }
-        const history = await client.chatkit.listMessageHistory(input);
+        log("info", "session history page requested", {
+          ...requestFields,
+          pageSize: input.pageSize,
+          hasNextPageToken: Boolean(input.nextPageToken),
+        });
+        const history = await client.chatkit.listMessageHistory<JsonValue>(input);
+        const normalized = normalizeHistoryItems(history.items, currentRequestMessageIds);
+        log("info", "session history page received", {
+          ...requestFields,
+          pageItemCount: history.items.length,
+          normalizedItemCount: normalized.length,
+          hasNextPage: Boolean(history.nextPageToken),
+          elapsedMs: elapsedMs(historyStartedAt),
+        });
         return {
           ...history,
-          items: normalizeHistoryItems(history.items, currentRequestMessageIds),
+          items: normalized,
         };
       },
     };
@@ -179,10 +275,55 @@ export function chatKitEndpoint(
       chatkit,
     };
 
-    return runWithChatKitContext(chatkit, () =>
-      options.handler(forwarded, context),
-    );
+    try {
+      const response = await runWithChatKitContext(chatkit, () =>
+        options.handler(forwarded, context),
+      );
+      log("info", "handler completed", {
+        ...requestFields,
+        status: response.status,
+        elapsedMs: elapsedMs(startedAt),
+      });
+      return response;
+    } catch (error) {
+      log("error", "handler failed", {
+        ...requestFields,
+        elapsedMs: elapsedMs(startedAt),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   };
+}
+
+function endpointLogger(logger: ChatKitEndpointOptions["logger"]): ChatKitEndpointLogger {
+  if (logger === false) {
+    return () => {};
+  }
+  if (logger) {
+    return logger;
+  }
+  return (level, message, fields) => {
+    const payload = {
+      ts: new Date().toISOString(),
+      level,
+      scope: "chatkit-endpoint",
+      message,
+      ...fields,
+    };
+    const line = `[tilde-chatkit] ${JSON.stringify(payload)}`;
+    if (level === "error") {
+      console.error(line);
+    } else if (level === "warn") {
+      console.warn(line);
+    } else {
+      console.log(line);
+    }
+  };
+}
+
+function elapsedMs(startedAt: number): number {
+  return Date.now() - startedAt;
 }
 
 function jsonError(status: number, error: string): Response {
@@ -252,7 +393,7 @@ function env(name: string): string | undefined {
   return process.env[name];
 }
 
-function messageIdsFromRequestBody(body: unknown): Set<string> {
+function messageIdsFromRequestBody(body: JsonValue): Set<string> {
   if (!isRecord(body) || !Array.isArray(body.messages)) return new Set();
   const ids = body.messages
     .map(messageId)
@@ -260,13 +401,18 @@ function messageIdsFromRequestBody(body: unknown): Set<string> {
   return new Set(ids);
 }
 
-function messageId(value: unknown): string | null {
+function requestMessageCount(body: JsonValue): number {
+  if (!isRecord(body) || !Array.isArray(body.messages)) return 0;
+  return body.messages.length;
+}
+
+function messageId(value: JsonValue): string | null {
   if (!isRecord(value)) return null;
   return typeof value.id === "string" ? value.id : null;
 }
 
 function normalizeHistoryItems(
-  items: unknown[],
+  items: JsonValue[],
   currentRequestMessageIds: Set<string>,
 ): ChatKitMessage[] {
   const normalized = items
@@ -279,7 +425,7 @@ function normalizeHistoryItems(
   });
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null;
 }
 

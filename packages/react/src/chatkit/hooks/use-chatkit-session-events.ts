@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
 import { useTildeClient } from "../../provider";
 
 export type UseChatKitSessionEventsOptions = {
@@ -10,19 +11,19 @@ export type UseChatKitSessionEventsOptions = {
   enabled?: boolean;
 };
 
-export type UseChatKitSessionEventsResult = {
-  items: unknown[];
+export type UseChatKitSessionEventsResult<TEvent extends JsonValue = JsonObject> = {
+  items: TEvent[];
   nextPageToken: string | undefined;
   isLoading: boolean;
   error: Error | null;
   reload(): Promise<void>;
 };
 
-export function useChatKitSessionEvents(
+export function useChatKitSessionEvents<TEvent extends JsonValue = JsonObject>(
   options: UseChatKitSessionEventsOptions,
-): UseChatKitSessionEventsResult {
+): UseChatKitSessionEventsResult<TEvent> {
   const client = useTildeClient();
-  const [items, setItems] = useState<unknown[]>([]);
+  const [items, setItems] = useState<TEvent[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -47,7 +48,7 @@ export function useChatKitSessionEvents(
       if (options.includeChildSessions !== undefined) {
         input.includeChildSessions = options.includeChildSessions;
       }
-      const result = await client.messages.eventHistory(input);
+      const result = await client.messages.eventHistory<TEvent>(input);
       setItems(result.items);
       setNextPageToken(result.nextPageToken);
     } catch (caught) {

@@ -1,13 +1,14 @@
 import type { NormalizedConfig } from "../config";
 import { configFetch, configHeaders } from "../config";
 import { errorFromResponse } from "../errors";
+import type { JsonValue } from "../tools";
 import { buildUrl } from "./paths";
 
 export type RequestOptions = {
   method?: string;
   path: string;
   query?: Record<string, string | number | boolean | null | undefined>;
-  body?: unknown;
+  body?: JsonValue;
   headers?: HeadersInit;
 };
 

@@ -1,26 +1,56 @@
-export type JsonObject = Record<string, unknown>;
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonObject | JsonValue[] | undefined;
+export type JsonObject = { [key: string]: JsonValue };
+export type ToolResult = JsonValue | undefined;
 
-export type LocalMcpToolContext = {
-  callTool(name: string, input?: JsonObject): Promise<unknown>;
-  callLocalTool(name: string, input?: JsonObject): Promise<unknown>;
-  callRemoteTool(name: string, input?: JsonObject): Promise<unknown>;
+export type McpRequest = {
+  method: string;
+  params?: JsonValue;
 };
 
-export type LocalMcpTool = {
+export type ProviderToolDefinition = {
+  description?: string;
+  inputSchema?: JsonObject;
+  parameters?: JsonObject;
+  outputSchema?: JsonObject;
+  execute?: (input?: JsonObject) => ToolResult | Promise<ToolResult>;
+};
+
+export type ToolRegistry<TTool = ProviderToolDefinition> = Record<string, TTool>;
+
+export type LocalMcpToolContext = {
+  callTool<TResult extends ToolResult = ToolResult>(
+    name: string,
+    input?: JsonObject,
+  ): Promise<TResult>;
+  callLocalTool<TResult extends ToolResult = ToolResult>(
+    name: string,
+    input?: JsonObject,
+  ): Promise<TResult>;
+  callRemoteTool<TResult extends ToolResult = ToolResult>(
+    name: string,
+    input?: JsonObject,
+  ): Promise<TResult>;
+};
+
+export type LocalMcpTool<TResult extends ToolResult = ToolResult> = {
   name: string;
   description: string;
   inputSchema: JsonObject;
   outputSchema?: JsonObject;
-  execute(input: JsonObject, context: LocalMcpToolContext): Promise<unknown>;
+  execute(input: JsonObject, context: LocalMcpToolContext): Promise<TResult>;
 };
 
 export type McpClientLike = {
-  tools?: () => Promise<Record<string, unknown>>;
-  callTool?: (name: string, input?: JsonObject) => Promise<unknown>;
+  tools?: () => Promise<ToolRegistry>;
+  callTool?: <TResult extends ToolResult = ToolResult>(
+    name: string,
+    input?: JsonObject,
+  ) => Promise<TResult>;
   request?: (
-    request: { method: string; params?: unknown },
-    options?: unknown,
-  ) => Promise<unknown>;
+    request: McpRequest,
+    options?: JsonValue,
+  ) => Promise<ToolResult>;
   close?: () => Promise<void> | void;
 };
 
@@ -41,7 +71,7 @@ export type LocalMcpToolWrapperOptions<TClient extends object> = {
   registerWithServer?: boolean;
   registerLocalTools?: (
     request: RegisterLocalMcpToolsRequest,
-  ) => Promise<unknown>;
+  ) => Promise<ToolResult>;
 };
 
 export type ToolInvocationRequest = {
@@ -49,10 +79,10 @@ export type ToolInvocationRequest = {
   parameters?: JsonObject;
 };
 
-export type ToolInvocationResult = {
+export type ToolInvocationResult = JsonObject & {
   tool_name: string;
   success: boolean;
-  output?: unknown;
+  output?: ToolResult;
   error?: string;
 };
 
@@ -60,15 +90,18 @@ export type MultiExecuteToolRequest = {
   invocations: ToolInvocationRequest[];
 };
 
-export type MultiExecuteToolResult = {
+export type MultiExecuteToolResult = JsonObject & {
   results: ToolInvocationResult[];
 };
 
 export type LocalMcpToolsClient<TClient extends object> = TClient & {
   readonly serverId: string;
   readonly localTools: readonly LocalMcpTool[];
-  tools(): Promise<Record<string, unknown>>;
-  callTool(name: string, input?: JsonObject): Promise<unknown>;
+  tools(): Promise<ToolRegistry>;
+  callTool<TResult extends ToolResult = ToolResult>(
+    name: string,
+    input?: JsonObject,
+  ): Promise<TResult>;
   close(): Promise<void>;
 };
 
@@ -98,48 +131,50 @@ export function wrapMcpClientWithLocalTools<TClient extends object>(
   }));
   const byName = new Map(localTools.map((entry) => [entry.key, entry]));
   const client = options.client as TClient & McpClientLike;
-  let registrationPromise: Promise<unknown> | undefined;
+  let registrationPromise: Promise<ToolResult> | undefined;
 
   const wrapper = Object.create(client) as LocalMcpToolsClient<TClient>;
 
-  const callRemoteTool = async (
+  const callRemoteTool = async <TResult extends ToolResult = ToolResult>(
     name: string,
     input?: JsonObject,
-  ): Promise<unknown> => {
+  ): Promise<TResult> => {
     if (!client.callTool) {
       throw new TypeError("Wrapped MCP client does not expose callTool");
     }
     return client.callTool(name, input);
   };
 
-  const callLocalTool = async (
+  const callLocalTool = async <TResult extends ToolResult = ToolResult>(
     name: string,
     input?: JsonObject,
-  ): Promise<unknown> => {
+  ): Promise<TResult> => {
     const entry = byName.get(normalizeToolName(name));
     if (!entry) {
       throw new TypeError(`Unknown local MCP tool: ${name}`);
     }
-    return entry.tool.execute(input ?? {}, context);
+    return entry.tool.execute(input ?? {}, context) as Promise<TResult>;
   };
 
-  const callTool = async (
+  const callTool = async <TResult extends ToolResult = ToolResult>(
     name: string,
     input?: JsonObject,
-  ): Promise<unknown> => {
+  ): Promise<TResult> => {
     await ensureServerRegistration();
     if (normalizeToolName(name) === SEARCH_TOOLS_NAME) {
-      return routeSearchTools(input, localTools, callRemoteTool);
+      return (await routeSearchTools(input, localTools, callRemoteTool)) as TResult;
     }
     if (normalizeToolName(name) === GET_TOOL_SCHEMAS_NAME) {
-      return routeGetToolSchemas(input, localTools, callRemoteTool);
+      return (await routeGetToolSchemas(input, localTools, callRemoteTool)) as TResult;
     }
     if (normalizeToolName(name) === MULTI_EXECUTE_TOOL_NAME) {
-      return routeMultiExecute(input, byName, context, callRemoteTool);
+      return typedToolResult<TResult>(
+        await routeMultiExecute(input, byName, context, callRemoteTool),
+      );
     }
     const entry = byName.get(normalizeToolName(name));
     if (entry) {
-      return entry.tool.execute(input ?? {}, context);
+      return entry.tool.execute(input ?? {}, context) as Promise<TResult>;
     }
     return callRemoteTool(name, input);
   };
@@ -201,7 +236,7 @@ async function registerLocalToolsWithServer<TClient extends object>(
   options: LocalMcpToolWrapperOptions<TClient>,
   client: TClient & McpClientLike,
   localTools: LocalToolEntry[],
-): Promise<unknown> {
+): Promise<ToolResult> {
   const request: RegisterLocalMcpToolsRequest = {
     tools: localTools.map(({ tool }) => ({
       name: tool.name,
@@ -273,10 +308,10 @@ function validateLocalTool(tool: LocalMcpTool): void {
 }
 
 function mergeLocalTools(
-  remoteTools: Record<string, unknown>,
+  remoteTools: ToolRegistry,
   localTools: LocalToolEntry[],
   context: LocalMcpToolContext,
-): Record<string, unknown> {
+): ToolRegistry {
   const merged = { ...remoteTools };
   const remoteNames = new Set(Object.keys(remoteTools).map(normalizeToolName));
 
@@ -295,8 +330,8 @@ function mergeLocalTools(
 function localToolToProviderTool(
   tool: LocalMcpTool,
   context: LocalMcpToolContext,
-): JsonObject {
-  const providerTool: JsonObject = {
+): ProviderToolDefinition {
+  const providerTool: ProviderToolDefinition = {
     description: tool.description,
     inputSchema: tool.inputSchema,
     parameters: tool.inputSchema,
@@ -312,7 +347,7 @@ async function routeMultiExecute(
   input: JsonObject | undefined,
   localTools: Map<string, LocalToolEntry>,
   context: LocalMcpToolContext,
-  callRemoteTool: (name: string, input?: JsonObject) => Promise<unknown>,
+  callRemoteTool: <TResult extends ToolResult = ToolResult>(name: string, input?: JsonObject) => Promise<TResult>,
 ): Promise<MultiExecuteToolResult> {
   const request = parseMultiExecuteRequest(input);
   const results = new Array<ToolInvocationResult>(request.invocations.length);
@@ -380,7 +415,7 @@ async function routeMultiExecute(
 async function routeSearchTools(
   input: JsonObject | undefined,
   localTools: LocalToolEntry[],
-  callRemoteTool: (name: string, input?: JsonObject) => Promise<unknown>,
+  callRemoteTool: <TResult extends ToolResult = ToolResult>(name: string, input?: JsonObject) => Promise<TResult>,
 ): Promise<JsonObject> {
   const request = parseSearchToolsRequest(input);
   let result: ReturnType<typeof normalizeSearchToolsResult>;
@@ -402,21 +437,25 @@ async function routeSearchTools(
   const tools = [...localRanked, ...result.tools]
     .sort((a, b) => Number(b.score) - Number(a.score))
     .slice(0, request.max_results);
-  return {
+  const routed: JsonObject = {
     ...result,
     tools,
-    recommended_tool: tools[0] ?? result.recommended_tool,
     confidence:
       typeof result.confidence === "number"
         ? Math.max(result.confidence, Number(tools[0]?.score ?? 0))
         : Number(tools[0]?.score ?? 0),
   };
+  const recommendedTool = tools[0] ?? result.recommended_tool;
+  if (recommendedTool) {
+    routed.recommended_tool = recommendedTool;
+  }
+  return routed;
 }
 
 async function routeGetToolSchemas(
   input: JsonObject | undefined,
   localTools: LocalToolEntry[],
-  callRemoteTool: (name: string, input?: JsonObject) => Promise<unknown>,
+  callRemoteTool: <TResult extends ToolResult = ToolResult>(name: string, input?: JsonObject) => Promise<TResult>,
 ): Promise<JsonObject> {
   const toolNames = parseToolNames(input);
   const localByName = new Map(
@@ -485,11 +524,11 @@ function parseToolNames(input: JsonObject | undefined): string[] {
   });
 }
 
-function normalizeSearchToolsResult(value: unknown): {
+function normalizeSearchToolsResult(value: ToolResult): {
   tools: JsonObject[];
   recommended_tool?: JsonObject;
-  recommended_plan_steps: unknown[];
-  next_steps: unknown[];
+  recommended_plan_steps: JsonValue[];
+  next_steps: JsonValue[];
   confidence: number;
 } {
   const result = unwrapStructuredResult(value);
@@ -504,8 +543,8 @@ function normalizeSearchToolsResult(value: unknown): {
   const normalized: {
     tools: JsonObject[];
     recommended_tool?: JsonObject;
-    recommended_plan_steps: unknown[];
-    next_steps: unknown[];
+    recommended_plan_steps: JsonValue[];
+    next_steps: JsonValue[];
     confidence: number;
   } = {
     ...result,
@@ -522,7 +561,7 @@ function normalizeSearchToolsResult(value: unknown): {
   return normalized;
 }
 
-function normalizeGetToolSchemasResult(value: unknown): {
+function normalizeGetToolSchemasResult(value: ToolResult): {
   tools: JsonObject[];
 } {
   const result = unwrapStructuredResult(value);
@@ -535,7 +574,7 @@ function normalizeGetToolSchemasResult(value: unknown): {
   };
 }
 
-function unwrapStructuredResult(value: unknown): unknown {
+function unwrapStructuredResult(value: ToolResult): ToolResult {
   if (isJsonObject(value) && "structuredContent" in value) {
     return value.structuredContent;
   }
@@ -623,7 +662,7 @@ function summarizeSchema(schema: JsonObject): string {
 
 async function executeRemoteMultiExecute(
   remoteInvocations: ToolInvocationRequest[],
-  callRemoteTool: (name: string, input?: JsonObject) => Promise<unknown>,
+  callRemoteTool: <TResult extends ToolResult = ToolResult>(name: string, input?: JsonObject) => Promise<TResult>,
 ): Promise<MultiExecuteToolResult> {
   try {
     const remoteResult = await callRemoteTool(MULTI_EXECUTE_TOOL_NAME, {
@@ -698,7 +737,7 @@ async function executeLocalInvocation(
 }
 
 function normalizeMultiExecuteResult(
-  value: unknown,
+  value: ToolResult,
   invocations: ToolInvocationRequest[],
 ): MultiExecuteToolResult {
   if (isJsonObject(value) && Array.isArray(value.results)) {
@@ -735,7 +774,7 @@ function normalizeMultiExecuteResult(
 }
 
 function normalizeInvocationResult(
-  value: unknown,
+  value: ToolResult,
   invocation: ToolInvocationRequest | undefined,
 ): ToolInvocationResult {
   if (!isJsonObject(value)) {
@@ -765,6 +804,10 @@ function normalizeInvocationResult(
 
 function normalizeToolName(name: string): string {
   return name.toUpperCase();
+}
+
+function typedToolResult<TResult extends ToolResult>(value: ToolResult): TResult {
+  return value as unknown as TResult;
 }
 
 function isJsonObject(value: unknown): value is JsonObject {
