@@ -1,9 +1,11 @@
+import type { JsonValue } from "./tools";
+
 export class ApiError extends Error {
   readonly status: number;
   readonly response: Response;
-  readonly body: unknown;
+  readonly body: JsonValue | string;
 
-  constructor(message: string, response: Response, body: unknown) {
+  constructor(message: string, response: Response, body: JsonValue | string) {
     super(message);
     this.name = "ApiError";
     this.status = response.status;
@@ -14,10 +16,10 @@ export class ApiError extends Error {
 
 export async function errorFromResponse(response: Response): Promise<ApiError> {
   const contentType = response.headers.get("content-type") ?? "";
-  let body: unknown;
+  let body: JsonValue | string;
   try {
     body = contentType.includes("application/json")
-      ? await response.json()
+      ? ((await response.json()) as JsonValue)
       : await response.text();
   } catch {
     body = null;

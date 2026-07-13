@@ -1,8 +1,9 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { JsonObject } from "@tilde/harness-sdk";
 
 export type ChatKitConvertedMessage = {
   chatKitMessageId: string;
-  message: Record<string, unknown>;
+  message: JsonObject;
 };
 
 export type ChatKitContextClient = {

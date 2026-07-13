@@ -18,6 +18,7 @@
     "baseUrl": ".",
     "paths": {
       "@tilde/harness-sdk": ["packages/core/src/index.ts"],
+      "@trytilde/cli": ["packages/cli/src/index.ts"],
       "@tilde/harness-sdk-react": ["packages/react/src/index.ts"],
       "@tilde/harness-sdk-vercel-ai-node": [
         "packages/vercel-ai-node/src/index.ts"

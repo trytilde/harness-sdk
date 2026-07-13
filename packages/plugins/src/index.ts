@@ -17,6 +17,10 @@ import {
   whoami,
 } from "@tilde/harness-sdk/api";
 
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[] | undefined;
+type JsonObject = { [key: string]: JsonValue };
+
 export type TildePluginConfig = {
   baseUrl: string;
   teamId?: string;
@@ -206,7 +210,7 @@ export async function downloadSkillRegistry(
 export function mcpServerConfigForCli(
   cli: AgentCli,
   server: TildeMcpServerChoice,
-): Record<string, unknown> {
+): JsonObject {
   const url = server.url;
   if (!url) {
     throw new Error(`MCP server ${server.label} does not include a URL`);
@@ -258,7 +262,7 @@ export function cliSkillInstallDir(cli: AgentCli, homeDir: string): string {
 export function mcpConfigDocumentForCli(
   cli: AgentCli,
   servers: TildeMcpServerChoice[],
-): Record<string, unknown> {
+): JsonObject {
   const entries = Object.fromEntries(
     servers.map((server) => [server.label, mcpServerConfigForCli(cli, server)]),
   );
@@ -374,7 +378,7 @@ function createPluginApiClient(config: TildePluginConfig): Client {
 async function apiCall<T>(
   promise: Promise<{
     data?: T | undefined;
-    error?: unknown;
+    error?: JsonValue;
     response?: Response;
   }>,
 ): Promise<T> {
@@ -422,7 +426,7 @@ function toSkillMarkdown(
   return `---\nname: ${yamlString(skill.name)}\ndescription: ${yamlString(skill.description)}\n---\n${metadata}\n${skill.content.trim()}\n`;
 }
 
-async function readJsonConfig(path: string): Promise<Record<string, unknown>> {
+async function readJsonConfig(path: string): Promise<JsonObject> {
   let contents: string;
   try {
     contents = await readFile(path, "utf8");
@@ -431,7 +435,7 @@ async function readJsonConfig(path: string): Promise<Record<string, unknown>> {
     throw error;
   }
   if (contents.trim().length === 0) return {};
-  const parsed = JSON.parse(contents) as unknown;
+  const parsed = JSON.parse(contents) as JsonObject;
   if (!isRecord(parsed)) {
     throw new Error(`Existing MCP config at ${path} must be a JSON object`);
   }
@@ -440,9 +444,9 @@ async function readJsonConfig(path: string): Promise<Record<string, unknown>> {
 
 function mergeMcpConfigDocumentForCli(
   cli: AgentCli,
-  existing: Record<string, unknown>,
+  existing: JsonObject,
   servers: TildeMcpServerChoice[],
-): Record<string, unknown> {
+): JsonObject {
   const key = mcpConfigServerKeyForCli(cli);
   const generated = mcpConfigDocumentForCli(cli, servers);
   const existingServers = isRecord(existing[key]) ? existing[key] : {};
@@ -498,7 +502,7 @@ function htmlCommentValue(value: string): string {
   return value.replace(/[\r\n]+/g, " ").replaceAll("--", "- -");
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

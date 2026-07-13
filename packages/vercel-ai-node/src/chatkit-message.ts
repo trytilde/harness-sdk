@@ -1,4 +1,5 @@
 import type { UIMessage } from "ai";
+import type { JsonObject } from "@tilde/harness-sdk";
 import {
   type ChatKitContextClient,
   type ChatKitConvertedMessage,
@@ -14,9 +15,9 @@ export type ChatKitMessageBase = {
   role: ChatKitMessageRole;
   created_at?: string;
   updated_at?: string;
-  metadata?: Record<string, unknown> | null;
-  provider_metadata?: Record<string, unknown> | null;
-  cached_agent_representation?: Record<string, unknown> | null;
+  metadata?: JsonObject | null;
+  provider_metadata?: JsonObject | null;
+  cached_agent_representation?: JsonObject | null;
 };
 
 export type ChatKitTextMessage = ChatKitMessageBase & {
@@ -27,13 +28,13 @@ export type ChatKitTextMessage = ChatKitMessageBase & {
 export type ChatKitUiTextPart = {
   type: "text";
   text?: string | null;
-  provider_metadata?: Record<string, unknown> | null;
+  provider_metadata?: JsonObject | null;
 };
 
 export type ChatKitUiReasoningPart = {
   type: "reasoning";
   text?: string | null;
-  provider_metadata?: Record<string, unknown> | null;
+  provider_metadata?: JsonObject | null;
 };
 
 export type ChatKitUiFilePart = {
@@ -46,8 +47,8 @@ export type ChatKitUiFilePart = {
   attachment_id?: string | null;
   size_bytes?: number | null;
   sha256?: string | null;
-  provider_metadata?: Record<string, unknown> | null;
-  providerMetadata?: Record<string, unknown> | null;
+  provider_metadata?: JsonObject | null;
+  providerMetadata?: JsonObject | null;
 };
 
 export type ChatKitUiPart =
@@ -74,7 +75,7 @@ export type ConvertToAiSdkCacheHandler = (input: {
 
 export type ConvertToAiSdkHydrateHandler = (input: {
   message: ChatKitMessage;
-  cachedAgentRepresentation: Record<string, unknown>;
+  cachedAgentRepresentation: JsonObject;
 }) => Awaitable<UIMessage | null>;
 
 export type ConvertToAiSdkMessageInput = ChatKitMessage | UIMessage;
@@ -193,7 +194,7 @@ async function hydrateCachedMessage(
       cachedAgentRepresentation: cached,
     });
   }
-  return isUiMessage(cached) ? (cached as unknown as UIMessage) : null;
+  return isUiMessage(cached) ? jsonObjectToUiMessage(cached) : null;
 }
 
 async function convertPartsToAiSdkParts(
@@ -258,7 +259,7 @@ async function convertUiPartToAiSdkPart(
   ) {
     return options.onUnprocessedFileUpload({
       message,
-      part: part as unknown as ChatKitUiFilePart,
+      part: jsonObjectToChatKitUiFilePart(part),
     });
   }
   return part;
@@ -292,11 +293,11 @@ function defaultConvertedMessageCacheEntry(
 ): ChatKitConvertedMessage {
   return {
     chatKitMessageId: message.id,
-    message: convertedMessage as unknown as Record<string, unknown>,
+    message: uiMessageToJsonObject(convertedMessage),
   };
 }
 
-function aiSdkMetadata(message: ChatKitMessage): Record<string, unknown> {
+function aiSdkMetadata(message: ChatKitMessage): JsonObject {
   return {
     createdAt: message.created_at,
     updatedAt: message.updated_at,
@@ -320,7 +321,7 @@ function isChatKitUiPart(value: unknown): value is ChatKitUiPart {
   return false;
 }
 
-function isUiMessage(value: Record<string, unknown>): boolean {
+function isUiMessage(value: JsonObject): boolean {
   return (
     typeof value.id === "string" &&
     isAiSdkRole(value.role) &&
@@ -332,6 +333,18 @@ function isAiSdkRole(value: unknown): value is UIMessage["role"] {
   return value === "system" || value === "user" || value === "assistant";
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null;
+}
+
+function uiMessageToJsonObject(message: UIMessage): JsonObject {
+  return message as unknown as JsonObject;
+}
+
+function jsonObjectToUiMessage(message: JsonObject): UIMessage {
+  return message as unknown as UIMessage;
+}
+
+function jsonObjectToChatKitUiFilePart(part: JsonObject): ChatKitUiFilePart {
+  return part as unknown as ChatKitUiFilePart;
 }

@@ -1,5 +1,8 @@
 import { type Client, createClient } from "./generated/client";
 
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | JsonValue[] | undefined;
+
 export type TildeApiClientOptions = {
   baseUrl: string;
   bearerToken?: string;
@@ -36,7 +39,7 @@ export function createTildeApiClient(
 }
 
 export async function unwrapTildeResponse<T>(
-  promise: Promise<{ data?: T; error?: unknown; response?: Response }>,
+  promise: Promise<{ data?: T; error?: JsonValue; response?: Response }>,
 ): Promise<T> {
   const result = await promise;
   if ("error" in result && result.error !== undefined) {

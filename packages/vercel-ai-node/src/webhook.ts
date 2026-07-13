@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { JsonValue } from "@tilde/harness-sdk";
 
 export const TILDE_WEBHOOK_ID_HEADER = "x-tilde-webhook-id";
 export const TILDE_WEBHOOK_TIMESTAMP_HEADER = "x-tilde-timestamp";
@@ -12,7 +13,7 @@ export type VerifyWebhookOptions = {
 
 export type VerifiedWebhookRequest = {
   rawBody: Uint8Array;
-  json: unknown;
+  json: JsonValue;
   webhookId: string;
   timestamp: number;
 };
@@ -47,9 +48,9 @@ export async function verifyWebhookRequest(
     throw new WebhookVerificationError("Invalid webhook signature");
   }
 
-  let json: unknown;
+  let json: JsonValue;
   try {
-    json = JSON.parse(new TextDecoder().decode(rawBody));
+    json = JSON.parse(new TextDecoder().decode(rawBody)) as JsonValue;
   } catch {
     throw new WebhookVerificationError("Invalid JSON body");
   }

@@ -1,10 +1,4 @@
 export {
-  ensureHarnessAuth,
-  type HarnessAuthOptions,
-  type HarnessAuthTokens,
-  writeStoredTokens,
-} from "./auth";
-export {
   type ChatKitAttachmentFilePartHandlerOptions,
   createChatKitAttachmentFilePartHandler,
 } from "./chatkit-attachments";
@@ -49,17 +43,6 @@ export {
   createMCPClient,
   type TildeMCPClient,
 } from "./mcp";
-export {
-  findAvailablePort,
-  type LocalRuntimeTunnelCommandProcess,
-  type LocalRuntimeTunnelConnector,
-  type LocalRuntimeTunnelExit,
-  type LocalRuntimeTunnelProcess,
-  type RunLocalRuntimeTunnelCommandOptions,
-  runLocalRuntimeTunnelCommand,
-  type StartLocalRuntimeTunnelOptions,
-  startLocalRuntimeTunnel,
-} from "./tunnel";
 export {
   DEFAULT_TOLERANCE_SECONDS,
   signBody,

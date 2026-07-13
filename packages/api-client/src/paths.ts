@@ -1,9 +1,10 @@
 export type TeamPathInput = {
-  teamId: string;
+  teamId?: string;
 };
 
 export type ReverseProxyUrlInput = TeamPathInput & {
-  baseUrl: string;
+  baseUrl?: string;
+  orgId?: string;
   profileId: string;
   path?: string;
   pathPrefix?: string;
@@ -16,7 +17,7 @@ export type McpServerUrlInput = TeamPathInput & {
 };
 
 export function teamPath(input: TeamPathInput, path: string): string {
-  return `/api/v1/team/${encodeURIComponent(input.teamId)}${ensureLeadingSlash(path)}`;
+  return `/api/v1/team/${encodeURIComponent(requiredTeamId(input.teamId))}${ensureLeadingSlash(path)}`;
 }
 
 export function mcpServerUrl(input: McpServerUrlInput): string {
@@ -44,7 +45,7 @@ export function reverseProxyPath(
 export function reverseProxyUrl(input: ReverseProxyUrlInput): string {
   const url = new URL(
     reverseProxyPath(input),
-    `${trimTrailingSlash(input.baseUrl)}/`,
+    `${trimTrailingSlash(orgScopedBaseUrl(input))}/`,
   );
   for (const [key, value] of Object.entries(input.query ?? {})) {
     if (value !== undefined && value !== null) {
@@ -52,6 +53,32 @@ export function reverseProxyUrl(input: ReverseProxyUrlInput): string {
     }
   }
   return url.toString();
+}
+
+function orgScopedBaseUrl(input: Pick<ReverseProxyUrlInput, "baseUrl" | "orgId">): string {
+  const orgId = requiredOrgId(input.orgId);
+  const baseUrl = input.baseUrl ?? env("TILDE_BASE_URL") ?? "https://api.trytilde.ai";
+  const url = new URL(baseUrl);
+  if (url.hostname !== orgId && !url.hostname.startsWith(`${orgId}.`)) {
+    url.hostname = `${orgId}.${url.hostname}`;
+  }
+  return url.toString();
+}
+
+function requiredOrgId(orgId: string | undefined): string {
+  const resolved = orgId ?? env("TILDE_ORG_ID");
+  if (!resolved || resolved.trim().length === 0) {
+    throw new TypeError("orgId is required");
+  }
+  return resolved.trim();
+}
+
+function requiredTeamId(teamId: string | undefined): string {
+  const resolved = teamId ?? env("TILDE_TEAM_ID");
+  if (!resolved || resolved.trim().length === 0) {
+    throw new TypeError("teamId is required");
+  }
+  return resolved.trim();
 }
 
 function absoluteUrl(baseUrl: string, path: string): string {
@@ -68,4 +95,12 @@ function normalizePathSegment(value: string | undefined): string {
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
+}
+
+function env(name: string): string | undefined {
+  if (typeof process === "undefined") {
+    return undefined;
+  }
+  const value = process.env[name];
+  return value && value.trim().length > 0 ? value : undefined;
 }

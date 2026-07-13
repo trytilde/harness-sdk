@@ -1,6 +1,7 @@
 import type { NormalizedConfig } from "../config";
 import { requestJson } from "../internal/fetch-client";
 import { buildUrl, pathWithParams, teamPath } from "../internal/paths";
+import type { JsonObject, JsonValue } from "../tools";
 import { MessagesClient } from "./messages";
 
 const REGISTER_HTTP_AGENT_PATH =
@@ -23,7 +24,24 @@ type Paginated<T> = {
 
 export type ConvertedChatKitMessage = {
   chatKitMessageId: string;
-  message: Record<string, unknown>;
+  message: JsonObject;
+};
+
+export type RegisteredChatKitAgent = JsonObject & {
+  id?: string;
+  display_name?: string;
+  endpoint_url?: string;
+};
+
+export type RegisteredChatKitChannel = JsonObject & {
+  id?: string;
+  display_name?: string;
+};
+
+export type ChatKitAttachment = JsonObject & {
+  id?: string;
+  filename?: string;
+  media_type?: string;
 };
 
 export class ChatKitClient {
@@ -42,12 +60,12 @@ export class ChatKitClient {
     streaming?: boolean;
     timeoutMs?: number;
   }): Promise<{
-    agent: unknown;
+    agent: RegisteredChatKitAgent;
     apiKey: string;
     webhookSigningKey: string;
   }> {
     const raw = await requestJson<{
-      agent: unknown;
+      agent: RegisteredChatKitAgent;
       api_key: string;
       webhook_signing_key: string;
     }>(this.#config, {
@@ -68,12 +86,14 @@ export class ChatKitClient {
     };
   }
 
-  async registerVercelUiChannel(input: {
+  async registerVercelUiChannel<
+    TResult extends RegisteredChatKitChannel = RegisteredChatKitChannel,
+  >(input: {
     id?: string;
     displayName: string;
     defaultAgentInboxId?: string;
-  }): Promise<unknown> {
-    return requestJson<unknown>(this.#config, {
+  }): Promise<TResult> {
+    return requestJson<TResult>(this.#config, {
       method: "POST",
       path: teamPath(this.#config, REGISTER_VERCEL_UI_CHANNEL_PATH),
       body: {
@@ -84,16 +104,16 @@ export class ChatKitClient {
     });
   }
 
-  async listMessageHistory(input: {
+  async listMessageHistory<TMessage extends JsonValue = JsonObject>(input: {
     sessionId: string;
     pageSize?: number;
     nextPageToken?: string;
     channelId?: string;
     participantInboxId?: string;
     externalUserId?: string;
-  }): Promise<{ items: unknown[]; nextPageToken?: string }> {
+  }): Promise<{ items: TMessage[]; nextPageToken?: string }> {
     try {
-      const raw = await requestJson<Paginated<unknown>>(this.#config, {
+      const raw = await requestJson<Paginated<TMessage>>(this.#config, {
         path: pathWithParams(teamPath(this.#config, MESSAGE_HISTORY_PATH), {
           session_id: input.sessionId,
         }),
@@ -105,7 +125,7 @@ export class ChatKitClient {
           user_external_id: input.externalUserId,
         },
       });
-      const result: { items: unknown[]; nextPageToken?: string } = {
+      const result: { items: TMessage[]; nextPageToken?: string } = {
         items: raw.items,
       };
       if (raw.next_page_token) {
@@ -114,7 +134,7 @@ export class ChatKitClient {
       return result;
     } catch (error) {
       if (isMissingChatKitRoute(error)) {
-        return this.#messages.list(input);
+        return this.#messages.list<TMessage>(input);
       }
       throw error;
     }
@@ -142,7 +162,7 @@ export class ChatKitClient {
     const raw = await requestJson<{
       messages: {
         chatkit_message_id: string;
-        message: Record<string, unknown>;
+        message: JsonObject;
       }[];
     }>(this.#config, {
       method: "POST",
@@ -163,12 +183,12 @@ export class ChatKitClient {
     sessionId: string;
     attachmentId: string;
   }): Promise<{
-    attachment: unknown;
+    attachment: ChatKitAttachment;
     downloadUrl: string;
     expiresAt: string;
   }> {
     const raw = await requestJson<{
-      attachment: unknown;
+      attachment: ChatKitAttachment;
       download_url: string;
       expires_at: string;
     }>(this.#config, {

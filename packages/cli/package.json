@@ -1,0 +1,36 @@
+{
+  "name": "@trytilde/cli",
+  "version": "0.0.0",
+  "description": "Tilde command line interface.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "tilde": "dist/cli.js",
+    "t": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build && chmod +x dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config ../../vitest.config.ts test"
+  },
+  "dependencies": {
+    "@tilde/harness-sdk": "workspace:*",
+    "ink": "^7.1.0",
+    "react": "^19.2.7",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17"
+  }
+}

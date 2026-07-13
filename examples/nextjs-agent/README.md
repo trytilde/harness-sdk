@@ -53,7 +53,7 @@ signed session.
 Use `pnpm tunnel` for local ChatKit testing. It runs:
 
 ```bash
-harness-sdk tunnel -- next dev --webpack -p '$TUNNEL_PORT'
+tilde tunnel -- next dev --webpack -p '$TUNNEL_PORT'
 ```
 
 The tunnel runner starts Cloudflare tunnel connectivity, picks a local app port
