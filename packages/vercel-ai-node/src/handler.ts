@@ -68,6 +68,7 @@ export type ChatKitEndpointContext = ChatKitEndpointProviderContext & {
   userId?: string;
   externalUserId?: string;
   externalUserProvider?: string;
+  client: Client;
   skills: SkillsClient;
   session: ChatKitSessionClient;
   chatkit: ChatKitContextClient;
@@ -343,6 +344,7 @@ export function chatKitEndpoint(
       ...(actorContext.externalUserProvider
         ? { externalUserProvider: actorContext.externalUserProvider }
         : {}),
+      client,
       skills: client.skills,
       session,
       chatkit,

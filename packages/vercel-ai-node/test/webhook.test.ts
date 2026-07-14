@@ -171,6 +171,8 @@ describe("chatKitEndpoint", () => {
       expect(context.externalUserId).toBe("U123");
       expect(context.externalUserProvider).toBe("slack");
       expect(context.skills).toBeDefined();
+      expect(context.client.chatkit).toBeDefined();
+      expect(context.skills).toBe(context.client.skills);
       expect(context.session.id).toBe("session_1");
       return new Response("ok");
     });
