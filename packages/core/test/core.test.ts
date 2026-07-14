@@ -186,6 +186,73 @@ describe("createConfig", () => {
   });
 });
 
+describe("skills", () => {
+  it("lists full skill bodies and finds a skill by stable title", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          id: "registry-1",
+          name: "Agent skills",
+          description: "",
+          org_id: "org-1",
+          team_id: "team-1",
+          created_at: "2026-07-14T00:00:00Z",
+          updated_at: "2026-07-14T00:00:00Z",
+          skills: [
+            {
+              id: "skill-1",
+              name: "website-seo-setup",
+              description: "SEO implementation requirements",
+              content: "Use the checklist verbatim.",
+              version: 1,
+              org_id: "org-1",
+              team_id: "team-1",
+              source_kind: "manual",
+              created_at: "2026-07-14T00:00:00Z",
+              updated_at: "2026-07-14T00:00:00Z",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          id: "skill-1",
+          name: "website-seo-setup",
+          description: "SEO implementation requirements",
+          content: "Use the checklist verbatim.",
+          version: 1,
+          org_id: "org-1",
+          team_id: "team-1",
+          source_kind: "manual",
+          created_at: "2026-07-14T00:00:00Z",
+          updated_at: "2026-07-14T00:00:00Z",
+        }),
+      );
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      teamId: "team-1",
+      apiKey: "test-key",
+      fetch: fetchMock,
+    });
+
+    const registry = await client.skills.registry("registry-1");
+    await expect(registry.list()).resolves.toMatchObject([
+      { name: "website-seo-setup", content: "Use the checklist verbatim." },
+    ]);
+    await expect(registry.find("website-seo-setup")).resolves.toMatchObject({
+      id: "skill-1",
+      content: "Use the checklist verbatim.",
+    });
+    expect(
+      fetchMock.mock.calls.map(([request]) => (request as Request).url),
+    ).toEqual([
+      "https://api.example.test/api/v1/team/team-1/skill-registry/registry-1",
+      "https://api.example.test/api/v1/team/team-1/skill-registry/registry-1/skill/by-title/website-seo-setup",
+    ]);
+  });
+});
+
 describe("MCP client", () => {
   it("constructs encoded MCP server URLs", () => {
     const client = createClient({

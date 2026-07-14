@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
+import type { JsonObject, JsonValue, SkillsClient } from "@tilde/harness-sdk";
 import {
   type ChatKitContextClient,
   type ChatKitConvertedMessage,
@@ -51,6 +51,7 @@ export type ChatKitEndpointContext = {
   externalUserId?: string;
   externalUserProvider?: string;
   client: Client;
+  skills: SkillsClient;
   session: ChatKitSessionClient;
   chatkit: ChatKitContextClient;
 };
@@ -300,6 +301,7 @@ export function chatKitEndpoint(
         ? { externalUserProvider: actorContext.externalUserProvider }
         : {}),
       client,
+      skills: client.skills,
       session,
       chatkit,
     };

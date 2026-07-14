@@ -23,6 +23,7 @@ export {
   type NormalizedConfig,
 } from "./config";
 export { ApiError } from "./errors";
+export { type SkillItem, type SkillRegistry, SkillsClient } from "./skills";
 export {
   type AddMcpServerFunctionInput,
   type AvailableToolGroup,
