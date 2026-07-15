@@ -26,10 +26,21 @@ tilde auth set-team
 tilde state import ./tilde-state.yaml ./tilde-import-output.json
 tilde state import ./tilde-state.yaml ./tilde-import-output.json --auto-apply
 tilde state export ./tilde-state.yaml
+tilde chat-slurper configure
+tilde chat-slurper backfill
+tilde chat-slurper status
+tilde chat-slurper disable
 ```
 
 The CLI can also be invoked as `t`. Running `tilde` or `t` with no command checks
 auth state and starts sign-in if needed.
+
+`tilde chat-slurper configure` detects Codex (including Codex Desktop) and Claude Code,
+lets the user select a team memory bank, and installs additive user-level
+capture hooks. Live hook events and `tilde chat-slurper backfill` share the same
+normalized, idempotent upload protocol. `disable` removes only Tilde-owned hooks
+and leaves previously synchronized history searchable. Codex requires users to
+review and trust newly installed command hooks through `/hooks` before they run.
 
 ## Core Config
 
