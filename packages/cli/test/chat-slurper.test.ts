@@ -1,18 +1,22 @@
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  acquireQueueLock,
+  coalesceQueuedHooks,
   installProviderHooks,
   parseTranscript,
   removeProviderHooks,
 } from "../src/chat-slurper";
+import { redactJsonValues, redactText } from "../src/chat-slurper-redaction";
 
 const temporaryDirectories: string[] = [];
 
@@ -23,6 +27,54 @@ afterEach(() => {
 });
 
 describe("chat-slurper hook configuration", () => {
+  it("refuses live queue locks and reclaims locks owned by dead processes", () => {
+    const root = temporaryDirectory();
+    const lock = join(root, "queue.lock");
+
+    expect(acquireQueueLock(lock)).toBe(true);
+    expect(acquireQueueLock(lock)).toBe(false);
+    rmSync(lock, { recursive: true, force: true });
+
+    mkdirSync(lock);
+    writeFileSync(
+      join(lock, "owner.json"),
+      JSON.stringify({
+        pid: 99_999_999,
+        hostname: hostname(),
+        createdAt: "2026-07-15T12:00:00Z",
+      }),
+    );
+    expect(acquireQueueLock(lock)).toBe(true);
+  });
+
+  it("coalesces lifecycle triggers by provider and transcript", () => {
+    const queued = (
+      provider: "codex" | "claude-code",
+      transcriptPath: string,
+      hookEvent: string,
+    ) => ({
+      version: 1 as const,
+      provider,
+      transcriptPath,
+      hookEvent,
+      queuedAt: "2026-07-15T12:00:00Z",
+    });
+
+    const groups = coalesceQueuedHooks([
+      {
+        file: "1.json",
+        queued: queued("codex", "/tmp/a.jsonl", "UserPromptSubmit"),
+      },
+      { file: "2.json", queued: queued("codex", "/tmp/a.jsonl", "Stop") },
+      { file: "3.json", queued: queued("claude-code", "/tmp/a.jsonl", "Stop") },
+    ]);
+
+    expect(groups.map((group) => group.map((item) => item.file))).toEqual([
+      ["1.json", "2.json"],
+      ["3.json"],
+    ]);
+  });
+
   it("installs exactly one Tilde command when configured repeatedly", () => {
     const home = temporaryDirectory();
 
@@ -31,13 +83,28 @@ describe("chat-slurper hook configuration", () => {
 
     const hooksFile = join(home, ".codex", "hooks.json");
     const configured = JSON.parse(readFileSync(hooksFile, "utf8")) as {
-      hooks: { Stop: Array<{ hooks: Array<{ command?: string }> }> };
+      hooks: Record<
+        string,
+        Array<{ matcher: string; hooks: Array<{ command?: string }> }>
+      >;
     };
-    const commands = configured.hooks.Stop.flatMap((matcher) => matcher.hooks)
+    const commands = Object.values(configured.hooks)
+      .flatMap((matchers) => matchers.flatMap((matcher) => matcher.hooks))
       .map((hook) => hook.command)
       .filter((command) => command?.includes("tilde chat-slurper"));
     expect(commands).toEqual([
-      "tilde chat-slurper capture-hook --provider codex --quiet",
+      "tilde chat-slurper capture-hook --provider codex --hook-event SessionStart --quiet",
+      "tilde chat-slurper capture-hook --provider codex --hook-event UserPromptSubmit --quiet",
+      "tilde chat-slurper capture-hook --provider codex --hook-event PreToolUse --quiet",
+      "tilde chat-slurper capture-hook --provider codex --hook-event PostToolUse --quiet",
+      "tilde chat-slurper capture-hook --provider codex --hook-event Stop --quiet",
+    ]);
+    expect(Object.keys(configured.hooks)).toEqual([
+      "SessionStart",
+      "UserPromptSubmit",
+      "PreToolUse",
+      "PostToolUse",
+      "Stop",
     ]);
   });
 
@@ -66,6 +133,31 @@ describe("chat-slurper hook configuration", () => {
     expect(readFileSync(path, "utf8")).not.toContain("tilde chat-slurper");
   });
 
+  it("installs Claude task and todo matchers at Entire-compatible depth", () => {
+    const home = temporaryDirectory();
+
+    installProviderHooks("claude-code", home);
+
+    const configured = JSON.parse(
+      readFileSync(join(home, ".claude", "settings.json"), "utf8"),
+    ) as { hooks: Record<string, Array<{ matcher: string }>> };
+    expect(Object.keys(configured.hooks)).toEqual([
+      "SessionStart",
+      "UserPromptSubmit",
+      "PreToolUse",
+      "PostToolUse",
+      "Stop",
+      "SessionEnd",
+    ]);
+    expect(configured.hooks.PreToolUse?.map((hook) => hook.matcher)).toEqual([
+      "Task",
+    ]);
+    expect(configured.hooks.PostToolUse?.map((hook) => hook.matcher)).toEqual([
+      "Task",
+      "TodoWrite",
+    ]);
+  });
+
   it("refuses to overwrite malformed provider JSON", () => {
     const home = temporaryDirectory();
     const path = join(home, ".codex", "hooks.json");
@@ -76,6 +168,70 @@ describe("chat-slurper hook configuration", () => {
       `Invalid JSON in ${path}`,
     );
     expect(readFileSync(path, "utf8")).toBe("{ definitely-not-json");
+  });
+});
+
+describe("chat-slurper redaction", () => {
+  it("redacts provider credentials, high entropy values, and connection strings", () => {
+    const input = [
+      "github_pat_11AA22BB33CC44DD55EE66FF77GG88HH",
+      "token=6YpR9qN3vW8sK2mX7zA4cD1fH5jL0uT",
+      "postgres://alice:secret@db.example.com/app",
+    ].join(" ");
+
+    const redacted = redactText(input, undefined);
+
+    expect(redacted).not.toContain("github_pat_");
+    expect(redacted).not.toContain("6YpR9qN3");
+    expect(redacted).not.toContain("alice:secret");
+  });
+
+  it("supports opt-in PII and custom rules", () => {
+    const redacted = redactText(
+      "Jane lives at 123 Market Street; jane@example.com; ACCT-4242",
+      {
+        customPatterns: { internal_account: "ACCT-[0-9]+" },
+        pii: { email: true, address: true },
+      },
+    );
+
+    expect(redacted).toContain("[REDACTED_ADDRESS]");
+    expect(redacted).toContain("[REDACTED_EMAIL]");
+    expect(redacted).toContain("[REDACTED_INTERNAL_ACCOUNT]");
+    expect(() =>
+      redactJsonValues([{ text: "aaaaaaaaaaaaaaaa" }], {
+        customPatterns: { unsafe: "(a+)+$" },
+      }),
+    ).toThrow("Unsafe custom redaction rule");
+  });
+
+  it("applies OPF spans and fails closed when OPF cannot run", () => {
+    const directory = temporaryDirectory();
+    const command = join(directory, "opf-fixture");
+    writeFileSync(
+      command,
+      '#!/bin/sh\ncat >/dev/null\nprintf \'%s\' \'{"detected_spans":[{"label":"private_person","start":0,"end":4}]}\'\n',
+    );
+    chmodSync(command, 0o700);
+    const config = {
+      openaiPrivacyFilter: {
+        enabled: true,
+        command,
+        categories: ["private_person"],
+      },
+    };
+
+    expect(
+      redactJsonValues([{ text: "John Smith works here" }], config),
+    ).toEqual([{ text: "[REDACTED_PERSON] Smith works here" }]);
+    expect(() =>
+      redactJsonValues([{ text: "John Smith works here" }], {
+        openaiPrivacyFilter: {
+          enabled: true,
+          command: join(directory, "missing-opf"),
+        },
+      }),
+    ).toThrow("failed closed");
   });
 });
 
@@ -211,7 +367,12 @@ describe("chat-slurper transcript adapters", () => {
       agent_name: "claude-code",
       model: "claude-opus-4",
     });
-    expect(session?.entries[1]?.content).toContain("schema.sql");
+    expect(session?.entries.map((entry) => entry.entry_type)).toEqual([
+      "message",
+      "message",
+      "tool_call",
+    ]);
+    expect(session?.entries[2]?.content).toContain("schema.sql");
   });
 
   it("redacts common credentials before upload", () => {
@@ -235,6 +396,42 @@ describe("chat-slurper transcript adapters", () => {
     const session = parseTranscript("codex", path);
 
     expect(session?.entries[0]?.content).toBe("api_key=[REDACTED]");
+    expect(session?.raw_transcript).not.toContain("super-secret-value");
+    expect(session?.prompts).toEqual(["api_key=[REDACTED]"]);
+  });
+
+  it("extracts embedded images from raw and compact transcripts", () => {
+    const image = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from("fixture"),
+    ]).toString("base64");
+    const path = fixture("claude-image.jsonl", [
+      {
+        uuid: "message-1",
+        sessionId: "claude-image",
+        type: "user",
+        timestamp: "2026-07-14T10:00:00Z",
+        message: {
+          role: "user",
+          content: [
+            { type: "text", text: "Inspect this screenshot" },
+            {
+              type: "image",
+              source: { type: "base64", media_type: "image/png", data: image },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const session = parseTranscript("claude-code", path);
+
+    expect(session?.assets).toHaveLength(1);
+    expect(session?.assets?.[0]?.data_base64).toBe(image);
+    expect(session?.raw_transcript).not.toContain(image);
+    expect(session?.raw_transcript).toContain("asset_id");
+    expect(session?.entries.at(-1)?.entry_type).toBe("asset");
+    expect(session?.entries.at(-1)?.content).toContain("sha256:");
   });
 });
 

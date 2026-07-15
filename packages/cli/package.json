@@ -28,6 +28,7 @@
     "@tilde/harness-sdk": "workspace:*",
     "ink": "^7.1.0",
     "react": "^19.2.7",
+    "safe-regex2": "^5.1.1",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

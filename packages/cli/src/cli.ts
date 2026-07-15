@@ -28,6 +28,7 @@ type ParsedArgs = {
   chatSlurperAction?: ChatSlurperAction;
   chatSlurperProvider?: ChatSlurperProvider;
   memoryBankId?: string;
+  hookEvent?: string;
   quiet?: boolean;
   stateAction?: StateAction;
   baseUrl?: string;
@@ -144,7 +145,7 @@ async function runChatSlurper(args: ParsedArgs): Promise<void> {
     );
   }
   if (args.chatSlurperAction === "capture-hook") {
-    await enqueueCaptureHook(args.chatSlurperProvider);
+    await enqueueCaptureHook(args.chatSlurperProvider, args.hookEvent);
     return;
   }
   const baseUrl = resolveBaseUrl(args);
@@ -385,6 +386,10 @@ function parseArgs(args: string[]): ParsedArgs {
     }
     if (arg === "--memory-bank-id") {
       parsed.memoryBankId = requiredValue(args[++index], arg);
+      continue;
+    }
+    if (arg === "--hook-event") {
+      parsed.hookEvent = requiredValue(args[++index], arg);
       continue;
     }
     if (arg === "--quiet") {

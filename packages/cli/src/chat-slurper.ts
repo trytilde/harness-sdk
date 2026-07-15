@@ -6,13 +6,27 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
 import { homedir, hostname } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+} from "node:path";
+import {
+  type ChatSlurperRedactionConfiguration,
+  redactJsonValues,
+  redactText,
+  validateRedactionConfiguration,
+} from "./chat-slurper-redaction";
 
 export type ChatSlurperProvider = "codex" | "claude-code";
 export type ChatSlurperAction =
@@ -31,6 +45,7 @@ export type ChatSlurperCommandOptions = {
   teamId: string;
   provider?: ChatSlurperProvider;
   memoryBankId?: string;
+  hookEvent?: string;
   quiet?: boolean;
   select<T>(input: {
     title: string;
@@ -67,11 +82,15 @@ type ProviderConfiguration = {
   hookFile: string;
 };
 
-type QueuedHook = {
+export type QueuedHook = {
   version: 1;
   provider: ChatSlurperProvider;
   transcriptPath: string;
+  hookEvent: string;
   queuedAt: string;
+  attempts?: number;
+  lastAttemptAt?: string;
+  lastError?: string;
 };
 
 type ChatSlurperConfiguration = {
@@ -80,6 +99,7 @@ type ChatSlurperConfiguration = {
   orgId?: string;
   teamId: string;
   providers: Partial<Record<ChatSlurperProvider, ProviderConfiguration>>;
+  redaction?: ChatSlurperRedactionConfiguration;
 };
 
 export type NormalizedHistoryEntry = {
@@ -106,7 +126,19 @@ export type NormalizedHistorySession = {
   agent_name: string;
   model?: string;
   metadata: Record<string, unknown>;
+  raw_transcript?: string;
+  raw_transcript_sha256?: string;
+  prompts?: string[];
+  assets?: NormalizedHistoryAsset[];
   entries: NormalizedHistoryEntry[];
+};
+
+export type NormalizedHistoryAsset = {
+  provider_asset_id: string;
+  media_type: string;
+  data_base64: string;
+  sha256: string;
+  metadata: Record<string, unknown>;
 };
 
 type ProviderAdapter = {
@@ -114,7 +146,7 @@ type ProviderAdapter = {
   label: string;
   historyRoot(home: string): string;
   hookFile(home: string): string;
-  hookEvents: string[];
+  hooks: Array<{ event: string; matcher?: string }>;
 };
 
 const adapters: Record<ChatSlurperProvider, ProviderAdapter> = {
@@ -123,22 +155,40 @@ const adapters: Record<ChatSlurperProvider, ProviderAdapter> = {
     label: "Codex / Codex Desktop",
     historyRoot: (home) => join(home, ".codex", "sessions"),
     hookFile: (home) => join(home, ".codex", "hooks.json"),
-    hookEvents: ["Stop"],
+    hooks: [
+      { event: "SessionStart" },
+      { event: "UserPromptSubmit" },
+      { event: "PreToolUse" },
+      { event: "PostToolUse" },
+      { event: "Stop" },
+    ],
   },
   "claude-code": {
     id: "claude-code",
     label: "Claude Code",
     historyRoot: (home) => join(home, ".claude", "projects"),
     hookFile: (home) => join(home, ".claude", "settings.json"),
-    hookEvents: ["Stop", "SessionEnd"],
+    hooks: [
+      { event: "SessionStart" },
+      { event: "UserPromptSubmit" },
+      { event: "PreToolUse", matcher: "Task" },
+      { event: "PostToolUse", matcher: "Task" },
+      { event: "PostToolUse", matcher: "TodoWrite" },
+      { event: "Stop" },
+      { event: "SessionEnd" },
+    ],
   },
 };
 
 const MAX_TRANSCRIPT_BYTES = 10 * 1024 * 1024;
 const MAX_TRANSCRIPT_FILES = 10_000;
+const MAX_DISCOVERED_HISTORY_BYTES = 256 * 1024 * 1024;
+const MAX_HOOK_INPUT_BYTES = 4 * 1024 * 1024;
 const MAX_ENTRY_CONTENT_BYTES = 64 * 1024;
-const MAX_UPLOAD_BATCH_BYTES = 1_250_000;
+const MAX_UPLOAD_BATCH_BYTES = 12_500_000;
 const API_TIMEOUT_MS = 30_000;
+const MAX_QUEUE_ATTEMPTS = 3;
+const STALE_LOCK_AGE_MS = 10 * 60 * 1000;
 
 export async function runChatSlurperCommand(
   options: ChatSlurperCommandOptions,
@@ -157,7 +207,7 @@ export async function runChatSlurperCommand(
       await disable(options);
       return;
     case "capture-hook":
-      await enqueueCaptureHook(options.provider);
+      await enqueueCaptureHook(options.provider, options.hookEvent);
       return;
     case "flush-hooks":
       await flushHooks(options);
@@ -256,6 +306,7 @@ async function backfill(
   options: ChatSlurperCommandOptions,
   kind: "live" | "backfill",
   transcriptPath?: string,
+  capture?: { events: string[]; latestQueuedAt: string },
 ): Promise<void> {
   const config = requiredConfiguration(options);
   const providers = options.provider
@@ -277,9 +328,21 @@ async function backfill(
       body: { client_request_id: randomUUID(), kind, cursor: null },
     });
     try {
-      const sessions = transcriptPath
-        ? [parseTranscript(provider, transcriptPath)].filter(isPresent)
-        : discoverHistory(provider);
+      const parsedSessions = transcriptPath
+        ? [parseTranscript(provider, transcriptPath, config.redaction)].filter(
+            isPresent,
+          )
+        : discoverHistory(provider, config.redaction);
+      const sessions = capture
+        ? parsedSessions.map((session) => ({
+            ...session,
+            metadata: {
+              ...session.metadata,
+              capture_events: [...new Set(capture.events)],
+              captured_at: capture.latestQueuedAt,
+            },
+          }))
+        : parsedSessions;
       const uploadSessions = sessions.flatMap(chunkSessionEntries);
       const uploadBatches = chunkUploadBatches(uploadSessions);
       let uploadedSessions = 0;
@@ -289,6 +352,11 @@ async function backfill(
             batch.map((session) => [
               session.provider_session_id,
               session.entries.map((entry) => entry.provider_entry_id),
+              session.raw_transcript_sha256,
+              session.assets?.map((asset) => [
+                asset.provider_asset_id,
+                asset.sha256,
+              ]),
             ]),
           ),
         );
@@ -376,18 +444,33 @@ async function disable(options: ChatSlurperCommandOptions): Promise<void> {
 
 export async function enqueueCaptureHook(
   provider: ChatSlurperProvider | undefined,
+  configuredEvent?: string,
 ): Promise<void> {
   if (!provider) throw new Error("capture-hook requires --provider.");
   const input = await readStdin();
   const payload = parseObject(input);
   const transcriptPath = stringAt(payload, "transcript_path", "transcriptPath");
   if (!transcriptPath || !existsSync(transcriptPath)) return;
+  const canonicalTranscriptPath = realpathSync(transcriptPath);
+  const historyRoot = adapters[provider].historyRoot(homedir());
+  if (
+    !existsSync(historyRoot) ||
+    !isWithin(historyRoot, canonicalTranscriptPath)
+  )
+    return;
+  const payloadEvent = stringAt(payload, "hook_event_name", "hookEventName");
+  const hookEvent = validHookEvent(payloadEvent)
+    ? payloadEvent
+    : validHookEvent(configuredEvent)
+      ? configuredEvent
+      : "unknown";
   const queue = queuePath();
   mkdirSync(queue, { recursive: true, mode: 0o700 });
   const queued: QueuedHook = {
     version: 1,
     provider,
-    transcriptPath: resolve(transcriptPath),
+    transcriptPath: canonicalTranscriptPath,
+    hookEvent,
     queuedAt: new Date().toISOString(),
   };
   atomicWriteJson(join(queue, `${Date.now()}-${randomUUID()}.json`), queued);
@@ -424,16 +507,12 @@ async function flushHooks(options: ChatSlurperCommandOptions): Promise<void> {
   const queue = queuePath();
   if (!existsSync(queue)) return;
   const lock = `${queue}.lock`;
-  try {
-    mkdirSync(lock);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") return;
-    throw error;
-  }
+  if (!acquireQueueLock(lock)) return;
   try {
     const files = readdirSync(queue)
       .filter((file) => file.endsWith(".json"))
       .sort();
+    const valid: Array<{ file: string; queued: QueuedHook }> = [];
     for (const file of files) {
       const path = join(queue, file);
       let queued: QueuedHook;
@@ -448,25 +527,131 @@ async function flushHooks(options: ChatSlurperCommandOptions): Promise<void> {
         rmSync(path);
         continue;
       }
-      await backfill(
-        { ...options, provider: queued.provider },
-        "live",
-        queued.transcriptPath,
-      );
-      rmSync(path);
+      const providerRoot = adapters[queued.provider].historyRoot(homedir());
+      if (
+        !existsSync(providerRoot) ||
+        !isWithin(providerRoot, realpathSync(queued.transcriptPath))
+      ) {
+        renameSync(path, `${path}.invalid`);
+        continue;
+      }
+      valid.push({ file: path, queued });
+    }
+    for (const items of coalesceQueuedHooks(valid)) {
+      const queued = items.at(-1)?.queued;
+      if (!queued) continue;
+      try {
+        await backfill(
+          { ...options, provider: queued.provider },
+          "live",
+          queued.transcriptPath,
+          {
+            events: items.map((item) => item.queued.hookEvent),
+            latestQueuedAt: queued.queuedAt,
+          },
+        );
+        for (const item of items) rmSync(item.file);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        for (const item of items) {
+          const attempts = (item.queued.attempts ?? 0) + 1;
+          const updated: QueuedHook = {
+            ...item.queued,
+            attempts,
+            lastAttemptAt: new Date().toISOString(),
+            lastError: message.slice(0, 2_048),
+          };
+          if (attempts >= MAX_QUEUE_ATTEMPTS) {
+            atomicWriteJson(`${item.file}.failed`, updated);
+            rmSync(item.file);
+          } else {
+            atomicWriteJson(item.file, updated);
+          }
+        }
+      }
     }
   } finally {
     rmSync(lock, { recursive: true, force: true });
   }
 }
 
+/** Acquire a process-owned queue lock and reclaim locks left by dead processes. */
+export function acquireQueueLock(lock: string): boolean {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      mkdirSync(lock, { mode: 0o700 });
+      try {
+        atomicWriteJson(join(lock, "owner.json"), {
+          pid: process.pid,
+          hostname: hostname(),
+          createdAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        rmSync(lock, { recursive: true, force: true });
+        throw error;
+      }
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      if (!isStaleQueueLock(lock)) return false;
+      const abandoned = `${lock}.stale.${process.pid}.${randomUUID()}`;
+      try {
+        renameSync(lock, abandoned);
+      } catch (renameError) {
+        if ((renameError as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw renameError;
+      }
+      rmSync(abandoned, { recursive: true, force: true });
+    }
+  }
+  return false;
+}
+
+function isStaleQueueLock(lock: string): boolean {
+  const ownerPath = join(lock, "owner.json");
+  try {
+    const owner = parseJsonObjectStrict(
+      readFileSync(ownerPath, "utf8"),
+      ownerPath,
+    );
+    const pid = owner.pid;
+    if (owner.hostname === hostname() && typeof pid === "number") {
+      try {
+        process.kill(pid, 0);
+        return false;
+      } catch (error) {
+        return (error as NodeJS.ErrnoException).code === "ESRCH";
+      }
+    }
+  } catch {
+    // A crash between mkdir and writing owner metadata is reclaimed by age.
+  }
+  return Date.now() - statSync(lock).mtimeMs > STALE_LOCK_AGE_MS;
+}
+
+/** Coalesce lifecycle triggers without dropping the queue files covered by a sync. */
+export function coalesceQueuedHooks(
+  items: Array<{ file: string; queued: QueuedHook }>,
+): Array<Array<{ file: string; queued: QueuedHook }>> {
+  const grouped = new Map<
+    string,
+    Array<{ file: string; queued: QueuedHook }>
+  >();
+  for (const item of items) {
+    const key = `${item.queued.provider}\u0000${item.queued.transcriptPath}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), item]);
+  }
+  return [...grouped.values()];
+}
+
 export function discoverHistory(
   provider: ChatSlurperProvider,
+  redaction?: ChatSlurperRedactionConfiguration,
 ): NormalizedHistorySession[] {
   const root = adapters[provider].historyRoot(homedir());
   if (!existsSync(root)) return [];
   return jsonlFiles(root)
-    .map((path) => parseTranscript(provider, path))
+    .map((path) => parseTranscript(provider, path, redaction))
     .filter(isPresent)
     .sort((left, right) => left.started_at.localeCompare(right.started_at));
 }
@@ -474,6 +659,7 @@ export function discoverHistory(
 export function parseTranscript(
   provider: ChatSlurperProvider,
   path: string,
+  redaction?: ChatSlurperRedactionConfiguration,
 ): NormalizedHistorySession | undefined {
   if (!existsSync(path)) return undefined;
   if (statSync(path).size > MAX_TRANSCRIPT_BYTES) {
@@ -481,15 +667,36 @@ export function parseTranscript(
       `Transcript exceeds ${MAX_TRANSCRIPT_BYTES} bytes: ${path}`,
     );
   }
-  const lines = readFileSync(path, "utf8")
+  const parsedLines = readFileSync(path, "utf8")
     .split(/\r?\n/u)
     .filter(Boolean)
     .map((line, index) => parseJsonObjectStrict(line, `${path}:${index + 1}`));
+  const assets: NormalizedHistoryAsset[] = [];
+  const withoutImages = parsedLines.map((line) =>
+    extractEmbeddedImages(line, assets),
+  );
+  const lines = redactJsonValues(withoutImages, redaction);
   if (lines.length === 0) return undefined;
   const fileTime = statSync(path).mtime.toISOString();
-  return provider === "codex"
-    ? parseCodex(lines, path, fileTime)
-    : parseClaude(lines, path, fileTime);
+  const session =
+    provider === "codex"
+      ? parseCodex(lines, path, fileTime)
+      : parseClaude(lines, path, fileTime);
+  if (!session) return undefined;
+  const rawTranscript = `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`;
+  const prompts = session.entries
+    .filter(
+      (entry) =>
+        entry.actor.kind === "human" && typeof entry.content === "string",
+    )
+    .map((entry) => entry.content as string);
+  return {
+    ...session,
+    raw_transcript: rawTranscript,
+    raw_transcript_sha256: digest(rawTranscript),
+    prompts,
+    assets,
+  };
 }
 
 function parseCodex(
@@ -573,7 +780,10 @@ function parseCodex(
     ...(headSha ? { head_sha: headSha } : {}),
     agent_name: "codex",
     ...(model ? { model } : {}),
-    metadata: { transcript_path: path, provider: "codex" },
+    metadata: {
+      transcript_path: redactText(path, undefined),
+      provider: "codex",
+    },
     entries,
   };
 }
@@ -588,19 +798,35 @@ function parseClaude(
     if (line.type !== "user" && line.type !== "assistant") continue;
     const message = objectAt(line, "message");
     const role = stringAt(message, "role") ?? String(line.type);
-    const content = boundedRedacted(messageContent(message.content));
-    if (!content) continue;
-    entries.push({
-      provider_entry_id:
-        stringAt(line, "uuid", "id") ??
-        digest(`${path}:${lineIndex}:${role}:${content}`),
-      sequence: entries.length,
-      entry_type: "message",
-      actor: { kind: role === "user" ? "human" : "agent", role },
-      content,
-      occurred_at: isoTime(stringAt(line, "timestamp"), fallbackTime),
-      metadata: { provider_record_type: String(line.type) },
-    });
+    const baseId =
+      stringAt(line, "uuid", "id") ?? digest(`${path}:${lineIndex}:${role}`);
+    const parts = claudeMessageParts(message.content);
+    for (const [partIndex, part] of parts.entries()) {
+      const content = boundedRedacted(part.content);
+      if (!content) continue;
+      entries.push({
+        provider_entry_id: `${baseId}:${partIndex}`,
+        sequence: entries.length,
+        entry_type: part.entryType,
+        actor: {
+          kind:
+            part.entryType === "message"
+              ? role === "user"
+                ? "human"
+                : "agent"
+              : part.entryType === "asset"
+                ? "attachment"
+                : "tool",
+          role,
+        },
+        content,
+        occurred_at: isoTime(stringAt(line, "timestamp"), fallbackTime),
+        metadata: {
+          provider_record_type: String(line.type),
+          ...(part.toolName ? { tool_name: part.toolName } : {}),
+        },
+      });
+    }
   }
   if (entries.length === 0) return undefined;
   const first = lines[0] ?? {};
@@ -623,7 +849,7 @@ function parseClaude(
     agent_name: "claude-code",
     ...(model ? { model } : {}),
     metadata: {
-      transcript_path: path,
+      transcript_path: redactText(path, undefined),
       provider: "claude-code",
       version: stringAt(first, "version"),
     },
@@ -641,16 +867,30 @@ export function installProviderHooks(
     ? parseJsonObjectStrict(readFileSync(path, "utf8"), path)
     : {};
   const hooks = hookMap(root, path);
-  const command = hookCommand(adapter.id);
-  for (const event of adapter.hookEvents) {
-    const matchers = Array.isArray(hooks[event]) ? [...hooks[event]] : [];
-    if (!matchers.some((matcher) => matcherContainsCommand(matcher, command))) {
+  for (const event of new Set(adapter.hooks.map((hook) => hook.event))) {
+    const matchers = hooks[event];
+    if (!Array.isArray(matchers)) continue;
+    const retained = withoutTildeCommands(matchers, provider);
+    if (retained.length > 0) hooks[event] = retained;
+    else delete hooks[event];
+  }
+  for (const spec of adapter.hooks) {
+    const command = hookCommand(adapter.id, spec.event);
+    const existing = hooks[spec.event];
+    const matchers: unknown[] = Array.isArray(existing) ? [...existing] : [];
+    if (
+      !matchers.some(
+        (matcher) =>
+          parseObject(matcher).matcher === (spec.matcher ?? "") &&
+          matcherContainsCommand(matcher, command),
+      )
+    ) {
       matchers.push({
-        matcher: "",
+        matcher: spec.matcher ?? "",
         hooks: [{ type: "command", command, timeout: 5 }],
       });
     }
-    hooks[event] = matchers;
+    hooks[spec.event] = matchers;
   }
   root.hooks = hooks;
   atomicWriteJson(path, root);
@@ -665,22 +905,31 @@ export function removeProviderHooks(
   if (!existsSync(path)) return;
   const root = parseJsonObjectStrict(readFileSync(path, "utf8"), path);
   const hooks = hookMap(root, path);
-  const command = hookCommand(adapter.id);
-  for (const event of adapter.hookEvents) {
+  for (const event of new Set(adapter.hooks.map((hook) => hook.event))) {
     if (!Array.isArray(hooks[event])) continue;
-    hooks[event] = hooks[event].flatMap((matcher) => {
-      const record = parseObject(matcher);
-      if (!Array.isArray(record.hooks)) return [matcher];
-      const retained = record.hooks.filter((hook) => {
-        const candidate = parseObject(hook);
-        return candidate.type !== "command" || candidate.command !== command;
-      });
-      return retained.length > 0 ? [{ ...record, hooks: retained }] : [];
-    });
+    hooks[event] = withoutTildeCommands(hooks[event], provider);
     if ((hooks[event] as unknown[]).length === 0) delete hooks[event];
   }
   root.hooks = hooks;
   atomicWriteJson(path, root);
+}
+
+function withoutTildeCommands(
+  matchers: unknown[],
+  provider: ChatSlurperProvider,
+): unknown[] {
+  return matchers.flatMap((matcher) => {
+    const record = parseObject(matcher);
+    if (!Array.isArray(record.hooks)) return [matcher];
+    const retained = record.hooks.filter((hook) => {
+      const candidate = parseObject(hook);
+      return (
+        candidate.type !== "command" ||
+        !isTildeHookCommand(candidate.command, provider)
+      );
+    });
+    return retained.length > 0 ? [{ ...record, hooks: retained }] : [];
+  });
 }
 
 function validateHookFile(adapter: ProviderAdapter, home: string): void {
@@ -723,8 +972,20 @@ function matcherContainsCommand(input: unknown, command: string): boolean {
   );
 }
 
-function hookCommand(provider: ChatSlurperProvider): string {
-  return `tilde chat-slurper capture-hook --provider ${provider} --quiet`;
+function hookCommand(provider: ChatSlurperProvider, event: string): string {
+  return `tilde chat-slurper capture-hook --provider ${provider} --hook-event ${event} --quiet`;
+}
+
+function isTildeHookCommand(
+  command: unknown,
+  provider: ChatSlurperProvider,
+): boolean {
+  return (
+    typeof command === "string" &&
+    command.startsWith(
+      `tilde chat-slurper capture-hook --provider ${provider} `,
+    )
+  );
 }
 
 function requiredConfiguration(
@@ -762,6 +1023,9 @@ function readConfiguration(): ChatSlurperConfiguration | undefined {
     throw new Error(`Invalid Chat Slurper configuration in ${path}`);
   }
   const providers = value.providers as Record<string, unknown>;
+  validateRedactionConfiguration(
+    value.redaction as ChatSlurperRedactionConfiguration | undefined,
+  );
   for (const [provider, raw] of Object.entries(providers)) {
     if (provider !== "codex" && provider !== "claude-code") {
       throw new Error(`Unknown Chat Slurper provider ${provider} in ${path}`);
@@ -801,7 +1065,7 @@ function stableDeviceId(): string {
 }
 
 function syncRunsPath(teamId: string, sourceId: string): string {
-  return `/api/v1/team/${encodeURIComponent(teamId)}/chat-slurper/sources/${sourceId}/sync-runs`;
+  return `/api/v1/team/${encodeURIComponent(teamId)}/chat-slurper/sources/${encodeURIComponent(sourceId)}/sync-runs`;
 }
 
 async function api<T = unknown>(
@@ -848,6 +1112,7 @@ async function api<T = unknown>(
 
 function jsonlFiles(root: string): string[] {
   const files: string[] = [];
+  let totalBytes = 0;
   const visit = (path: string) => {
     for (const entry of readdirSync(path, { withFileTypes: true })) {
       const child = join(path, entry.name);
@@ -858,7 +1123,13 @@ function jsonlFiles(root: string): string[] {
             `History contains more than ${MAX_TRANSCRIPT_FILES} transcript files.`,
           );
         }
-        if (entry.isSymbolicLink()) continue;
+        const bytes = statSync(child).size;
+        totalBytes += bytes;
+        if (totalBytes > MAX_DISCOVERED_HISTORY_BYTES) {
+          throw new Error(
+            `History exceeds the ${MAX_DISCOVERED_HISTORY_BYTES}-byte local processing limit. Backfill providers separately or remove unwanted transcripts.`,
+          );
+        }
         files.push(child);
       }
     }
@@ -874,8 +1145,23 @@ function chunkSessionEntries(
   if (session.entries.length <= chunkSize) return [session];
   const chunks: NormalizedHistorySession[] = [];
   for (let index = 0; index < session.entries.length; index += chunkSize) {
+    const {
+      raw_transcript,
+      raw_transcript_sha256,
+      prompts,
+      assets,
+      ...common
+    } = session;
     chunks.push({
-      ...session,
+      ...common,
+      ...(index === 0
+        ? {
+            ...(raw_transcript ? { raw_transcript } : {}),
+            ...(raw_transcript_sha256 ? { raw_transcript_sha256 } : {}),
+            ...(prompts ? { prompts } : {}),
+            ...(assets ? { assets } : {}),
+          }
+        : {}),
       entries: session.entries.slice(index, index + chunkSize),
     });
   }
@@ -925,6 +1211,8 @@ function messageContent(value: unknown): string | undefined {
     const record = item as Record<string, unknown>;
     const text = stringAt(record, "text", "input_text", "output_text");
     if (text) return [text];
+    const assetId = stringAt(record, "asset_id");
+    if (assetId) return [`[image:${assetId}]`];
     if (record.type === "tool_use" || record.type === "tool_result") {
       return [JSON.stringify(record)];
     }
@@ -934,22 +1222,174 @@ function messageContent(value: unknown): string | undefined {
   return content || undefined;
 }
 
+function claudeMessageParts(
+  value: unknown,
+): Array<{ entryType: string; content: string; toolName?: string }> {
+  if (typeof value === "string")
+    return value.trim() ? [{ entryType: "message", content: value }] : [];
+  if (!Array.isArray(value)) return [];
+  const parts: Array<{
+    entryType: string;
+    content: string;
+    toolName?: string;
+  }> = [];
+  const text: string[] = [];
+  const flushText = () => {
+    const content = text.splice(0).join("\n").trim();
+    if (content) parts.push({ entryType: "message", content });
+  };
+  for (const item of value) {
+    const record = parseObject(item);
+    const itemText = stringAt(record, "text", "input_text", "output_text");
+    if (itemText) {
+      text.push(itemText);
+      continue;
+    }
+    if (record.type === "tool_use" || record.type === "tool_result") {
+      flushText();
+      const toolName = stringAt(record, "name");
+      parts.push({
+        entryType: record.type === "tool_use" ? "tool_call" : "tool_result",
+        content: JSON.stringify(record),
+        ...(toolName ? { toolName } : {}),
+      });
+      continue;
+    }
+    const assetId = stringAt(record, "asset_id");
+    if (assetId) {
+      flushText();
+      parts.push({ entryType: "asset", content: `[image:${assetId}]` });
+    }
+  }
+  flushText();
+  return parts;
+}
+
 function boundedRedacted(value: string | undefined): string | undefined {
   if (!value) return undefined;
-  const redacted = value
-    .replace(
-      /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gu,
-      "[REDACTED PRIVATE KEY]",
-    )
-    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/giu, "Bearer [REDACTED]")
-    .replace(
-      /\b(api[_-]?key|access[_-]?token|auth[_-]?token|password|secret)\b(\s*[=:]\s*|["']\s*:\s*["'])[^\s,"'}]+/giu,
-      (_match, key: string, separator: string) =>
-        `${key}${separator}[REDACTED]`,
-    );
+  const redacted = redactText(value, undefined);
   return Buffer.byteLength(redacted, "utf8") <= MAX_ENTRY_CONTENT_BYTES
     ? redacted
     : `${Buffer.from(redacted).subarray(0, MAX_ENTRY_CONTENT_BYTES).toString("utf8")}\n[TRUNCATED]`;
+}
+
+function extractEmbeddedImages<T>(
+  value: T,
+  assets: NormalizedHistoryAsset[],
+): T {
+  if (typeof value === "string") {
+    return extractImageDataUris(value, assets) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => extractEmbeddedImages(item, assets)) as T;
+  }
+  if (!value || typeof value !== "object") return value;
+  const record = { ...(value as Record<string, unknown>) };
+  const source = parseObject(record.source);
+  const sourceData = stringAt(source, "data");
+  const sourceMediaType = stringAt(source, "media_type", "mediaType");
+  const dataUri = stringAt(record, "image_url", "url");
+  const embedded =
+    record.type === "image" &&
+    source.type === "base64" &&
+    sourceData &&
+    sourceMediaType
+      ? { data: sourceData, mediaType: sourceMediaType }
+      : parseImageDataUri(dataUri);
+  if (embedded) {
+    const providerAssetId = storeEmbeddedImage(embedded, assets);
+    return {
+      type: "image",
+      asset_id: providerAssetId,
+      media_type: embedded.mediaType,
+    } as T;
+  }
+  return Object.fromEntries(
+    Object.entries(record).map(([key, child]) => [
+      key,
+      extractEmbeddedImages(child, assets),
+    ]),
+  ) as T;
+}
+
+function extractImageDataUris(
+  value: string,
+  assets: NormalizedHistoryAsset[],
+): string {
+  return value.replace(
+    /data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/]+={0,2})/gu,
+    (_match, mediaType: string, data: string) =>
+      `tilde-asset:${storeEmbeddedImage({ mediaType, data }, assets)}`,
+  );
+}
+
+function storeEmbeddedImage(
+  embedded: { data: string; mediaType: string },
+  assets: NormalizedHistoryAsset[],
+): string {
+  const canonical = embedded.data.replace(/\s+/gu, "");
+  const bytes = Buffer.from(canonical, "base64");
+  if (
+    bytes.length === 0 ||
+    bytes.toString("base64").replace(/=+$/u, "") !==
+      canonical.replace(/=+$/u, "")
+  ) {
+    throw new Error("Transcript contains an invalid embedded image.");
+  }
+  if (!matchesImageSignature(embedded.mediaType, bytes)) {
+    throw new Error(
+      `Embedded ${embedded.mediaType} data does not match its declared media type.`,
+    );
+  }
+  const sha256 = digestBuffer(bytes);
+  const providerAssetId = `sha256:${sha256}`;
+  if (!assets.some((asset) => asset.provider_asset_id === providerAssetId)) {
+    assets.push({
+      provider_asset_id: providerAssetId,
+      media_type: embedded.mediaType,
+      data_base64: bytes.toString("base64"),
+      sha256,
+      metadata: { source: "embedded_transcript" },
+    });
+  }
+  return providerAssetId;
+}
+
+function parseImageDataUri(
+  value: string | undefined,
+): { data: string; mediaType: string } | undefined {
+  if (!value) return undefined;
+  const match =
+    /^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\s]+)$/u.exec(
+      value,
+    );
+  return match?.[1] && match[2]
+    ? { mediaType: match[1], data: match[2] }
+    : undefined;
+}
+
+function matchesImageSignature(mediaType: string, content: Buffer): boolean {
+  if (mediaType === "image/png")
+    return content
+      .subarray(0, 8)
+      .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (mediaType === "image/jpeg")
+    return (
+      content.length >= 3 &&
+      content[0] === 0xff &&
+      content[1] === 0xd8 &&
+      content[2] === 0xff
+    );
+  if (mediaType === "image/gif") {
+    const signature = content.subarray(0, 6).toString("ascii");
+    return signature === "GIF87a" || signature === "GIF89a";
+  }
+  if (mediaType === "image/webp")
+    return (
+      content.subarray(0, 4).toString("ascii") === "RIFF" &&
+      content.subarray(8, 12).toString("ascii") === "WEBP"
+    );
+  return false;
 }
 
 function parseObject(input: unknown): Record<string, unknown> {
@@ -989,11 +1429,22 @@ function parseQueuedHook(input: string): QueuedHook {
   if ((provider !== "codex" && provider !== "claude-code") || !transcriptPath) {
     throw new Error("Invalid Chat Slurper hook queue item");
   }
+  const lastAttemptAt = stringAt(value, "lastAttemptAt");
+  const lastError = stringAt(value, "lastError");
   return {
     version: 1,
     provider,
     transcriptPath,
+    hookEvent: stringAt(value, "hookEvent") ?? "unknown",
     queuedAt: stringAt(value, "queuedAt") ?? new Date(0).toISOString(),
+    attempts:
+      typeof value.attempts === "number" &&
+      Number.isInteger(value.attempts) &&
+      value.attempts >= 0
+        ? value.attempts
+        : 0,
+    ...(lastAttemptAt ? { lastAttemptAt } : {}),
+    ...(lastError ? { lastError } : {}),
   };
 }
 
@@ -1046,12 +1497,40 @@ function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function digestBuffer(value: Buffer): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
 function isPresent<T>(value: T | undefined): value is T {
   return value !== undefined;
 }
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+  let bytes = 0;
+  for await (const chunk of process.stdin) {
+    const buffer = Buffer.from(chunk);
+    bytes += buffer.length;
+    if (bytes > MAX_HOOK_INPUT_BYTES) {
+      throw new Error(`Hook input exceeds ${MAX_HOOK_INPUT_BYTES} bytes.`);
+    }
+    chunks.push(buffer);
+  }
   return Buffer.concat(chunks).toString("utf8");
+}
+
+function validHookEvent(value: string | undefined): value is string {
+  return Boolean(
+    value && value.length <= 64 && /^[A-Za-z][A-Za-z0-9]*$/u.test(value),
+  );
+}
+
+function isWithin(root: string, candidate: string): boolean {
+  const child = relative(realpathSync(root), candidate);
+  return (
+    child !== "" &&
+    !child.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) &&
+    child !== ".." &&
+    !isAbsolute(child)
+  );
 }
