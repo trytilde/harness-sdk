@@ -1,10 +1,10 @@
+import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
 import {
   type ChatKitContextClient,
   type ChatKitConvertedMessage,
   runWithChatKitContext,
 } from "./chatkit-context";
 import { type ChatKitMessage, isChatKitMessage } from "./chatkit-message";
-import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
 import { type Client, type Config, createClient } from "./client";
 import {
   type VerifiedWebhookRequest,
@@ -16,6 +16,9 @@ import {
 const TILDE_ORG_ID_HEADER = "x-tilde-org-id";
 const TILDE_TEAM_ID_HEADER = "x-tilde-team-id";
 const TILDE_SESSION_ID_HEADER = "x-tilde-session-id";
+const TILDE_USER_ID_HEADER = "x-tilde-user-id";
+const EXTERNAL_USER_ID_HEADER = "x-external-user-id";
+const EXTERNAL_USER_PROVIDER_HEADER = "x-external-user-provider";
 
 export type { ChatKitContextClient, ChatKitConvertedMessage };
 
@@ -44,6 +47,9 @@ export type ChatKitEndpointContext = {
   orgId: string;
   teamId: string;
   sessionId: string;
+  userId?: string;
+  externalUserId?: string;
+  externalUserProvider?: string;
   client: Client;
   session: ChatKitSessionClient;
   chatkit: ChatKitContextClient;
@@ -152,6 +158,14 @@ export function chatKitEndpoint(
       teamId: teamId.value,
       sessionId: sessionId.value,
     };
+    const actorContext = {
+      userId: optionalHeader(request.headers, TILDE_USER_ID_HEADER),
+      externalUserId: optionalHeader(request.headers, EXTERNAL_USER_ID_HEADER),
+      externalUserProvider: optionalHeader(
+        request.headers,
+        EXTERNAL_USER_PROVIDER_HEADER,
+      ),
+    };
     log("info", "context resolved", {
       ...requestFields,
       requestMessageCount: requestMessageCount(verified.json),
@@ -189,7 +203,8 @@ export function chatKitEndpoint(
               pageSize: input.pageSize,
               hasNextPageToken: Boolean(input.nextPageToken),
             });
-            const page = await client.chatkit.listMessageHistory<JsonValue>(input);
+            const page =
+              await client.chatkit.listMessageHistory<JsonValue>(input);
             items.push(...page.items);
             nextPageToken = page.nextPageToken;
             log("info", "session history page received", {
@@ -200,7 +215,10 @@ export function chatKitEndpoint(
               elapsedMs: elapsedMs(historyStartedAt),
             });
           } while (nextPageToken);
-          const normalized = normalizeHistoryItems(items, currentRequestMessageIds);
+          const normalized = normalizeHistoryItems(
+            items,
+            currentRequestMessageIds,
+          );
           log("info", "session history completed", {
             ...requestFields,
             rawItemCount: items.length,
@@ -230,8 +248,12 @@ export function chatKitEndpoint(
           pageSize: input.pageSize,
           hasNextPageToken: Boolean(input.nextPageToken),
         });
-        const history = await client.chatkit.listMessageHistory<JsonValue>(input);
-        const normalized = normalizeHistoryItems(history.items, currentRequestMessageIds);
+        const history =
+          await client.chatkit.listMessageHistory<JsonValue>(input);
+        const normalized = normalizeHistoryItems(
+          history.items,
+          currentRequestMessageIds,
+        );
         log("info", "session history page received", {
           ...requestFields,
           pageItemCount: history.items.length,
@@ -270,6 +292,13 @@ export function chatKitEndpoint(
       orgId: orgId.value,
       teamId: teamId.value,
       sessionId: sessionId.value,
+      ...(actorContext.userId ? { userId: actorContext.userId } : {}),
+      ...(actorContext.externalUserId
+        ? { externalUserId: actorContext.externalUserId }
+        : {}),
+      ...(actorContext.externalUserProvider
+        ? { externalUserProvider: actorContext.externalUserProvider }
+        : {}),
       client,
       session,
       chatkit,
@@ -296,7 +325,14 @@ export function chatKitEndpoint(
   };
 }
 
-function endpointLogger(logger: ChatKitEndpointOptions["logger"]): ChatKitEndpointLogger {
+function optionalHeader(headers: Headers, name: string): string | undefined {
+  const value = headers.get(name)?.trim();
+  return value || undefined;
+}
+
+function endpointLogger(
+  logger: ChatKitEndpointOptions["logger"],
+): ChatKitEndpointLogger {
   if (logger === false) {
     return () => {};
   }

@@ -19,6 +19,9 @@ function signedRequest(
     "x-tilde-org-id": "org-123",
     "x-tilde-team-id": "team_123",
     "x-tilde-session-id": "session_1",
+    "x-tilde-user-id": "user_123",
+    "x-external-user-id": "U123",
+    "x-external-user-provider": "slack",
   },
 ) {
   const raw = new TextEncoder().encode(JSON.stringify(body));
@@ -81,6 +84,9 @@ describe("chatKitEndpoint", () => {
       expect(context.orgId).toBe("org-123");
       expect(context.teamId).toBe("team_123");
       expect(context.sessionId).toBe("session_1");
+      expect(context.userId).toBe("user_123");
+      expect(context.externalUserId).toBe("U123");
+      expect(context.externalUserProvider).toBe("slack");
       expect(context.client.chatkit).toBeDefined();
       expect(context.session.id).toBe("session_1");
       return new Response("ok");
@@ -167,6 +173,31 @@ describe("chatKitEndpoint", () => {
     expect(response.status).toBe(200);
     expect(handler).toHaveBeenCalledOnce();
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("keeps unresolved external identity optional", async () => {
+    const handler = vi.fn(async (_request: Request, context) => {
+      expect(context.userId).toBeUndefined();
+      expect(context.externalUserId).toBeUndefined();
+      expect(context.externalUserProvider).toBeUndefined();
+      return new Response("ok");
+    });
+    const endpoint = chatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      handler,
+    });
+
+    const response = await endpoint(
+      signedRequest({ messages: [] }, Math.floor(Date.now() / 1000), {
+        "x-tilde-org-id": "org-123",
+        "x-tilde-team-id": "team_123",
+        "x-tilde-session-id": "session_1",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
   });
 
   it("loads full session history when no pagination params are passed", async () => {
