@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, createClient, createConfig } from "../src";
+import { ApiError, configHeaders, createClient, createConfig } from "../src";
 
 const spawnMock = vi.fn(() => ({
   killed: false,
@@ -68,6 +68,28 @@ describe("createConfig", () => {
     });
 
     expect(config.baseUrl).toBe("https://org-example.api.example.test");
+  });
+
+  it("keeps an explicit tunnel baseUrl when org subdomains are disabled", () => {
+    const config = createConfig({
+      baseUrl: "https://example.ngrok-free.app/",
+      orgId: "org-example",
+      orgSubdomain: false,
+      teamId: "team_123",
+    });
+
+    expect(config.baseUrl).toBe("https://example.ngrok-free.app");
+  });
+
+  it("sends org context as a header", () => {
+    const config = createConfig({
+      baseUrl: "https://example.ngrok-free.app",
+      orgId: "org-example",
+      orgSubdomain: false,
+      teamId: "team_123",
+    });
+
+    expect(configHeaders(config).get("x-tilde-org-id")).toBe("org-example");
   });
 
   it("rejects orgId values that cannot be used as a hostname label", () => {

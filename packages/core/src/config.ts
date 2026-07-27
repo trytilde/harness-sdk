@@ -2,6 +2,7 @@ export type Config = {
   baseUrl?: string;
   baseApiUrl?: string;
   orgId?: string;
+  orgSubdomain?: boolean;
   teamId?: string;
   apiKey?: string;
   tunnel?: boolean;
@@ -44,7 +45,10 @@ export function createConfig(input: Config = {}): NormalizedConfig {
     throw new TypeError("baseUrl must use http or https");
   }
 
-  const baseUrl = canonicalizeBaseUrlForOrg(baseUrlInput, input.orgId);
+  const baseUrl =
+    input.orgSubdomain === false
+      ? baseUrlInput.replace(/\/+$/, "")
+      : canonicalizeBaseUrlForOrg(baseUrlInput, input.orgId);
   return {
     ...input,
     baseUrl,
@@ -56,6 +60,13 @@ export function createConfig(input: Config = {}): NormalizedConfig {
 
 export function configHeaders(config: Config): Headers {
   const headers = new Headers(config.headers);
+  if (
+    config.orgSubdomain === false &&
+    config.orgId &&
+    !headers.has("x-tilde-org-id")
+  ) {
+    headers.set("x-tilde-org-id", config.orgId);
+  }
   const token = config.bearerToken ?? config.apiKey;
   const hasExplicitApiKeyHeader = headers.has("x-api-key");
   if (token && !headers.has("Authorization") && !hasExplicitApiKeyHeader) {
