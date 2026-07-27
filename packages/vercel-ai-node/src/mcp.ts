@@ -11,10 +11,7 @@ import type {
   ToolRegistry,
   ToolResult,
 } from "@tilde/harness-sdk";
-import {
-  configHeaders,
-  wrapMcpClientWithLocalTools,
-} from "@tilde/harness-sdk";
+import { configHeaders, wrapMcpClientWithLocalTools } from "@tilde/harness-sdk";
 import type { ToolExecutionOptions, ToolSet } from "ai";
 
 export type CreateMCPClientOptions<TTools extends ToolSet = ToolSet> = Omit<
@@ -27,16 +24,18 @@ export type CreateMCPClientOptions<TTools extends ToolSet = ToolSet> = Omit<
   headers?: Record<string, string>;
 };
 
-export type TildeMCPClient<TTools extends ToolSet = ToolSet> =
-  Omit<MCPClient, "tools"> & {
-    readonly serverId: string;
-    readonly localTools: readonly LocalMcpTool[];
-    callTool<TResult extends ToolResult = ToolResult>(
-      name: string,
-      input?: JsonObject,
-    ): Promise<TResult>;
-    tools(): Promise<ToolRegistry & TTools>;
-  };
+export type TildeMCPClient<TTools extends ToolSet = ToolSet> = Omit<
+  MCPClient,
+  "tools"
+> & {
+  readonly serverId: string;
+  readonly localTools: readonly LocalMcpTool[];
+  callTool<TResult extends ToolResult = ToolResult>(
+    name: string,
+    input?: JsonObject,
+  ): Promise<TResult>;
+  tools(): Promise<ToolRegistry & TTools>;
+};
 
 export async function createMCPClient<TTools extends ToolSet = ToolSet>(
   options: CreateMCPClientOptions<TTools>,
@@ -81,7 +80,10 @@ type ExecutableToolLike = {
   description?: string;
   inputSchema?: JsonObject;
   outputSchema?: JsonObject;
-  execute?: (input: JsonObject, options: ToolExecutionOptions) => ToolResult | Promise<ToolResult>;
+  execute?: (
+    input: JsonObject,
+    options: ToolExecutionOptions,
+  ) => ToolResult | Promise<ToolResult>;
 };
 
 function toLocalTool(name: string, value: ToolSet[string]): LocalMcpTool {
