@@ -176,6 +176,37 @@ describe("chatKitEndpoint", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
+  it("preserves a non-subdomain tunnel base URL for session history", async () => {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        expect(String(input)).toBe(
+          "https://example.ngrok-free.app/api/v1/team/team_123/chatkit/sessions/session_1/messages?page_size=10",
+        );
+        expect(new Headers(init?.headers).get("x-tilde-org-id")).toBe(
+          "org-123",
+        );
+        return Response.json({ items: [] });
+      },
+    );
+    const endpoint = chatKitEndpoint({
+      webhookSigningKey: key,
+      client: {
+        baseUrl: "https://example.ngrok-free.app",
+        orgSubdomain: false,
+        apiKey: "test-key",
+        fetch: fetchMock as typeof fetch,
+      },
+      handler: async (_request, context) => {
+        await context.session.history({ pageSize: 10 });
+        return new Response("ok");
+      },
+    });
+
+    const response = await endpoint(signedRequest({ messages: [] }));
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("keeps unresolved external identity optional", async () => {
     const handler = vi.fn(async (_request: Request, context) => {
       expect(context.userId).toBeUndefined();

@@ -403,6 +403,7 @@ function resolveClientConfig(
     "baseApiUrl",
     overrides?.baseApiUrl ?? env("TILDE_BASE_API_URL"),
   );
+  assignIfDefined(config, "orgSubdomain", overrides?.orgSubdomain);
   assignIfDefined(config, "apiKey", overrides?.apiKey ?? env("TILDE_API_KEY"));
   assignIfDefined(
     config,
