@@ -66,6 +66,32 @@ describe("createMCPClient", () => {
     });
   });
 
+  it("forwards org context for a non-subdomain tunnel", async () => {
+    const client = createClient({
+      baseUrl: "https://example.ngrok-free.app",
+      orgId: "org-example",
+      orgSubdomain: false,
+      teamId: "team_123",
+      apiKey: "tilde-key",
+    });
+
+    await createMCPClient({
+      client,
+      serverId: "server_1",
+    });
+
+    const config = mocks.createVercelMCPClient.mock.calls.at(-1)?.[0] as
+      | { transport: { headers: Record<string, string>; url: string } }
+      | undefined;
+    expect(config?.transport.url).toBe(
+      "https://example.ngrok-free.app/api/v1/team/team_123/mcp/mcp-server/server_1/mcp",
+    );
+    expect(config?.transport.headers).toMatchObject({
+      "x-api-key": "tilde-key",
+      "x-tilde-org-id": "org-example",
+    });
+  });
+
   it("registers provided AI SDK tools as local MCP tools", async () => {
     const client = createClient({
       baseUrl: "https://api.example.test",

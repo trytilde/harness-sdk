@@ -11,7 +11,10 @@ import type {
   ToolRegistry,
   ToolResult,
 } from "@tilde/harness-sdk";
-import { wrapMcpClientWithLocalTools } from "@tilde/harness-sdk";
+import {
+  configHeaders,
+  wrapMcpClientWithLocalTools,
+} from "@tilde/harness-sdk";
 import type { ToolExecutionOptions, ToolSet } from "ai";
 
 export type CreateMCPClientOptions<TTools extends ToolSet = ToolSet> = Omit<
@@ -43,12 +46,17 @@ export async function createMCPClient<TTools extends ToolSet = ToolSet>(
     throw new TypeError("createMCPClient requires client config apiKey");
   }
 
+  const clientHeaders = Object.fromEntries(
+    configHeaders(options.client.config).entries(),
+  );
+  delete clientHeaders.authorization;
   const remoteClient = await createVercelMCPClient({
     ...options,
     transport: {
       type: "http",
       url: options.client.mcp.getServerUrl({ id: options.serverId }),
       headers: {
+        ...clientHeaders,
         ...options.headers,
         "x-api-key": apiKey,
       },
