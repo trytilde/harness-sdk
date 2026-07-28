@@ -9,15 +9,10 @@ import {
   jsonSchema,
   streamText,
   tool,
-  type UIMessage,
 } from "ai";
 import { modelProvider } from "@/lib/tilde";
 
 export const maxDuration = 60;
-
-type AgentRequestBody = {
-  messages: UIMessage[];
-};
 
 async function waitForAbort(signal: AbortSignal): Promise<never> {
   if (signal.aborted) {
@@ -40,10 +35,9 @@ export const POST = chatKitEndpoint({
     baseUrl: process.env.TILDE_BASE_URL,
   },
   async handler(request, context) {
-    const body = context.body as AgentRequestBody;
     const history = await context.session.history();
     const messages = await convertToAiSdkMessages({
-      messages: [...history.items, ...body.messages],
+      messages: [...history.items, ...context.messages],
       onUnprocessedFileUpload: createChatKitAttachmentFilePartHandler(context),
     });
 

@@ -1,10 +1,16 @@
-import type { UIMessage } from "ai";
 import type { JsonObject } from "@tilde/harness-sdk";
+import type { UIMessage } from "ai";
 import {
   type ChatKitContextClient,
   type ChatKitConvertedMessage,
   currentChatKitContext,
 } from "./chatkit-context";
+import {
+  type ChatKitRequestFilePart,
+  type ChatKitRequestMessage,
+  type ChatKitRequestMessagePart,
+  isChatKitRequestMessage,
+} from "./chatkit-request";
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -78,7 +84,10 @@ export type ConvertToAiSdkHydrateHandler = (input: {
   cachedAgentRepresentation: JsonObject;
 }) => Awaitable<UIMessage | null>;
 
-export type ConvertToAiSdkMessageInput = ChatKitMessage | UIMessage;
+export type ConvertToAiSdkMessageInput =
+  | ChatKitMessage
+  | ChatKitRequestMessage
+  | UIMessage;
 
 export type ConvertToAiSdkMessageOptions = {
   message: ConvertToAiSdkMessageInput;
@@ -130,6 +139,9 @@ async function convertToAiSdkMessageInternal(
 ): Promise<UIMessage> {
   const { message } = options;
   if (!isChatKitMessage(message)) {
+    if (isChatKitRequestMessage(message)) {
+      return convertRequestMessageToAiSdkMessage(message, options);
+    }
     return convertUiMessageToAiSdkMessage(message, options);
   }
   const chatKitOptions = {
@@ -158,6 +170,64 @@ async function convertToAiSdkMessageInternal(
 
   await cacheConvertedMessage(chatKitOptions, converted);
   return converted;
+}
+
+async function convertRequestMessageToAiSdkMessage(
+  message: ChatKitRequestMessage,
+  options: ConvertToAiSdkMessageOptions,
+): Promise<UIMessage> {
+  const parts = (
+    await Promise.all(
+      message.parts.map((part) =>
+        convertRequestPartToAiSdkPart(message, part, options),
+      ),
+    )
+  ).filter((part): part is UIMessage["parts"][number] => part !== null);
+  return {
+    id: message.id,
+    role: message.role,
+    parts,
+  } as UIMessage;
+}
+
+async function convertRequestPartToAiSdkPart(
+  message: ChatKitRequestMessage,
+  part: ChatKitRequestMessagePart,
+  options: ConvertToAiSdkMessageOptions,
+): Promise<UIMessage["parts"][number] | null> {
+  if (part.type === "text" || part.type === "reasoning") {
+    return {
+      type: part.type,
+      text: part.text ?? "",
+    } as UIMessage["parts"][number];
+  }
+  if (part.type === "file" && options.onUnprocessedFileUpload) {
+    return options.onUnprocessedFileUpload({
+      message,
+      part: requestFilePartToChatKitFilePart(part),
+    });
+  }
+  if (part.type === "data") {
+    return {
+      type: `data-${part.dataType}`,
+      data: part.data,
+    } as UIMessage["parts"][number];
+  }
+  return part as UIMessage["parts"][number];
+}
+
+function requestFilePartToChatKitFilePart(
+  part: ChatKitRequestFilePart,
+): ChatKitUiFilePart {
+  return {
+    type: "file",
+    mediaType: part.mediaType,
+    url: part.url,
+    ...(part.filename !== undefined ? { filename: part.filename } : {}),
+    ...(isRecord(part.providerMetadata)
+      ? { providerMetadata: part.providerMetadata }
+      : {}),
+  };
 }
 
 /** Convert ChatKit messages into Vercel AI SDK UIMessage objects. */

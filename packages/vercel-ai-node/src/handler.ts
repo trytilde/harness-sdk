@@ -5,6 +5,12 @@ import {
   runWithChatKitContext,
 } from "./chatkit-context";
 import { type ChatKitMessage, isChatKitMessage } from "./chatkit-message";
+import {
+  type ChatKitRequestBody,
+  type ChatKitRequestMessage,
+  ChatKitRequestValidationError,
+  parseChatKitRequestBody,
+} from "./chatkit-request";
 import { type Client, type Config, createClient } from "./client";
 import {
   type VerifiedWebhookRequest,
@@ -41,7 +47,8 @@ export type ChatKitSessionClient = {
 
 export type ChatKitEndpointContext = {
   rawBody: Uint8Array;
-  body: JsonValue;
+  body: ChatKitRequestBody;
+  messages: ChatKitRequestMessage[];
   webhookId: string;
   timestamp: number;
   orgId: string;
@@ -121,6 +128,23 @@ export function chatKitEndpoint(
       );
     }
 
+    let body: ChatKitRequestBody;
+    try {
+      body = parseChatKitRequestBody(verified.json);
+    } catch (error) {
+      const message =
+        error instanceof ChatKitRequestValidationError
+          ? error.message
+          : "Invalid ChatKit request";
+      log("warn", "request rejected", {
+        ...baseFields,
+        status: 400,
+        error: message,
+        elapsedMs: elapsedMs(startedAt),
+      });
+      return jsonError(400, message);
+    }
+
     const orgId = requiredHeader(request.headers, TILDE_ORG_ID_HEADER);
     const teamId = requiredHeader(request.headers, TILDE_TEAM_ID_HEADER);
     const sessionId = requiredHeader(request.headers, TILDE_SESSION_ID_HEADER);
@@ -169,14 +193,14 @@ export function chatKitEndpoint(
     };
     log("info", "context resolved", {
       ...requestFields,
-      requestMessageCount: requestMessageCount(verified.json),
-      requestMessageIds: messageIdsFromRequestBody(verified.json).size,
+      requestMessageCount: body.messages.length,
+      requestMessageIds: messageIds(body.messages).size,
     });
 
     const client = createClient(
       resolveClientConfig(options.client, orgId.value, teamId.value),
     );
-    const currentRequestMessageIds = messageIdsFromRequestBody(verified.json);
+    const currentRequestMessageIds = messageIds(body.messages);
     const session: ChatKitSessionClient = {
       id: sessionId.value,
       async history(historyOptions = {}) {
@@ -287,7 +311,8 @@ export function chatKitEndpoint(
 
     const context: ChatKitEndpointContext = {
       rawBody: verified.rawBody,
-      body: verified.json,
+      body,
+      messages: body.messages,
       webhookId: verified.webhookId,
       timestamp: verified.timestamp,
       orgId: orgId.value,
@@ -432,17 +457,8 @@ function env(name: string): string | undefined {
   return process.env[name];
 }
 
-function messageIdsFromRequestBody(body: JsonValue): Set<string> {
-  if (!isRecord(body) || !Array.isArray(body.messages)) return new Set();
-  const ids = body.messages
-    .map(messageId)
-    .filter((id): id is string => typeof id === "string" && id.length > 0);
-  return new Set(ids);
-}
-
-function requestMessageCount(body: JsonValue): number {
-  if (!isRecord(body) || !Array.isArray(body.messages)) return 0;
-  return body.messages.length;
+function messageIds(messages: ChatKitRequestMessage[]): Set<string> {
+  return new Set(messages.map((message) => message.id).filter(Boolean));
 }
 
 function messageId(value: JsonValue): string | null {

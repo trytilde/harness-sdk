@@ -80,6 +80,7 @@ describe("chatKitEndpoint", () => {
   it("reconstructs the request body after verification", async () => {
     const handler = vi.fn(async (request: Request, context) => {
       expect(context.body).toEqual({ messages: [] });
+      expect(context.messages).toEqual([]);
       expect(await request.json()).toEqual({ messages: [] });
       expect(context.orgId).toBe("org-123");
       expect(context.teamId).toBe("team_123");
@@ -105,6 +106,105 @@ describe("chatKitEndpoint", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("ok");
     expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("provides validated Tilde request messages to the handler", async () => {
+    const messages = [
+      {
+        id: "message-1",
+        role: "user",
+        parts: [
+          { type: "text", text: "hello" },
+          {
+            type: "file",
+            mediaType: "image/png",
+            filename: "image.png",
+            url: "https://example.test/image.png",
+          },
+          {
+            type: "dynamic-tool",
+            toolCallId: "tool-1",
+            toolName: "lookup",
+            state: "output-available",
+            input: { query: "hello" },
+            output: { ok: true },
+          },
+          {
+            type: "source-url",
+            sourceId: "source-1",
+            url: "https://example.test/source",
+          },
+          {
+            type: "source-document",
+            sourceId: "document-1",
+            mediaType: "text/plain",
+          },
+          { type: "step-start" },
+          { type: "data", dataType: "tilde.signal", data: { value: 1 } },
+        ],
+      },
+    ];
+    const handler = vi.fn(async (_request: Request, context) => {
+      expect(context.messages).toEqual(messages);
+      return new Response("ok");
+    });
+    const endpoint = chatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      handler,
+    });
+
+    const response = await endpoint(signedRequest({ messages }));
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    [{}, "body.messages must be an array"],
+    [
+      { messages: [{ id: "message-1", role: "invalid", parts: [] }] },
+      "body.messages[0].role",
+    ],
+    [
+      {
+        messages: [
+          {
+            id: "message-1",
+            role: "user",
+            parts: [{ type: "file", url: "https://example.test/file" }],
+          },
+        ],
+      },
+      "body.messages[0].parts[0].mediaType",
+    ],
+    [
+      {
+        messages: [
+          {
+            id: "message-1",
+            role: "user",
+            parts: [{ type: "unsupported" }],
+          },
+        ],
+      },
+      "body.messages[0].parts[0].type",
+    ],
+  ])("rejects an invalid ChatKit request body", async (body, error) => {
+    const handler = vi.fn(async () => new Response("ok"));
+    const endpoint = chatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      handler,
+    });
+
+    const response = await endpoint(signedRequest(body));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: expect.stringContaining(error),
+    });
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it("loads session history through the typed session client", async () => {
