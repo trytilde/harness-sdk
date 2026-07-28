@@ -727,6 +727,35 @@ describe("chatKitEndpoint", () => {
 });
 
 describe("ChatKit AI SDK converters", () => {
+  it("converts Tilde request data parts to AI SDK data parts", async () => {
+    await expect(
+      convertToAiSdkMessage({
+        message: {
+          id: "request_message",
+          role: "user",
+          parts: [
+            { type: "text", text: "hello" },
+            {
+              type: "data",
+              dataType: "tilde.signal",
+              data: { summary: "changed" },
+            },
+          ],
+        },
+      }),
+    ).resolves.toEqual({
+      id: "request_message",
+      role: "user",
+      parts: [
+        { type: "text", text: "hello" },
+        {
+          type: "data-tilde.signal",
+          data: { summary: "changed" },
+        },
+      ],
+    });
+  });
+
   it("converts typed ChatKit text messages", async () => {
     await expect(
       convertToAiSdkMessage({
