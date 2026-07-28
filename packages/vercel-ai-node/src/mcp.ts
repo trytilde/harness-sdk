@@ -37,9 +37,14 @@ export type TildeMCPClient<TTools extends ToolSet = ToolSet> = Omit<
   tools(): Promise<ToolRegistry & TTools>;
 };
 
+export type TildeMCPClientHandle<TTools extends ToolSet = ToolSet> = {
+  mcp: TildeMCPClient<TTools>;
+  closeMcp(): Promise<void>;
+};
+
 export async function createMCPClient<TTools extends ToolSet = ToolSet>(
   options: CreateMCPClientOptions<TTools>,
-): Promise<TildeMCPClient<TTools>> {
+): Promise<TildeMCPClientHandle<TTools>> {
   const apiKey = options.client.config.apiKey;
   if (!apiKey) {
     throw new TypeError("createMCPClient requires client config apiKey");
@@ -65,11 +70,18 @@ export async function createMCPClient<TTools extends ToolSet = ToolSet>(
     },
   });
 
-  return wrapMcpClientWithLocalTools({
+  const mcp = wrapMcpClientWithLocalTools({
     client: remoteClient,
     serverId: options.serverId,
     tools: toLocalTools(options.tools ?? ({} as TTools)),
   }) as TildeMCPClient<TTools>;
+  let mcpClosed = false;
+  const closeMcp = async () => {
+    if (mcpClosed) return;
+    mcpClosed = true;
+    await mcp.close();
+  };
+  return { mcp, closeMcp };
 }
 
 function toLocalTools(tools: ToolSet): LocalMcpTool[] {

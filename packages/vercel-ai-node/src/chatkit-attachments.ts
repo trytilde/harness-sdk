@@ -1,5 +1,5 @@
+import type { Client, JsonObject } from "@tilde/harness-sdk";
 import { configHeaders } from "@tilde/harness-sdk";
-import type { JsonObject } from "@tilde/harness-sdk";
 import type { UIMessage } from "ai";
 import type {
   ChatKitUiFilePart,
@@ -13,6 +13,7 @@ export type ChatKitAttachmentFilePartHandlerOptions = {
 
 /** Create a file-part handler that downloads ChatKit attachments for AI SDK models. */
 export function createChatKitAttachmentFilePartHandler(
+  client: Client,
   context: ChatKitEndpointContext,
   options: ChatKitAttachmentFilePartHandlerOptions = {},
 ): ConvertToAiSdkFileUploadHandler {
@@ -23,16 +24,16 @@ export function createChatKitAttachmentFilePartHandler(
       return modelSafeFilePart(part);
     }
 
-    const download = await context.client.chatkit.getAttachmentDownloadUrl({
+    const download = await client.chatkit.getAttachmentDownloadUrl({
       sessionId: context.sessionId,
       attachmentId: attachment.attachmentId,
     });
     const downloadUrl = absoluteDownloadUrl(
       download.downloadUrl,
-      context.client.config.baseUrl,
+      client.config.baseUrl,
     );
     const response = await fetchImpl(downloadUrl, {
-      headers: configHeaders(context.client.config),
+      headers: configHeaders(client.config),
     });
     if (!response.ok) {
       throw new Error(
@@ -185,10 +186,7 @@ function isModelSupportedFileMediaType(mediaType: string): boolean {
   return mediaType.startsWith("image/");
 }
 
-function stringField(
-  value: JsonObject,
-  key: string,
-): string | undefined {
+function stringField(value: JsonObject, key: string): string | undefined {
   const field = value[key];
   return typeof field === "string" && field.length > 0 ? field : undefined;
 }

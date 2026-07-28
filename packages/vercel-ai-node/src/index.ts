@@ -61,6 +61,7 @@ export {
   type CreateMCPClientOptions,
   createMCPClient,
   type TildeMCPClient,
+  type TildeMCPClientHandle,
 } from "./mcp";
 export {
   DEFAULT_TOLERANCE_SECONDS,

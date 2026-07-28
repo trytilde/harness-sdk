@@ -1,6 +1,6 @@
 import {
   createMCPClient,
-  type TildeMCPClient,
+  type TildeMCPClientHandle,
 } from "@tilde/harness-sdk-vercel-ai-node";
 import { jsonSchema, type ToolSet, tool } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
@@ -23,11 +23,11 @@ const toolExecutionOptions = () => ({
 
 describe("MCP e2e", () => {
   const fixtures: McpFixture[] = [];
-  const mcpClients: TildeMCPClient[] = [];
+  const mcpClients: TildeMCPClientHandle[] = [];
 
   afterEach(async () => {
-    for (const mcp of mcpClients.splice(0).reverse()) {
-      await mcp.close();
+    for (const { closeMcp } of mcpClients.splice(0).reverse()) {
+      await closeMcp();
     }
     for (const fixture of fixtures.splice(0).reverse()) {
       await fixture.cleanup();
@@ -42,11 +42,12 @@ describe("MCP e2e", () => {
     });
     fixtures.push(fixture);
 
-    const mcp = await createMCPClient({
+    const mcpClient = await createMCPClient({
       client,
       serverId: fixture.serverId,
     });
-    mcpClients.push(mcp);
+    mcpClients.push(mcpClient);
+    const { mcp } = mcpClient;
 
     const tools = await mcp.tools();
     expect(tools).toHaveProperty(DEBUG_HELLO_WORLD_TOOL_TYPE_ID);
@@ -70,11 +71,12 @@ describe("MCP e2e", () => {
     });
     fixtures.push(fixture);
 
-    const mcp = await createMCPClient({
+    const mcpClient = await createMCPClient({
       client,
       serverId: fixture.serverId,
     });
-    mcpClients.push(mcp);
+    mcpClients.push(mcpClient);
+    const { mcp } = mcpClient;
 
     const tools = await mcp.tools();
     expect(Object.keys(tools).sort()).toEqual([
@@ -158,14 +160,15 @@ describe("MCP e2e", () => {
       },
     });
 
-    const mcp = await createMCPClient({
+    const mcpClient = await createMCPClient({
       client,
       serverId: fixture.serverId,
       tools: {
         localEcho,
       } as unknown as ToolSet,
     });
-    mcpClients.push(mcp);
+    mcpClients.push(mcpClient);
+    const { mcp } = mcpClient;
 
     const tools = await mcp.tools();
     expect(tools).toHaveProperty(DEBUG_HELLO_WORLD_TOOL_TYPE_ID);

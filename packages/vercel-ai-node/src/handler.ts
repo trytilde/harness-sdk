@@ -11,7 +11,7 @@ import {
   ChatKitRequestValidationError,
   parseChatKitRequestBody,
 } from "./chatkit-request";
-import { type Client, type Config, createClient } from "./client";
+import type { Client } from "./client";
 import {
   type VerifiedWebhookRequest,
   type VerifyWebhookOptions,
@@ -57,14 +57,13 @@ export type ChatKitEndpointContext = {
   userId?: string;
   externalUserId?: string;
   externalUserProvider?: string;
-  client: Client;
   skills: SkillsClient;
   session: ChatKitSessionClient;
   chatkit: ChatKitContextClient;
 };
 
 export type ChatKitEndpointOptions = VerifyWebhookOptions & {
-  client?: Partial<Config>;
+  client: Client;
   logger?: ChatKitEndpointLogger | false;
   handler: (
     request: Request,
@@ -197,9 +196,7 @@ export function chatKitEndpoint(
       requestMessageIds: messageIds(body.messages).size,
     });
 
-    const client = createClient(
-      resolveClientConfig(options.client, orgId.value, teamId.value),
-    );
+    const client = options.client;
     const currentRequestMessageIds = messageIds(body.messages);
     const session: ChatKitSessionClient = {
       id: sessionId.value,
@@ -325,7 +322,6 @@ export function chatKitEndpoint(
       ...(actorContext.externalUserProvider
         ? { externalUserProvider: actorContext.externalUserProvider }
         : {}),
-      client,
       skills: client.skills,
       session,
       chatkit,
@@ -407,54 +403,6 @@ function requiredHeader(
     return { ok: false, error: `Missing ${name} header` };
   }
   return { ok: true, value };
-}
-
-function resolveClientConfig(
-  overrides: Partial<Config> | undefined,
-  orgId: string,
-  teamId: string,
-): Config {
-  const config: Config = {
-    orgId,
-    teamId,
-  };
-  assignIfDefined(
-    config,
-    "baseUrl",
-    overrides?.baseUrl ?? env("TILDE_BASE_URL"),
-  );
-  assignIfDefined(
-    config,
-    "baseApiUrl",
-    overrides?.baseApiUrl ?? env("TILDE_BASE_API_URL"),
-  );
-  assignIfDefined(config, "orgSubdomain", overrides?.orgSubdomain);
-  assignIfDefined(config, "apiKey", overrides?.apiKey ?? env("TILDE_API_KEY"));
-  assignIfDefined(
-    config,
-    "bearerToken",
-    overrides?.bearerToken ?? env("TILDE_BEARER_TOKEN"),
-  );
-  assignIfDefined(config, "fetch", overrides?.fetch);
-  assignIfDefined(config, "headers", overrides?.headers);
-  return config;
-}
-
-function assignIfDefined<Key extends keyof Config>(
-  config: Config,
-  key: Key,
-  value: Config[Key] | undefined,
-) {
-  if (value !== undefined) {
-    config[key] = value;
-  }
-}
-
-function env(name: string): string | undefined {
-  if (typeof process === "undefined") {
-    return undefined;
-  }
-  return process.env[name];
 }
 
 function messageIds(messages: ChatKitRequestMessage[]): Set<string> {

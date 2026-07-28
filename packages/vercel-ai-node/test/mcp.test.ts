@@ -112,7 +112,7 @@ describe("createMCPClient", () => {
       execute,
     });
 
-    const mcp = await createMCPClient({
+    const { mcp } = await createMCPClient({
       client,
       serverId: "server_1",
       tools: {
@@ -153,5 +153,23 @@ describe("createMCPClient", () => {
         serverId: "server_1",
       }),
     ).rejects.toThrow("apiKey");
+  });
+
+  it("closes the MCP client at most once", async () => {
+    mocks.remoteClient.close.mockClear();
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      teamId: "team_123",
+      apiKey: "tilde-key",
+    });
+    const { closeMcp } = await createMCPClient({
+      client,
+      serverId: "server_1",
+    });
+
+    await closeMcp();
+    await closeMcp();
+
+    expect(mocks.remoteClient.close).toHaveBeenCalledOnce();
   });
 });

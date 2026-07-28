@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  type ChatKitEndpointOptions,
+  type Config,
   chatKitEndpoint,
   convertToAiSdkMessage,
   convertToAiSdkMessages,
+  createClient,
   signBody,
   TILDE_WEBHOOK_ID_HEADER,
   TILDE_WEBHOOK_SIGNATURE_HEADER,
@@ -11,6 +14,23 @@ import {
 } from "../src";
 
 const key = "whsec--test";
+
+function testChatKitEndpoint(
+  options: Omit<ChatKitEndpointOptions, "client"> & {
+    client?: Config;
+  },
+) {
+  const { client: clientConfig, ...endpointOptions } = options;
+  return chatKitEndpoint({
+    ...endpointOptions,
+    client: createClient({
+      apiKey: "test-key",
+      orgId: "org-123",
+      teamId: "team_123",
+      ...clientConfig,
+    }),
+  });
+}
 
 function signedRequest(
   body: unknown,
@@ -88,13 +108,12 @@ describe("chatKitEndpoint", () => {
       expect(context.userId).toBe("user_123");
       expect(context.externalUserId).toBe("U123");
       expect(context.externalUserProvider).toBe("slack");
-      expect(context.client.chatkit).toBeDefined();
-      expect(context.skills).toBe(context.client.skills);
+      expect(context.skills).toBeDefined();
       expect(context.session.id).toBe("session_1");
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         apiKey: "test-key",
@@ -148,7 +167,7 @@ describe("chatKitEndpoint", () => {
       expect(context.messages).toEqual(messages);
       return new Response("ok");
     });
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: { apiKey: "test-key" },
       handler,
@@ -192,7 +211,7 @@ describe("chatKitEndpoint", () => {
     ],
   ])("rejects an invalid ChatKit request body", async (body, error) => {
     const handler = vi.fn(async () => new Response("ok"));
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: { apiKey: "test-key" },
       handler,
@@ -260,7 +279,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -288,7 +307,7 @@ describe("chatKitEndpoint", () => {
         return Response.json({ items: [] });
       },
     );
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://example.ngrok-free.app",
@@ -314,7 +333,7 @@ describe("chatKitEndpoint", () => {
       expect(context.externalUserProvider).toBeUndefined();
       return new Response("ok");
     });
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: { apiKey: "test-key" },
       handler,
@@ -407,7 +426,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -455,7 +474,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -530,7 +549,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -564,7 +583,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -627,7 +646,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -645,7 +664,7 @@ describe("chatKitEndpoint", () => {
 
   it("returns 400 before calling the handler when org id is missing", async () => {
     const handler = vi.fn(async () => new Response("ok"));
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       handler,
     });
@@ -666,7 +685,7 @@ describe("chatKitEndpoint", () => {
 
   it("returns 400 before calling the handler when team id is missing", async () => {
     const handler = vi.fn(async () => new Response("ok"));
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       handler,
     });
@@ -687,7 +706,7 @@ describe("chatKitEndpoint", () => {
 
   it("returns 400 before calling the handler when session id is missing", async () => {
     const handler = vi.fn(async () => new Response("ok"));
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       handler,
     });
@@ -715,7 +734,7 @@ describe("chatKitEndpoint", () => {
     );
     request.headers.set(TILDE_WEBHOOK_SIGNATURE_HEADER, "hmac-sha256=deadbeef");
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       handler,
     });

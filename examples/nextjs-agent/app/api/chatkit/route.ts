@@ -1,3 +1,4 @@
+import { createClient } from "@tilde/harness-sdk";
 import {
   chatKitEndpoint,
   convertToAiSdkMessages,
@@ -13,6 +14,13 @@ import {
 import { modelProvider } from "@/lib/tilde";
 
 export const maxDuration = 60;
+
+const client = createClient({
+  apiKey: process.env.TILDE_API_KEY,
+  baseUrl: process.env.TILDE_BASE_URL,
+  orgId: process.env.TILDE_ORG_ID,
+  teamId: process.env.TILDE_TEAM_ID,
+});
 
 async function waitForAbort(signal: AbortSignal): Promise<never> {
   if (signal.aborted) {
@@ -30,15 +38,15 @@ async function waitForAbort(signal: AbortSignal): Promise<never> {
 
 export const POST = chatKitEndpoint({
   webhookSigningKey: process.env.TILDE_CHATKIT_WEBHOOK_SIGNING_KEY || "",
-  client: {
-    apiKey: process.env.TILDE_API_KEY,
-    baseUrl: process.env.TILDE_BASE_URL,
-  },
+  client,
   async handler(request, context) {
     const history = await context.session.history();
     const messages = await convertToAiSdkMessages({
       messages: [...history.items, ...context.messages],
-      onUnprocessedFileUpload: createChatKitAttachmentFilePartHandler(context),
+      onUnprocessedFileUpload: createChatKitAttachmentFilePartHandler(
+        client,
+        context,
+      ),
     });
 
     const provider = modelProvider();
