@@ -23,6 +23,14 @@ export {
   isChatKitMessage,
 } from "./chatkit-message";
 export {
+  type ChatKitEndpointProviderContext,
+  type ChatKitProviderMetadata,
+  chatKitProviderContext,
+  type GitHubChatKitMessageMetadata,
+  parseProviderMetadata,
+  type SlackChatKitMessageMetadata,
+} from "./chatkit-provider-metadata";
+export {
   type ChatKitRequestApproval,
   type ChatKitRequestBody,
   type ChatKitRequestDataPart,

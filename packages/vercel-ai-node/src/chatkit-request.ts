@@ -84,6 +84,7 @@ export type ChatKitRequestMessage = {
   id: string;
   role: ChatKitRequestMessageRole;
   parts: ChatKitRequestMessagePart[];
+  metadata?: JsonValue;
 };
 
 export type ChatKitRequestBody = {
@@ -146,13 +147,17 @@ function parseMessage(value: JsonValue, path: string): ChatKitRequestMessage {
   if (!Array.isArray(value.parts)) {
     throw invalid(`${path}.parts`, "must be an array");
   }
-  return {
+  const message: ChatKitRequestMessage = {
     id: value.id,
     role: value.role,
     parts: value.parts.map((part, index) =>
       parsePart(part, `${path}.parts[${index}]`),
     ),
   };
+  if (value.metadata !== undefined) {
+    message.metadata = value.metadata;
+  }
+  return message;
 }
 
 function parsePart(value: JsonValue, path: string): ChatKitRequestMessagePart {

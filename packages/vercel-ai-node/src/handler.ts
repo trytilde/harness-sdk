@@ -6,6 +6,10 @@ import {
 } from "./chatkit-context";
 import { type ChatKitMessage, isChatKitMessage } from "./chatkit-message";
 import {
+  type ChatKitEndpointProviderContext,
+  chatKitProviderContext,
+} from "./chatkit-provider-metadata";
+import {
   type ChatKitRequestBody,
   type ChatKitRequestMessage,
   ChatKitRequestValidationError,
@@ -45,7 +49,7 @@ export type ChatKitSessionClient = {
   ): Promise<ChatKitSessionHistory>;
 };
 
-export type ChatKitEndpointContext = {
+export type ChatKitEndpointContext = ChatKitEndpointProviderContext & {
   rawBody: Uint8Array;
   body: ChatKitRequestBody;
   messages: ChatKitRequestMessage[];
@@ -310,6 +314,7 @@ export function chatKitEndpoint(
       rawBody: verified.rawBody,
       body,
       messages: body.messages,
+      ...chatKitProviderContext(body.messages),
       webhookId: verified.webhookId,
       timestamp: verified.timestamp,
       orgId: orgId.value,

@@ -127,6 +127,144 @@ describe("chatKitEndpoint", () => {
     expect(handler).toHaveBeenCalledOnce();
   });
 
+  it("promotes validated GitHub message metadata into typed context", async () => {
+    const github = {
+      event: "created",
+      delivery_id: "delivery-123",
+      installation_id: 42,
+      repository_id: 99,
+      owner: "trytilde",
+      repo: "agents",
+      issue_number: 5,
+      pull_number: 5,
+      comment_id: 123,
+      comment_node_id: "IC_123",
+      comment_url: "https://api.github.com/comments/123",
+      html_url: "https://github.com/trytilde/agents/pull/5#comment-123",
+      thread_kind: "pull_request",
+      message_identity: "github-comment:123",
+    };
+    const handler = vi.fn(async (_request: Request, context) => {
+      expect(context.messages[0]?.metadata).toEqual({
+        provider: "chatkit.channel.github",
+        github,
+      });
+      expect(context.github).toEqual(github);
+      expect(context.slack).toBeUndefined();
+      expect(context.$chatkit_meta_provider).toEqual({
+        provider: "chatkit.channel.github",
+        metadata: github,
+      });
+      return new Response("ok");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      handler,
+    });
+
+    const response = await endpoint(
+      signedRequest({
+        messages: [
+          {
+            id: "message-1",
+            role: "user",
+            parts: [{ type: "text", text: "review this" }],
+            metadata: {
+              provider: "chatkit.channel.github",
+              github,
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("keeps malformed provider metadata raw without promoting it", async () => {
+    const metadata = {
+      provider: "chatkit.channel.github",
+      github: {
+        owner: "trytilde",
+        repo: "agents",
+      },
+    };
+    const handler = vi.fn(async (_request: Request, context) => {
+      expect(context.messages[0]?.metadata).toEqual(metadata);
+      expect(context.github).toBeUndefined();
+      expect(context.$chatkit_meta_provider).toBeUndefined();
+      return new Response("ok");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      handler,
+    });
+
+    const response = await endpoint(
+      signedRequest({
+        messages: [
+          {
+            id: "message-1",
+            role: "user",
+            parts: [{ type: "text", text: "review this" }],
+            metadata,
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("promotes validated Slack message metadata into typed context", async () => {
+    const slack = {
+      team_id: "T123",
+      channel_id: "C123",
+      thread_ts: "123.456",
+      message_ts: "123.789",
+      event_ts: "123.999",
+      user: "U123",
+    };
+    const handler = vi.fn(async (_request: Request, context) => {
+      expect(context.slack).toEqual(slack);
+      expect(context.github).toBeUndefined();
+      expect(context.$chatkit_meta_provider).toEqual({
+        provider: "chatkit.channel.slack",
+        metadata: slack,
+      });
+      return new Response("ok");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      handler,
+    });
+
+    const response = await endpoint(
+      signedRequest({
+        messages: [
+          {
+            id: "message-1",
+            role: "user",
+            parts: [{ type: "text", text: "hello" }],
+            metadata: {
+              provider: "chatkit.channel.slack",
+              route: "mention",
+              slack,
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
   it("provides validated Tilde request messages to the handler", async () => {
     const messages = [
       {
