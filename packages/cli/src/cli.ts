@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
+import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
 import { Box, render, Text, useApp, useInput } from "ink";
 import React from "react";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
 import {
   deleteStoredAuth,
   ensureHarnessAuth,
@@ -12,17 +12,24 @@ import {
   readSelectedTeamId,
   writeSelectedTeamId,
 } from "./auth";
+import type { ChatSlurperAction, ChatSlurperProvider } from "./chat-slurper";
+import { enqueueCaptureHook, runChatSlurperCommand } from "./chat-slurper";
 import { loadDotenvFiles } from "./env";
 import type { RunLocalRuntimeTunnelCommandOptions } from "./tunnel";
 import { runLocalRuntimeTunnelCommand } from "./tunnel";
 
-type CommandName = "auth" | "state" | "tunnel" | "root";
+type CommandName = "auth" | "chat-slurper" | "state" | "tunnel" | "root";
 type AuthAction = "login" | "logout" | "set-team" | "whoami";
 type StateAction = "import" | "export";
 
 type ParsedArgs = {
   commandName: CommandName;
   authAction?: AuthAction;
+  chatSlurperAction?: ChatSlurperAction;
+  chatSlurperProvider?: ChatSlurperProvider;
+  memoryBankId?: string;
+  hookEvent?: string;
+  quiet?: boolean;
   stateAction?: StateAction;
   baseUrl?: string;
   orgId?: string;
@@ -124,7 +131,42 @@ async function main() {
     await runStateCommand(args);
     return;
   }
+  if (args.commandName === "chat-slurper") {
+    await runChatSlurper(args);
+    return;
+  }
   await runTunnelCommand(args);
+}
+
+async function runChatSlurper(args: ParsedArgs): Promise<void> {
+  if (!args.chatSlurperAction) {
+    throw new Error(
+      "Usage: tilde chat-slurper <configure|backfill|status|disable|capture-hook> [options]",
+    );
+  }
+  if (args.chatSlurperAction === "capture-hook") {
+    await enqueueCaptureHook(args.chatSlurperProvider, args.hookEvent);
+    return;
+  }
+  const baseUrl = resolveBaseUrl(args);
+  const teamId = resolveRequiredTeamId(args, baseUrl);
+  const orgId = resolveOptionalOrgId(args, baseUrl);
+  const accessToken =
+    args.chatSlurperAction === "flush-hooks"
+      ? await tryAccessTokenForCommand(args, baseUrl)
+      : await accessTokenForCommand(args, baseUrl);
+  if (!accessToken) return;
+  await runChatSlurperCommand({
+    action: args.chatSlurperAction,
+    baseUrl,
+    accessToken,
+    teamId,
+    ...(orgId ? { orgId } : {}),
+    ...(args.chatSlurperProvider ? { provider: args.chatSlurperProvider } : {}),
+    ...(args.memoryBankId ? { memoryBankId: args.memoryBankId } : {}),
+    ...(args.quiet !== undefined ? { quiet: args.quiet } : {}),
+    select: renderSelect,
+  });
 }
 
 async function runRoot(args: ParsedArgs): Promise<void> {
@@ -298,8 +340,13 @@ function parseArgs(args: string[]): ParsedArgs {
   if (args.length === 0) {
     return { commandName: "root", command: [] };
   }
-  if (args[0] !== "auth" && args[0] !== "state" && args[0] !== "tunnel") {
-    throw new Error("Usage: tilde <auth|state|tunnel> [options]");
+  if (
+    args[0] !== "auth" &&
+    args[0] !== "chat-slurper" &&
+    args[0] !== "state" &&
+    args[0] !== "tunnel"
+  ) {
+    throw new Error("Usage: tilde <auth|chat-slurper|state|tunnel> [options]");
   }
   const parsed: ParsedArgs = { commandName: args[0], command: [] };
   let positionalCount = 0;
@@ -327,6 +374,26 @@ function parseArgs(args: string[]): ParsedArgs {
     }
     if (arg === "--org-id") {
       parsed.orgId = requiredValue(args[++index], arg);
+      continue;
+    }
+    if (arg === "--provider") {
+      const provider = requiredValue(args[++index], arg);
+      if (provider !== "codex" && provider !== "claude-code") {
+        throw new Error("--provider must be codex or claude-code");
+      }
+      parsed.chatSlurperProvider = provider;
+      continue;
+    }
+    if (arg === "--memory-bank-id") {
+      parsed.memoryBankId = requiredValue(args[++index], arg);
+      continue;
+    }
+    if (arg === "--hook-event") {
+      parsed.hookEvent = requiredValue(args[++index], arg);
+      continue;
+    }
+    if (arg === "--quiet") {
+      parsed.quiet = true;
       continue;
     }
     if (arg === "--cloudflared-path") {
@@ -372,6 +439,27 @@ function parseArgs(args: string[]): ParsedArgs {
       } else {
         parsed.outputFilePath = arg;
       }
+      continue;
+    }
+    if (parsed.commandName === "chat-slurper" && !arg.startsWith("-")) {
+      if (parsed.chatSlurperAction !== undefined) {
+        throw new Error(
+          "Usage: tilde chat-slurper <configure|backfill|status|disable|capture-hook> [options]",
+        );
+      }
+      if (
+        arg !== "configure" &&
+        arg !== "backfill" &&
+        arg !== "status" &&
+        arg !== "disable" &&
+        arg !== "capture-hook" &&
+        arg !== "flush-hooks"
+      ) {
+        throw new Error(
+          "Usage: tilde chat-slurper <configure|backfill|status|disable|capture-hook> [options]",
+        );
+      }
+      parsed.chatSlurperAction = arg;
       continue;
     }
     throw new Error(`Unknown option: ${arg}`);
@@ -603,7 +691,10 @@ async function resolveStateImportResponse(
   response: JsonValue,
 ): Promise<JsonValue> {
   const importResponse = asStateImportResponse(response);
-  if (!importResponse?.import_id || !isPendingImportStatus(importResponse.status)) {
+  if (
+    !importResponse?.import_id ||
+    !isPendingImportStatus(importResponse.status)
+  ) {
     return response;
   }
   return await pollStateImport(input, importResponse.import_id);
@@ -673,14 +764,18 @@ function importResultFromResponse(
   };
 }
 
-function asStateImportResponse(response: JsonValue): StateImportResponse | undefined {
+function asStateImportResponse(
+  response: JsonValue,
+): StateImportResponse | undefined {
   if (!response || typeof response !== "object") {
     return undefined;
   }
   return response as StateImportResponse;
 }
 
-function outputsFromImportResponse(response: JsonValue): StateImportOutputs | undefined {
+function outputsFromImportResponse(
+  response: JsonValue,
+): StateImportOutputs | undefined {
   if (!response || typeof response !== "object") {
     return undefined;
   }
@@ -699,7 +794,9 @@ function outputsFromImportResponse(response: JsonValue): StateImportOutputs | un
   return undefined;
 }
 
-function isResourceOutputMap(value: JsonValue): value is Record<string, JsonObject> {
+function isResourceOutputMap(
+  value: JsonValue,
+): value is Record<string, JsonObject> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
@@ -833,7 +930,11 @@ function collectStateItems(
     for (const [resourceId, resource] of Object.entries(
       resources as JsonObject,
     )) {
-      if (!resource || typeof resource !== "object" || Array.isArray(resource)) {
+      if (
+        !resource ||
+        typeof resource !== "object" ||
+        Array.isArray(resource)
+      ) {
         continue;
       }
       const resourceRecord = resource as JsonObject;
@@ -917,9 +1018,7 @@ function statePlanFromResponse(response: JsonValue): StatePlan | undefined {
 
 function normalizeStateItem(value: JsonValue, index: number): StateItem {
   const record =
-    value && typeof value === "object"
-      ? (value as JsonObject)
-      : {};
+    value && typeof value === "object" ? (value as JsonObject) : {};
   const detail =
     stringField(record, "message") ?? stringField(record, "detail");
   return {
@@ -1348,10 +1447,7 @@ function credentialSetupUrl(baseUrl: string): string {
   return new URL("/settings/team/pending-credentials", baseUrl).toString();
 }
 
-function stringField(
-  record: JsonObject,
-  field: string,
-): string | undefined {
+function stringField(record: JsonObject, field: string): string | undefined {
   const value = record[field];
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }

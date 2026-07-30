@@ -26,10 +26,50 @@ tilde auth set-team
 tilde state import ./tilde-state.yaml ./tilde-import-output.json
 tilde state import ./tilde-state.yaml ./tilde-import-output.json --auto-apply
 tilde state export ./tilde-state.yaml
+tilde chat-slurper configure
+tilde chat-slurper backfill
+tilde chat-slurper status
+tilde chat-slurper disable
 ```
 
 The CLI can also be invoked as `t`. Running `tilde` or `t` with no command checks
 auth state and starts sign-in if needed.
+
+`tilde chat-slurper configure` detects Codex (including Codex Desktop) and Claude Code,
+lets the user select a team memory bank, and installs additive user-level
+capture hooks. Live hook events and `tilde chat-slurper backfill` share the same
+normalized, idempotent upload protocol. `disable` removes only Tilde-owned hooks
+and leaves previously synchronized history searchable. Codex requires users to
+review and trust newly installed command hooks through `/hooks` before they run.
+
+Capture covers session start, prompt submission, tool activity, and stop/end
+events. Claude Code additionally captures `Task` and `TodoWrite` lifecycle
+events. Repeated events for one transcript are durably queued and coalesced.
+Each upload contains compact messages/tool calls, prompts, a locally redacted
+raw JSONL transcript, and embedded PNG/JPEG/GIF/WebP assets with SHA-256
+integrity metadata.
+
+Secret, provider-token, high-entropy, credentialed-URI, and database connection
+string redaction is always enabled. Optional redaction is configured in
+`~/.config/tilde/chat-slurper.json` (or `TILDE_CHAT_SLURPER_CONFIG_PATH`):
+
+```json
+{
+  "redaction": {
+    "customPatterns": { "internal_ticket": "TICKET-[0-9]+" },
+    "pii": { "email": true, "phone": true, "address": true },
+    "openaiPrivacyFilter": {
+      "enabled": true,
+      "command": "opf",
+      "timeoutSeconds": 30,
+      "categories": ["private_person", "private_email", "private_phone", "private_address", "secret"]
+    }
+  }
+}
+```
+
+When the OpenAI Privacy Filter is enabled, a missing, timed-out, or malformed
+`opf` process fails closed: no transcript is uploaded.
 
 ## Core Config
 
