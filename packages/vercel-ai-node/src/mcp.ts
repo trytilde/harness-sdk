@@ -11,7 +11,7 @@ import type {
   ToolRegistry,
   ToolResult,
 } from "@tilde/harness-sdk";
-import { wrapMcpClientWithLocalTools } from "@tilde/harness-sdk";
+import { configHeaders, wrapMcpClientWithLocalTools } from "@tilde/harness-sdk";
 import type { ToolExecutionOptions, ToolSet } from "ai";
 
 export type CreateMCPClientOptions<TTools extends ToolSet = ToolSet> = Omit<
@@ -24,31 +24,43 @@ export type CreateMCPClientOptions<TTools extends ToolSet = ToolSet> = Omit<
   headers?: Record<string, string>;
 };
 
-export type TildeMCPClient<TTools extends ToolSet = ToolSet> =
-  Omit<MCPClient, "tools"> & {
-    readonly serverId: string;
-    readonly localTools: readonly LocalMcpTool[];
-    callTool<TResult extends ToolResult = ToolResult>(
-      name: string,
-      input?: JsonObject,
-    ): Promise<TResult>;
-    tools(): Promise<ToolRegistry & TTools>;
-  };
+export type TildeMCPClient<TTools extends ToolSet = ToolSet> = Omit<
+  MCPClient,
+  "tools"
+> & {
+  readonly serverId: string;
+  readonly localTools: readonly LocalMcpTool[];
+  callTool<TResult extends ToolResult = ToolResult>(
+    name: string,
+    input?: JsonObject,
+  ): Promise<TResult>;
+  tools(): Promise<ToolRegistry & TTools>;
+};
+
+export type TildeMCPClientHandle<TTools extends ToolSet = ToolSet> = {
+  mcp: TildeMCPClient<TTools>;
+  closeMcp(): Promise<void>;
+};
 
 export async function createMCPClient<TTools extends ToolSet = ToolSet>(
   options: CreateMCPClientOptions<TTools>,
-): Promise<TildeMCPClient<TTools>> {
+): Promise<TildeMCPClientHandle<TTools>> {
   const apiKey = options.client.config.apiKey;
   if (!apiKey) {
     throw new TypeError("createMCPClient requires client config apiKey");
   }
 
+  const clientHeaders = Object.fromEntries(
+    configHeaders(options.client.config).entries(),
+  );
+  delete clientHeaders.authorization;
   const remoteClient = await createVercelMCPClient({
     ...options,
     transport: {
       type: "http",
       url: options.client.mcp.getServerUrl({ id: options.serverId }),
       headers: {
+        ...clientHeaders,
         ...options.headers,
         "x-api-key": apiKey,
       },
@@ -58,11 +70,18 @@ export async function createMCPClient<TTools extends ToolSet = ToolSet>(
     },
   });
 
-  return wrapMcpClientWithLocalTools({
+  const mcp = wrapMcpClientWithLocalTools({
     client: remoteClient,
     serverId: options.serverId,
     tools: toLocalTools(options.tools ?? ({} as TTools)),
   }) as TildeMCPClient<TTools>;
+  let mcpClosed = false;
+  const closeMcp = async () => {
+    if (mcpClosed) return;
+    mcpClosed = true;
+    await mcp.close();
+  };
+  return { mcp, closeMcp };
 }
 
 function toLocalTools(tools: ToolSet): LocalMcpTool[] {
@@ -73,7 +92,10 @@ type ExecutableToolLike = {
   description?: string;
   inputSchema?: JsonObject;
   outputSchema?: JsonObject;
-  execute?: (input: JsonObject, options: ToolExecutionOptions) => ToolResult | Promise<ToolResult>;
+  execute?: (
+    input: JsonObject,
+    options: ToolExecutionOptions,
+  ) => ToolResult | Promise<ToolResult>;
 };
 
 function toLocalTool(name: string, value: ToolSet[string]): LocalMcpTool {

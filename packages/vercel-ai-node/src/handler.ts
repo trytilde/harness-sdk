@@ -1,11 +1,21 @@
-import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
+import type { JsonObject, JsonValue, SkillsClient } from "@tilde/harness-sdk";
 import {
   type ChatKitContextClient,
   type ChatKitConvertedMessage,
   runWithChatKitContext,
 } from "./chatkit-context";
 import { type ChatKitMessage, isChatKitMessage } from "./chatkit-message";
-import { type Client, type Config, createClient } from "./client";
+import {
+  type ChatKitEndpointProviderContext,
+  chatKitProviderContext,
+} from "./chatkit-provider-metadata";
+import {
+  type ChatKitRequestBody,
+  type ChatKitRequestMessage,
+  ChatKitRequestValidationError,
+  parseChatKitRequestBody,
+} from "./chatkit-request";
+import type { Client } from "./client";
 import {
   type VerifiedWebhookRequest,
   type VerifyWebhookOptions,
@@ -39,9 +49,10 @@ export type ChatKitSessionClient = {
   ): Promise<ChatKitSessionHistory>;
 };
 
-export type ChatKitEndpointContext = {
+export type ChatKitEndpointContext = ChatKitEndpointProviderContext & {
   rawBody: Uint8Array;
-  body: JsonValue;
+  body: ChatKitRequestBody;
+  messages: ChatKitRequestMessage[];
   webhookId: string;
   timestamp: number;
   orgId: string;
@@ -50,13 +61,13 @@ export type ChatKitEndpointContext = {
   userId?: string;
   externalUserId?: string;
   externalUserProvider?: string;
-  client: Client;
+  skills: SkillsClient;
   session: ChatKitSessionClient;
   chatkit: ChatKitContextClient;
 };
 
 export type ChatKitEndpointOptions = VerifyWebhookOptions & {
-  client?: Partial<Config>;
+  client: Client;
   logger?: ChatKitEndpointLogger | false;
   handler: (
     request: Request,
@@ -120,6 +131,23 @@ export function chatKitEndpoint(
       );
     }
 
+    let body: ChatKitRequestBody;
+    try {
+      body = parseChatKitRequestBody(verified.json);
+    } catch (error) {
+      const message =
+        error instanceof ChatKitRequestValidationError
+          ? error.message
+          : "Invalid ChatKit request";
+      log("warn", "request rejected", {
+        ...baseFields,
+        status: 400,
+        error: message,
+        elapsedMs: elapsedMs(startedAt),
+      });
+      return jsonError(400, message);
+    }
+
     const orgId = requiredHeader(request.headers, TILDE_ORG_ID_HEADER);
     const teamId = requiredHeader(request.headers, TILDE_TEAM_ID_HEADER);
     const sessionId = requiredHeader(request.headers, TILDE_SESSION_ID_HEADER);
@@ -168,14 +196,12 @@ export function chatKitEndpoint(
     };
     log("info", "context resolved", {
       ...requestFields,
-      requestMessageCount: requestMessageCount(verified.json),
-      requestMessageIds: messageIdsFromRequestBody(verified.json).size,
+      requestMessageCount: body.messages.length,
+      requestMessageIds: messageIds(body.messages).size,
     });
 
-    const client = createClient(
-      resolveClientConfig(options.client, orgId.value, teamId.value),
-    );
-    const currentRequestMessageIds = messageIdsFromRequestBody(verified.json);
+    const client = options.client;
+    const currentRequestMessageIds = messageIds(body.messages);
     const session: ChatKitSessionClient = {
       id: sessionId.value,
       async history(historyOptions = {}) {
@@ -286,7 +312,9 @@ export function chatKitEndpoint(
 
     const context: ChatKitEndpointContext = {
       rawBody: verified.rawBody,
-      body: verified.json,
+      body,
+      messages: body.messages,
+      ...chatKitProviderContext(body.messages),
       webhookId: verified.webhookId,
       timestamp: verified.timestamp,
       orgId: orgId.value,
@@ -299,7 +327,7 @@ export function chatKitEndpoint(
       ...(actorContext.externalUserProvider
         ? { externalUserProvider: actorContext.externalUserProvider }
         : {}),
-      client,
+      skills: client.skills,
       session,
       chatkit,
     };
@@ -382,64 +410,8 @@ function requiredHeader(
   return { ok: true, value };
 }
 
-function resolveClientConfig(
-  overrides: Partial<Config> | undefined,
-  orgId: string,
-  teamId: string,
-): Config {
-  const config: Config = {
-    orgId,
-    teamId,
-  };
-  assignIfDefined(
-    config,
-    "baseUrl",
-    overrides?.baseUrl ?? env("TILDE_BASE_URL"),
-  );
-  assignIfDefined(
-    config,
-    "baseApiUrl",
-    overrides?.baseApiUrl ?? env("TILDE_BASE_API_URL"),
-  );
-  assignIfDefined(config, "apiKey", overrides?.apiKey ?? env("TILDE_API_KEY"));
-  assignIfDefined(
-    config,
-    "bearerToken",
-    overrides?.bearerToken ?? env("TILDE_BEARER_TOKEN"),
-  );
-  assignIfDefined(config, "fetch", overrides?.fetch);
-  assignIfDefined(config, "headers", overrides?.headers);
-  return config;
-}
-
-function assignIfDefined<Key extends keyof Config>(
-  config: Config,
-  key: Key,
-  value: Config[Key] | undefined,
-) {
-  if (value !== undefined) {
-    config[key] = value;
-  }
-}
-
-function env(name: string): string | undefined {
-  if (typeof process === "undefined") {
-    return undefined;
-  }
-  return process.env[name];
-}
-
-function messageIdsFromRequestBody(body: JsonValue): Set<string> {
-  if (!isRecord(body) || !Array.isArray(body.messages)) return new Set();
-  const ids = body.messages
-    .map(messageId)
-    .filter((id): id is string => typeof id === "string" && id.length > 0);
-  return new Set(ids);
-}
-
-function requestMessageCount(body: JsonValue): number {
-  if (!isRecord(body) || !Array.isArray(body.messages)) return 0;
-  return body.messages.length;
+function messageIds(messages: ChatKitRequestMessage[]): Set<string> {
+  return new Set(messages.map((message) => message.id).filter(Boolean));
 }
 
 function messageId(value: JsonValue): string | null {

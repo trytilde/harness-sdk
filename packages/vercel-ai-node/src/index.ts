@@ -23,6 +23,33 @@ export {
   isChatKitMessage,
 } from "./chatkit-message";
 export {
+  type ChatKitEndpointProviderContext,
+  type ChatKitProviderMetadata,
+  chatKitProviderContext,
+  type GitHubChatKitMessageMetadata,
+  parseProviderMetadata,
+  type SlackChatKitMessageMetadata,
+} from "./chatkit-provider-metadata";
+export {
+  type ChatKitRequestApproval,
+  type ChatKitRequestBody,
+  type ChatKitRequestDataPart,
+  type ChatKitRequestFilePart,
+  type ChatKitRequestMessage,
+  type ChatKitRequestMessagePart,
+  type ChatKitRequestMessageRole,
+  type ChatKitRequestReasoningPart,
+  type ChatKitRequestSourceDocumentPart,
+  type ChatKitRequestSourceUrlPart,
+  type ChatKitRequestStepStartPart,
+  type ChatKitRequestTextPart,
+  type ChatKitRequestToolPart,
+  type ChatKitRequestToolState,
+  ChatKitRequestValidationError,
+  isChatKitRequestMessage,
+  parseChatKitRequestBody,
+} from "./chatkit-request";
+export {
   type Client,
   type Config,
   createClient,
@@ -42,6 +69,7 @@ export {
   type CreateMCPClientOptions,
   createMCPClient,
   type TildeMCPClient,
+  type TildeMCPClientHandle,
 } from "./mcp";
 export {
   DEFAULT_TOLERANCE_SECONDS,

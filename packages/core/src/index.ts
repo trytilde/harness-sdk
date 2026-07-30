@@ -23,6 +23,7 @@ export {
   type NormalizedConfig,
 } from "./config";
 export { ApiError } from "./errors";
+export { type SkillItem, type SkillRegistry, SkillsClient } from "./skills";
 export {
   type AddMcpServerFunctionInput,
   type AvailableToolGroup,
@@ -41,14 +42,14 @@ export {
   type McpRequest,
   type McpServer,
   type McpToolDefinition,
-  type ToolDeployment,
-  type ToolGroupInstance,
   MULTI_EXECUTE_TOOL_NAME,
   type MultiExecuteToolRequest,
   type MultiExecuteToolResult,
   REGISTER_LOCAL_TOOLS_METHOD,
   type RegisterLocalMcpToolsRequest,
   SEARCH_TOOLS_NAME,
+  type ToolDeployment,
+  type ToolGroupInstance,
   type ToolInvocationRequest,
   type ToolInvocationResult,
   type ToolRegistry,

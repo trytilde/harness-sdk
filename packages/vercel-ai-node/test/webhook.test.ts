@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  type ChatKitEndpointOptions,
+  type Config,
   chatKitEndpoint,
   convertToAiSdkMessage,
   convertToAiSdkMessages,
+  createClient,
   signBody,
   TILDE_WEBHOOK_ID_HEADER,
   TILDE_WEBHOOK_SIGNATURE_HEADER,
@@ -11,6 +14,23 @@ import {
 } from "../src";
 
 const key = "whsec--test";
+
+function testChatKitEndpoint(
+  options: Omit<ChatKitEndpointOptions, "client"> & {
+    client?: Config;
+  },
+) {
+  const { client: clientConfig, ...endpointOptions } = options;
+  return chatKitEndpoint({
+    ...endpointOptions,
+    client: createClient({
+      apiKey: "test-key",
+      orgId: "org-123",
+      teamId: "team_123",
+      ...clientConfig,
+    }),
+  });
+}
 
 function signedRequest(
   body: unknown,
@@ -80,6 +100,7 @@ describe("chatKitEndpoint", () => {
   it("reconstructs the request body after verification", async () => {
     const handler = vi.fn(async (request: Request, context) => {
       expect(context.body).toEqual({ messages: [] });
+      expect(context.messages).toEqual([]);
       expect(await request.json()).toEqual({ messages: [] });
       expect(context.orgId).toBe("org-123");
       expect(context.teamId).toBe("team_123");
@@ -87,12 +108,12 @@ describe("chatKitEndpoint", () => {
       expect(context.userId).toBe("user_123");
       expect(context.externalUserId).toBe("U123");
       expect(context.externalUserProvider).toBe("slack");
-      expect(context.client.chatkit).toBeDefined();
+      expect(context.skills).toBeDefined();
       expect(context.session.id).toBe("session_1");
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         apiKey: "test-key",
@@ -104,6 +125,243 @@ describe("chatKitEndpoint", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("ok");
     expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("promotes validated GitHub message metadata into typed context", async () => {
+    const github = {
+      event: "created",
+      delivery_id: "delivery-123",
+      installation_id: 42,
+      repository_id: 99,
+      owner: "trytilde",
+      repo: "agents",
+      issue_number: 5,
+      pull_number: 5,
+      comment_id: 123,
+      comment_node_id: "IC_123",
+      comment_url: "https://api.github.com/comments/123",
+      html_url: "https://github.com/trytilde/agents/pull/5#comment-123",
+      thread_kind: "pull_request",
+      message_identity: "github-comment:123",
+    };
+    const handler = vi.fn(async (_request: Request, context) => {
+      expect(context.messages[0]?.metadata).toEqual({
+        provider: "chatkit.channel.github",
+        github,
+      });
+      expect(context.github).toEqual(github);
+      expect(context.slack).toBeUndefined();
+      expect(context.$chatkit_meta_provider).toEqual({
+        provider: "chatkit.channel.github",
+        metadata: github,
+      });
+      return new Response("ok");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      handler,
+    });
+
+    const response = await endpoint(
+      signedRequest({
+        messages: [
+          {
+            id: "message-1",
+            role: "user",
+            parts: [{ type: "text", text: "review this" }],
+            metadata: {
+              provider: "chatkit.channel.github",
+              github,
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("keeps malformed provider metadata raw without promoting it", async () => {
+    const metadata = {
+      provider: "chatkit.channel.github",
+      github: {
+        owner: "trytilde",
+        repo: "agents",
+      },
+    };
+    const handler = vi.fn(async (_request: Request, context) => {
+      expect(context.messages[0]?.metadata).toEqual(metadata);
+      expect(context.github).toBeUndefined();
+      expect(context.$chatkit_meta_provider).toBeUndefined();
+      return new Response("ok");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      handler,
+    });
+
+    const response = await endpoint(
+      signedRequest({
+        messages: [
+          {
+            id: "message-1",
+            role: "user",
+            parts: [{ type: "text", text: "review this" }],
+            metadata,
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("promotes validated Slack message metadata into typed context", async () => {
+    const slack = {
+      team_id: "T123",
+      channel_id: "C123",
+      thread_ts: "123.456",
+      message_ts: "123.789",
+      event_ts: "123.999",
+      user: "U123",
+    };
+    const handler = vi.fn(async (_request: Request, context) => {
+      expect(context.slack).toEqual(slack);
+      expect(context.github).toBeUndefined();
+      expect(context.$chatkit_meta_provider).toEqual({
+        provider: "chatkit.channel.slack",
+        metadata: slack,
+      });
+      return new Response("ok");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      handler,
+    });
+
+    const response = await endpoint(
+      signedRequest({
+        messages: [
+          {
+            id: "message-1",
+            role: "user",
+            parts: [{ type: "text", text: "hello" }],
+            metadata: {
+              provider: "chatkit.channel.slack",
+              route: "mention",
+              slack,
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("provides validated Tilde request messages to the handler", async () => {
+    const messages = [
+      {
+        id: "message-1",
+        role: "user",
+        parts: [
+          { type: "text", text: "hello" },
+          {
+            type: "file",
+            mediaType: "image/png",
+            filename: "image.png",
+            url: "https://example.test/image.png",
+          },
+          {
+            type: "dynamic-tool",
+            toolCallId: "tool-1",
+            toolName: "lookup",
+            state: "output-available",
+            input: { query: "hello" },
+            output: { ok: true },
+          },
+          {
+            type: "source-url",
+            sourceId: "source-1",
+            url: "https://example.test/source",
+          },
+          {
+            type: "source-document",
+            sourceId: "document-1",
+            mediaType: "text/plain",
+          },
+          { type: "step-start" },
+          { type: "data", dataType: "tilde.signal", data: { value: 1 } },
+        ],
+      },
+    ];
+    const handler = vi.fn(async (_request: Request, context) => {
+      expect(context.messages).toEqual(messages);
+      return new Response("ok");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      handler,
+    });
+
+    const response = await endpoint(signedRequest({ messages }));
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    [{}, "body.messages must be an array"],
+    [
+      { messages: [{ id: "message-1", role: "invalid", parts: [] }] },
+      "body.messages[0].role",
+    ],
+    [
+      {
+        messages: [
+          {
+            id: "message-1",
+            role: "user",
+            parts: [{ type: "file", url: "https://example.test/file" }],
+          },
+        ],
+      },
+      "body.messages[0].parts[0].mediaType",
+    ],
+    [
+      {
+        messages: [
+          {
+            id: "message-1",
+            role: "user",
+            parts: [{ type: "unsupported" }],
+          },
+        ],
+      },
+      "body.messages[0].parts[0].type",
+    ],
+  ])("rejects an invalid ChatKit request body", async (body, error) => {
+    const handler = vi.fn(async () => new Response("ok"));
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      handler,
+    });
+
+    const response = await endpoint(signedRequest(body));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: expect.stringContaining(error),
+    });
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it("loads session history through the typed session client", async () => {
@@ -159,7 +417,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -175,6 +433,37 @@ describe("chatKitEndpoint", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
+  it("preserves a non-subdomain tunnel base URL for session history", async () => {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        expect(String(input)).toBe(
+          "https://example.ngrok-free.app/api/v1/team/team_123/chatkit/sessions/session_1/messages?page_size=10",
+        );
+        expect(new Headers(init?.headers).get("x-tilde-org-id")).toBe(
+          "org-123",
+        );
+        return Response.json({ items: [] });
+      },
+    );
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: {
+        baseUrl: "https://example.ngrok-free.app",
+        orgSubdomain: false,
+        apiKey: "test-key",
+        fetch: fetchMock as typeof fetch,
+      },
+      handler: async (_request, context) => {
+        await context.session.history({ pageSize: 10 });
+        return new Response("ok");
+      },
+    });
+
+    const response = await endpoint(signedRequest({ messages: [] }));
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("keeps unresolved external identity optional", async () => {
     const handler = vi.fn(async (_request: Request, context) => {
       expect(context.userId).toBeUndefined();
@@ -182,7 +471,7 @@ describe("chatKitEndpoint", () => {
       expect(context.externalUserProvider).toBeUndefined();
       return new Response("ok");
     });
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: { apiKey: "test-key" },
       handler,
@@ -275,7 +564,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -323,7 +612,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -398,7 +687,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -432,7 +721,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -495,7 +784,7 @@ describe("chatKitEndpoint", () => {
       return new Response("ok");
     });
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       client: {
         baseUrl: "https://api.example.test",
@@ -513,7 +802,7 @@ describe("chatKitEndpoint", () => {
 
   it("returns 400 before calling the handler when org id is missing", async () => {
     const handler = vi.fn(async () => new Response("ok"));
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       handler,
     });
@@ -534,7 +823,7 @@ describe("chatKitEndpoint", () => {
 
   it("returns 400 before calling the handler when team id is missing", async () => {
     const handler = vi.fn(async () => new Response("ok"));
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       handler,
     });
@@ -555,7 +844,7 @@ describe("chatKitEndpoint", () => {
 
   it("returns 400 before calling the handler when session id is missing", async () => {
     const handler = vi.fn(async () => new Response("ok"));
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       handler,
     });
@@ -583,7 +872,7 @@ describe("chatKitEndpoint", () => {
     );
     request.headers.set(TILDE_WEBHOOK_SIGNATURE_HEADER, "hmac-sha256=deadbeef");
 
-    const endpoint = chatKitEndpoint({
+    const endpoint = testChatKitEndpoint({
       webhookSigningKey: key,
       handler,
     });
@@ -595,6 +884,35 @@ describe("chatKitEndpoint", () => {
 });
 
 describe("ChatKit AI SDK converters", () => {
+  it("converts Tilde request data parts to AI SDK data parts", async () => {
+    await expect(
+      convertToAiSdkMessage({
+        message: {
+          id: "request_message",
+          role: "user",
+          parts: [
+            { type: "text", text: "hello" },
+            {
+              type: "data",
+              dataType: "tilde.signal",
+              data: { summary: "changed" },
+            },
+          ],
+        },
+      }),
+    ).resolves.toEqual({
+      id: "request_message",
+      role: "user",
+      parts: [
+        { type: "text", text: "hello" },
+        {
+          type: "data-tilde.signal",
+          data: { summary: "changed" },
+        },
+      ],
+    });
+  });
+
   it("converts typed ChatKit text messages", async () => {
     await expect(
       convertToAiSdkMessage({

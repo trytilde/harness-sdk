@@ -149,12 +149,10 @@ import { streamText } from "ai";
 
 export const POST = chatKitEndpoint({
   webhookSigningKey: process.env.TILDE_WEBHOOK_SIGNING_KEY!,
-  async handler(request) {
-    const body = await request.json();
-
+  async handler(_request, context) {
     const result = streamText({
       model,
-      messages: body.messages
+      messages: context.messages
     });
 
     return result.toUIMessageStreamResponse();

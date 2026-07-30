@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, createClient, createConfig } from "../src";
+import { ApiError, configHeaders, createClient, createConfig } from "../src";
 
 const spawnMock = vi.fn(() => ({
   killed: false,
@@ -68,6 +68,28 @@ describe("createConfig", () => {
     });
 
     expect(config.baseUrl).toBe("https://org-example.api.example.test");
+  });
+
+  it("keeps an explicit tunnel baseUrl when org subdomains are disabled", () => {
+    const config = createConfig({
+      baseUrl: "https://example.ngrok-free.app/",
+      orgId: "org-example",
+      orgSubdomain: false,
+      teamId: "team_123",
+    });
+
+    expect(config.baseUrl).toBe("https://example.ngrok-free.app");
+  });
+
+  it("sends org context as a header", () => {
+    const config = createConfig({
+      baseUrl: "https://example.ngrok-free.app",
+      orgId: "org-example",
+      orgSubdomain: false,
+      teamId: "team_123",
+    });
+
+    expect(configHeaders(config).get("x-tilde-org-id")).toBe("org-example");
   });
 
   it("rejects orgId values that cannot be used as a hostname label", () => {
@@ -183,6 +205,73 @@ describe("createConfig", () => {
         teamId: "team_123",
       }),
     ).toThrow("baseUrl must be an absolute URL");
+  });
+});
+
+describe("skills", () => {
+  it("lists full skill bodies and finds a skill by stable title", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          id: "registry-1",
+          name: "Agent skills",
+          description: "",
+          org_id: "org-1",
+          team_id: "team-1",
+          created_at: "2026-07-14T00:00:00Z",
+          updated_at: "2026-07-14T00:00:00Z",
+          skills: [
+            {
+              id: "skill-1",
+              name: "website-seo-setup",
+              description: "SEO implementation requirements",
+              content: "Use the checklist verbatim.",
+              version: 1,
+              org_id: "org-1",
+              team_id: "team-1",
+              source_kind: "manual",
+              created_at: "2026-07-14T00:00:00Z",
+              updated_at: "2026-07-14T00:00:00Z",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          id: "skill-1",
+          name: "website-seo-setup",
+          description: "SEO implementation requirements",
+          content: "Use the checklist verbatim.",
+          version: 1,
+          org_id: "org-1",
+          team_id: "team-1",
+          source_kind: "manual",
+          created_at: "2026-07-14T00:00:00Z",
+          updated_at: "2026-07-14T00:00:00Z",
+        }),
+      );
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      teamId: "team-1",
+      apiKey: "test-key",
+      fetch: fetchMock,
+    });
+
+    const registry = await client.skills.registry("registry-1");
+    await expect(registry.list()).resolves.toMatchObject([
+      { name: "website-seo-setup", content: "Use the checklist verbatim." },
+    ]);
+    await expect(registry.find("website-seo-setup")).resolves.toMatchObject({
+      id: "skill-1",
+      content: "Use the checklist verbatim.",
+    });
+    expect(
+      fetchMock.mock.calls.map(([request]) => (request as Request).url),
+    ).toEqual([
+      "https://api.example.test/api/v1/team/team-1/skill-registry/registry-1",
+      "https://api.example.test/api/v1/team/team-1/skill-registry/registry-1/skill/by-title/website-seo-setup",
+    ]);
   });
 });
 
