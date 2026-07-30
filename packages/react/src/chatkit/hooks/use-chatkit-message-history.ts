@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
 import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
+import { useCallback, useEffect, useState } from "react";
 import { useChatKit } from "./use-chatkit";
 
 export type UseChatKitMessageHistoryOptions = {
@@ -12,7 +12,9 @@ export type UseChatKitMessageHistoryOptions = {
   enabled?: boolean;
 };
 
-export type UseChatKitMessageHistoryResult<TMessage extends JsonValue = JsonObject> = {
+export type UseChatKitMessageHistoryResult<
+  TMessage extends JsonValue = JsonObject,
+> = {
   items: TMessage[];
   nextPageToken: string | undefined;
   isLoading: boolean;
@@ -20,7 +22,9 @@ export type UseChatKitMessageHistoryResult<TMessage extends JsonValue = JsonObje
   reload(): Promise<void>;
 };
 
-export function useChatKitMessageHistory<TMessage extends JsonValue = JsonObject>(
+export function useChatKitMessageHistory<
+  TMessage extends JsonValue = JsonObject,
+>(
   options: UseChatKitMessageHistoryOptions,
 ): UseChatKitMessageHistoryResult<TMessage> {
   const chatkit = useChatKit();

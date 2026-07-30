@@ -1,8 +1,20 @@
 {
   "name": "@tilde/harness-sdk",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Core TypeScript SDK for Tilde Harness APIs.",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trytilde/harness-sdk.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/trytilde/harness-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/trytilde/harness-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,11 +33,12 @@
   ],
   "scripts": {
     "build": "vite build",
+    "prepack": "pnpm build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config ../../vitest.config.ts"
   },
   "dependencies": {
-    "@tilde/api-client": "workspace:*",
+    "@tilde/api-client": "workspace:^",
     "nice-grpc": "^2.1.16"
   },
   "devDependencies": {}

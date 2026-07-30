@@ -16,7 +16,10 @@ export type ProviderToolDefinition = {
   execute?: (input?: JsonObject) => ToolResult | Promise<ToolResult>;
 };
 
-export type ToolRegistry<TTool = ProviderToolDefinition> = Record<string, TTool>;
+export type ToolRegistry<TTool = ProviderToolDefinition> = Record<
+  string,
+  TTool
+>;
 
 export type LocalMcpToolContext = {
   callTool<TResult extends ToolResult = ToolResult>(
@@ -47,10 +50,7 @@ export type McpClientLike = {
     name: string,
     input?: JsonObject,
   ) => Promise<TResult>;
-  request?: (
-    request: McpRequest,
-    options?: JsonValue,
-  ) => Promise<ToolResult>;
+  request?: (request: McpRequest, options?: JsonValue) => Promise<ToolResult>;
   close?: () => Promise<void> | void;
 };
 
@@ -162,10 +162,18 @@ export function wrapMcpClientWithLocalTools<TClient extends object>(
   ): Promise<TResult> => {
     await ensureServerRegistration();
     if (normalizeToolName(name) === SEARCH_TOOLS_NAME) {
-      return (await routeSearchTools(input, localTools, callRemoteTool)) as TResult;
+      return (await routeSearchTools(
+        input,
+        localTools,
+        callRemoteTool,
+      )) as TResult;
     }
     if (normalizeToolName(name) === GET_TOOL_SCHEMAS_NAME) {
-      return (await routeGetToolSchemas(input, localTools, callRemoteTool)) as TResult;
+      return (await routeGetToolSchemas(
+        input,
+        localTools,
+        callRemoteTool,
+      )) as TResult;
     }
     if (normalizeToolName(name) === MULTI_EXECUTE_TOOL_NAME) {
       return typedToolResult<TResult>(
@@ -347,7 +355,10 @@ async function routeMultiExecute(
   input: JsonObject | undefined,
   localTools: Map<string, LocalToolEntry>,
   context: LocalMcpToolContext,
-  callRemoteTool: <TResult extends ToolResult = ToolResult>(name: string, input?: JsonObject) => Promise<TResult>,
+  callRemoteTool: <TResult extends ToolResult = ToolResult>(
+    name: string,
+    input?: JsonObject,
+  ) => Promise<TResult>,
 ): Promise<MultiExecuteToolResult> {
   const request = parseMultiExecuteRequest(input);
   const results = new Array<ToolInvocationResult>(request.invocations.length);
@@ -415,7 +426,10 @@ async function routeMultiExecute(
 async function routeSearchTools(
   input: JsonObject | undefined,
   localTools: LocalToolEntry[],
-  callRemoteTool: <TResult extends ToolResult = ToolResult>(name: string, input?: JsonObject) => Promise<TResult>,
+  callRemoteTool: <TResult extends ToolResult = ToolResult>(
+    name: string,
+    input?: JsonObject,
+  ) => Promise<TResult>,
 ): Promise<JsonObject> {
   const request = parseSearchToolsRequest(input);
   let result: ReturnType<typeof normalizeSearchToolsResult>;
@@ -455,7 +469,10 @@ async function routeSearchTools(
 async function routeGetToolSchemas(
   input: JsonObject | undefined,
   localTools: LocalToolEntry[],
-  callRemoteTool: <TResult extends ToolResult = ToolResult>(name: string, input?: JsonObject) => Promise<TResult>,
+  callRemoteTool: <TResult extends ToolResult = ToolResult>(
+    name: string,
+    input?: JsonObject,
+  ) => Promise<TResult>,
 ): Promise<JsonObject> {
   const toolNames = parseToolNames(input);
   const localByName = new Map(
@@ -662,7 +679,10 @@ function summarizeSchema(schema: JsonObject): string {
 
 async function executeRemoteMultiExecute(
   remoteInvocations: ToolInvocationRequest[],
-  callRemoteTool: <TResult extends ToolResult = ToolResult>(name: string, input?: JsonObject) => Promise<TResult>,
+  callRemoteTool: <TResult extends ToolResult = ToolResult>(
+    name: string,
+    input?: JsonObject,
+  ) => Promise<TResult>,
 ): Promise<MultiExecuteToolResult> {
   try {
     const remoteResult = await callRemoteTool(MULTI_EXECUTE_TOOL_NAME, {
@@ -806,7 +826,9 @@ function normalizeToolName(name: string): string {
   return name.toUpperCase();
 }
 
-function typedToolResult<TResult extends ToolResult>(value: ToolResult): TResult {
+function typedToolResult<TResult extends ToolResult>(
+  value: ToolResult,
+): TResult {
   return value as unknown as TResult;
 }
 

@@ -1,7 +1,11 @@
 import { type Client, createClient } from "./generated/client";
 
 type JsonPrimitive = string | number | boolean | null;
-type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | JsonValue[] | undefined;
+type JsonValue =
+  | JsonPrimitive
+  | { [key: string]: JsonValue }
+  | JsonValue[]
+  | undefined;
 
 export type TildeApiClientOptions = {
   baseUrl: string;

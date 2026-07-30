@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
+import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
 import { Box, render, Text, useApp, useInput } from "ink";
 import React from "react";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
 import {
   deleteStoredAuth,
   ensureHarnessAuth,
@@ -603,7 +603,10 @@ async function resolveStateImportResponse(
   response: JsonValue,
 ): Promise<JsonValue> {
   const importResponse = asStateImportResponse(response);
-  if (!importResponse?.import_id || !isPendingImportStatus(importResponse.status)) {
+  if (
+    !importResponse?.import_id ||
+    !isPendingImportStatus(importResponse.status)
+  ) {
     return response;
   }
   return await pollStateImport(input, importResponse.import_id);
@@ -673,14 +676,18 @@ function importResultFromResponse(
   };
 }
 
-function asStateImportResponse(response: JsonValue): StateImportResponse | undefined {
+function asStateImportResponse(
+  response: JsonValue,
+): StateImportResponse | undefined {
   if (!response || typeof response !== "object") {
     return undefined;
   }
   return response as StateImportResponse;
 }
 
-function outputsFromImportResponse(response: JsonValue): StateImportOutputs | undefined {
+function outputsFromImportResponse(
+  response: JsonValue,
+): StateImportOutputs | undefined {
   if (!response || typeof response !== "object") {
     return undefined;
   }
@@ -699,7 +706,9 @@ function outputsFromImportResponse(response: JsonValue): StateImportOutputs | un
   return undefined;
 }
 
-function isResourceOutputMap(value: JsonValue): value is Record<string, JsonObject> {
+function isResourceOutputMap(
+  value: JsonValue,
+): value is Record<string, JsonObject> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
@@ -833,7 +842,11 @@ function collectStateItems(
     for (const [resourceId, resource] of Object.entries(
       resources as JsonObject,
     )) {
-      if (!resource || typeof resource !== "object" || Array.isArray(resource)) {
+      if (
+        !resource ||
+        typeof resource !== "object" ||
+        Array.isArray(resource)
+      ) {
         continue;
       }
       const resourceRecord = resource as JsonObject;
@@ -917,9 +930,7 @@ function statePlanFromResponse(response: JsonValue): StatePlan | undefined {
 
 function normalizeStateItem(value: JsonValue, index: number): StateItem {
   const record =
-    value && typeof value === "object"
-      ? (value as JsonObject)
-      : {};
+    value && typeof value === "object" ? (value as JsonObject) : {};
   const detail =
     stringField(record, "message") ?? stringField(record, "detail");
   return {
@@ -1348,10 +1359,7 @@ function credentialSetupUrl(baseUrl: string): string {
   return new URL("/settings/team/pending-credentials", baseUrl).toString();
 }
 
-function stringField(
-  record: JsonObject,
-  field: string,
-): string | undefined {
+function stringField(record: JsonObject, field: string): string | undefined {
   const value = record[field];
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }

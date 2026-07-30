@@ -1,5 +1,7 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
+import { nodeEsmDeclarations } from "../../scripts/vite-dts";
 
 export default defineConfig({
   build: {
@@ -27,5 +29,13 @@ export default defineConfig({
     sourcemap: true,
     target: "node20",
   },
-  plugins: [dts({ insertTypesEntry: true })],
+  plugins: [
+    dts({
+      ...nodeEsmDeclarations(fileURLToPath(new URL(".", import.meta.url))),
+      aliasesExclude: [/^@tilde\//],
+      entryRoot: "src",
+      include: ["src"],
+      insertTypesEntry: true,
+    }),
+  ],
 });
