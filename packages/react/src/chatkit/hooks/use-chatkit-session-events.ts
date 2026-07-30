@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
 import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
+import { useCallback, useEffect, useState } from "react";
 import { useTildeClient } from "../../provider";
 
 export type UseChatKitSessionEventsOptions = {
@@ -11,7 +11,9 @@ export type UseChatKitSessionEventsOptions = {
   enabled?: boolean;
 };
 
-export type UseChatKitSessionEventsResult<TEvent extends JsonValue = JsonObject> = {
+export type UseChatKitSessionEventsResult<
+  TEvent extends JsonValue = JsonObject,
+> = {
   items: TEvent[];
   nextPageToken: string | undefined;
   isLoading: boolean;

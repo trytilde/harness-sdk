@@ -200,4 +200,32 @@ pnpm sdk:refresh
 pnpm lint
 ```
 
+## Publishing
+
+The public runtime packages are versioned together and published in dependency
+order:
+
+1. `@tilde/api-client`
+2. `@tilde/harness-sdk`
+3. `@tilde/harness-sdk-vercel-ai-node`
+
+Validate the release tarballs without publishing:
+
+```bash
+pnpm build
+pnpm release:validate
+pnpm release:smoke
+pnpm release:publish -- --dry-run
+```
+
+The `Publish npm packages` GitHub workflow runs the complete validation suite
+and skips package versions that already exist, so a partially completed release
+can be retried safely.
+
+The first npm release requires an `NPM_TOKEN` secret because trusted publishing
+can only be configured after each package exists. After the first release,
+configure each package to trust `trytilde/harness-sdk` and `publish.yml`, then
+remove the long-lived token. The workflow already grants the required OIDC
+permission.
+
 Package builds use Vite and tests use Vitest. The generated OpenAPI types are internal. Add public APIs through hand-authored wrappers.

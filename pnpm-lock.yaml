@@ -76,7 +76,7 @@ importers:
   packages/core:
     dependencies:
       '@tilde/api-client':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../api-client
       nice-grpc:
         specifier: ^2.1.16

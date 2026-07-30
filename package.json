@@ -9,11 +9,14 @@
   },
   "scripts": {
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter '@tilde/harness-sdk...' build && pnpm -r typecheck",
     "test": "pnpm -r test",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "lint": "biome check . && pnpm typecheck",
     "format": "biome check --write .",
+    "release:publish": "node scripts/publish-packages.mjs",
+    "release:smoke": "node scripts/smoke-test-packages.mjs",
+    "release:validate": "node scripts/validate-packages.mjs",
     "sync:openapi": "tsx scripts/sync-openapi.ts",
     "validate:openapi": "tsx scripts/validate-openapi-surface.ts",
     "sdk:refresh": "pnpm sync:openapi && pnpm validate:openapi && pnpm -r build && pnpm test"

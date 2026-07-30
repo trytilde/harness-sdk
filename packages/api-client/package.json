@@ -1,9 +1,20 @@
 {
   "name": "@tilde/api-client",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "Generated Tilde API client and helpers.",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trytilde/harness-sdk.git",
+    "directory": "packages/api-client"
+  },
+  "homepage": "https://github.com/trytilde/harness-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/trytilde/harness-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -22,6 +33,7 @@
   ],
   "scripts": {
     "build": "vite build",
+    "prepack": "pnpm build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config ../../vitest.config.ts"
   },

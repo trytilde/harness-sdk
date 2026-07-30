@@ -3,11 +3,11 @@ import type { NormalizedConfig } from "../config";
 import { requestJson } from "../internal/fetch-client";
 import { pathWithParams, teamPath } from "../internal/paths";
 import {
+  type JsonObject,
+  type JsonValue,
   type LocalMcpTool,
   type LocalMcpToolsClient,
   type RegisterLocalMcpToolsRequest,
-  type JsonObject,
-  type JsonValue,
   type ToolResult,
   wrapMcpClientWithLocalTools,
 } from "./local";

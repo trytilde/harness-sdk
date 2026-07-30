@@ -55,9 +55,12 @@ export function reverseProxyUrl(input: ReverseProxyUrlInput): string {
   return url.toString();
 }
 
-function orgScopedBaseUrl(input: Pick<ReverseProxyUrlInput, "baseUrl" | "orgId">): string {
+function orgScopedBaseUrl(
+  input: Pick<ReverseProxyUrlInput, "baseUrl" | "orgId">,
+): string {
   const orgId = requiredOrgId(input.orgId);
-  const baseUrl = input.baseUrl ?? env("TILDE_BASE_URL") ?? "https://api.trytilde.ai";
+  const baseUrl =
+    input.baseUrl ?? env("TILDE_BASE_URL") ?? "https://api.trytilde.ai";
   const url = new URL(baseUrl);
   if (url.hostname !== orgId && !url.hostname.startsWith(`${orgId}.`)) {
     url.hostname = `${orgId}.${url.hostname}`;
