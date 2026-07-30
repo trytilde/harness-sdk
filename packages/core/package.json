@@ -25,7 +25,8 @@
     "test": "vitest run --config ../../vitest.config.ts"
   },
   "dependencies": {
-    "@tilde/api-client": "workspace:*"
+    "@tilde/api-client": "workspace:*",
+    "nice-grpc": "^2.1.16"
   },
   "devDependencies": {}
 }

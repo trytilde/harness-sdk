@@ -12,7 +12,7 @@ export default defineConfig({
       fileName: (_, entryName) => `${entryName}.js`,
     },
     rollupOptions: {
-      external: [],
+      external: ["nice-grpc"],
     },
     sourcemap: true,
     target: "es2022",
