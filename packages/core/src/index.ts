@@ -23,6 +23,11 @@ export {
   type NormalizedConfig,
 } from "./config";
 export { ApiError } from "./errors";
+export {
+  type CreateTildeGrpcReverseProxyOptions,
+  createTildeGrpcReverseProxy,
+  type TildeGrpcReverseProxy,
+} from "./grpc";
 export { type SkillItem, type SkillRegistry, SkillsClient } from "./skills";
 export {
   type AddMcpServerFunctionInput,
