@@ -1,4 +1,4 @@
-import { createClient } from "@tilde/harness-sdk";
+import { createClient } from "@trytilde/harness-sdk";
 import type { ToolExecutionOptions } from "ai";
 import { jsonSchema, tool } from "ai";
 import { describe, expect, it, vi } from "vitest";

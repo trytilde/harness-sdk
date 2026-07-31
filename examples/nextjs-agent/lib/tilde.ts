@@ -1,5 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { createClient, createConfig } from "@tilde/harness-sdk";
+import { createClient, createConfig } from "@trytilde/harness-sdk";
 
 function requireEnv(name: string): string {
   const value = process.env[name];

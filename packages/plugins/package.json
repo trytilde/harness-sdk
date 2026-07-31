@@ -1,5 +1,5 @@
 {
-  "name": "@tilde/harness-plugins",
+  "name": "@trytilde/harness-plugins",
   "version": "0.0.0",
   "description": "Plugin/session-start helpers for enabling Tilde MCP servers and skill registries in local coding agents.",
   "license": "UNLICENSED",
@@ -33,6 +33,6 @@
   },
   "dependencies": {
     "@inquirer/checkbox": "^5.2.1",
-    "@tilde/harness-sdk": "workspace:*"
+    "@trytilde/harness-sdk": "workspace:*"
   }
 }

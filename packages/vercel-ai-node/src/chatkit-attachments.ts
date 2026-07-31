@@ -1,5 +1,5 @@
-import type { Client, JsonObject } from "@tilde/harness-sdk";
-import { configHeaders } from "@tilde/harness-sdk";
+import type { Client, JsonObject } from "@trytilde/harness-sdk";
+import { configHeaders } from "@trytilde/harness-sdk";
 import type { UIMessage } from "ai";
 import type {
   ChatKitUiFilePart,

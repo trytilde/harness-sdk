@@ -3,4 +3,4 @@ export {
   type Config,
   createClient,
   createConfig,
-} from "@tilde/harness-sdk";
+} from "@trytilde/harness-sdk";

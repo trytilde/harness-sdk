@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
+import type { JsonObject, JsonValue } from "@trytilde/harness-sdk";
 
 export type ChatKitRequestMessageRole = "system" | "user" | "assistant";
 

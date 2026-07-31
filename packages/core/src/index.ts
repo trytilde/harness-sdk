@@ -6,7 +6,7 @@ export {
   reverseProxyUrl,
   type TeamPathInput,
   teamPath,
-} from "@tilde/api-client";
+} from "@trytilde/api-client";
 export {
   type ChatKitAttachment,
   ChatKitClient,

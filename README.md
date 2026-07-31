@@ -4,16 +4,16 @@ TypeScript SDK packages for Tilde Harness APIs.
 
 ## Packages
 
-- `@tilde/harness-sdk`: core client, MCP helpers, ChatKit helpers, and message history.
-- `@tilde/harness-sdk-react`: React provider and ChatKit hooks.
-- `@tilde/harness-sdk-vercel-ai-node`: ChatKit webhook verification and Vercel AI SDK route helpers.
-- `@tilde/harness-sdk-vercel-ai-react`: React helpers for Vercel AI SDK ChatKit UIs.
+- `@trytilde/harness-sdk`: core client, MCP helpers, ChatKit helpers, and message history.
+- `@trytilde/harness-sdk-react`: React provider and ChatKit hooks.
+- `@trytilde/harness-sdk-vercel-ai-node`: ChatKit webhook verification and Vercel AI SDK route helpers.
+- `@trytilde/harness-sdk-vercel-ai-react`: React helpers for Vercel AI SDK ChatKit UIs.
 - `@trytilde/cli`: Tilde terminal CLI, published with `tilde` and `t` binaries.
 
 ## Install
 
 ```bash
-pnpm add @tilde/harness-sdk @tilde/harness-sdk-react @tilde/harness-sdk-vercel-ai-node @tilde/harness-sdk-vercel-ai-react
+pnpm add @trytilde/harness-sdk @trytilde/harness-sdk-react @trytilde/harness-sdk-vercel-ai-node @trytilde/harness-sdk-vercel-ai-react
 pnpm add -D @trytilde/cli
 ```
 
@@ -34,7 +34,7 @@ auth state and starts sign-in if needed.
 ## Core Config
 
 ```ts
-import { createClient, createConfig } from "@tilde/harness-sdk";
+import { createClient, createConfig } from "@trytilde/harness-sdk";
 
 const tilde = createClient(createConfig({
   orgId: "org-example",
@@ -77,7 +77,7 @@ alongside remote MCP tools, execute in-process, and are split out of
 
 ```ts
 import { createMCPClient } from "@ai-sdk/mcp";
-import { wrapMcpClientWithLocalTools } from "@tilde/harness-sdk";
+import { wrapMcpClientWithLocalTools } from "@trytilde/harness-sdk";
 
 const mcp = await createMCPClient({
   transport: {
@@ -112,8 +112,8 @@ registered as local tools alongside the remote MCP server tools.
 
 ```ts
 import { jsonSchema, tool } from "ai";
-import { createClient } from "@tilde/harness-sdk";
-import { createMCPClient } from "@tilde/harness-sdk-vercel-ai-node";
+import { createClient } from "@trytilde/harness-sdk";
+import { createMCPClient } from "@trytilde/harness-sdk-vercel-ai-node";
 
 const client = createClient({
   orgId: process.env.TILDE_ORG_ID!,
@@ -144,7 +144,7 @@ const tools = await mcp.tools();
 ## Vercel AI Endpoint
 
 ```ts
-import { chatKitEndpoint } from "@tilde/harness-sdk-vercel-ai-node";
+import { chatKitEndpoint } from "@trytilde/harness-sdk-vercel-ai-node";
 import { streamText } from "ai";
 
 export const POST = chatKitEndpoint({
@@ -163,7 +163,7 @@ export const POST = chatKitEndpoint({
 ## React ChatKit Hooks
 
 ```tsx
-import { TildeProvider, useChatKitSessionEvents } from "@tilde/harness-sdk-react";
+import { TildeProvider, useChatKitSessionEvents } from "@trytilde/harness-sdk-react";
 
 function Events({ sessionId }: { sessionId: string }) {
   const events = useChatKitSessionEvents({ sessionId, pollIntervalMs: 3000 });
@@ -205,9 +205,9 @@ pnpm lint
 The public runtime packages are versioned together and published in dependency
 order:
 
-1. `@tilde/api-client`
-2. `@tilde/harness-sdk`
-3. `@tilde/harness-sdk-vercel-ai-node`
+1. `@trytilde/api-client`
+2. `@trytilde/harness-sdk`
+3. `@trytilde/harness-sdk-vercel-ai-node`
 
 Validate the release tarballs without publishing:
 

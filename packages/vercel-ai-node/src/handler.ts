@@ -1,4 +1,8 @@
-import type { JsonObject, JsonValue, SkillsClient } from "@tilde/harness-sdk";
+import type {
+  JsonObject,
+  JsonValue,
+  SkillsClient,
+} from "@trytilde/harness-sdk";
 import {
   type ChatKitContextClient,
   type ChatKitConvertedMessage,

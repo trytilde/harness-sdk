@@ -1,9 +1,9 @@
-import { createClient } from "@tilde/harness-sdk";
+import { createClient } from "@trytilde/harness-sdk";
 import {
   chatKitEndpoint,
   convertToAiSdkMessages,
   createChatKitAttachmentFilePartHandler,
-} from "@tilde/harness-sdk-vercel-ai-node";
+} from "@trytilde/harness-sdk-vercel-ai-node";
 import {
   consumeStream,
   convertToModelMessages,

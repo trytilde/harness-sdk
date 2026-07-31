@@ -18,7 +18,7 @@ import http from "node:http";
 import net from "node:net";
 import { homedir, hostname, tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
-import { ApiError, type Config, type JsonObject } from "@tilde/harness-sdk";
+import { ApiError, type Config, type JsonObject } from "@trytilde/harness-sdk";
 
 const AUTH_VERSION = 1;
 const TOKEN_EXPIRY_SKEW_SECONDS = 60;

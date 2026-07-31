@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
-import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
+import type { JsonObject, JsonValue } from "@trytilde/harness-sdk";
 import { Box, render, Text, useApp, useInput } from "ink";
 import React from "react";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";

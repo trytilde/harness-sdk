@@ -1,4 +1,4 @@
-import { mcpServerUrl } from "@tilde/api-client";
+import { mcpServerUrl } from "@trytilde/api-client";
 import type { NormalizedConfig } from "../config";
 import { requestJson } from "../internal/fetch-client";
 import { pathWithParams, teamPath } from "../internal/paths";

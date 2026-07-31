@@ -1,4 +1,4 @@
-import { ApiError } from "@tilde/harness-sdk";
+import { ApiError } from "@trytilde/harness-sdk";
 import { describe, expect, it, vi } from "vitest";
 import { runLocalRuntimeTunnelCommand, startLocalRuntimeTunnel } from "../src";
 

@@ -1,7 +1,7 @@
 import {
   createMCPClient,
   type TildeMCPClientHandle,
-} from "@tilde/harness-sdk-vercel-ai-node";
+} from "@trytilde/harness-sdk-vercel-ai-node";
 import { jsonSchema, type ToolSet, tool } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 import { createE2EClient } from "./helpers/env";

@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { JsonValue } from "@tilde/harness-sdk";
+import type { JsonValue } from "@trytilde/harness-sdk";
 
 export const TILDE_WEBHOOK_ID_HEADER = "x-tilde-webhook-id";
 export const TILDE_WEBHOOK_TIMESTAMP_HEADER = "x-tilde-timestamp";

@@ -5,7 +5,7 @@ import {
   getSkillRegistrySkill,
   getSkillRegistrySkillByTitle,
   type Skill,
-} from "@tilde/api-client";
+} from "@trytilde/api-client";
 import { configFetch, configHeaders, type NormalizedConfig } from "./config";
 
 export type SkillItem = Skill;

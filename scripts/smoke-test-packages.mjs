@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,17 +15,18 @@ const temporaryDirectory = mkdtempSync(
   join(tmpdir(), "tilde-harness-package-smoke-"),
 );
 const packages = [
-  ["api-client", "packages/api-client"],
-  ["harness-sdk", "packages/core"],
-  ["harness-sdk-vercel-ai-node", "packages/vercel-ai-node"],
+  "packages/api-client",
+  "packages/core",
+  "packages/vercel-ai-node",
 ];
 
 try {
   const tarballs = new Map();
-  for (const [tarballName, packageDirectory] of packages) {
+  for (const packageDirectory of packages) {
     const packageJson = JSON.parse(
       readFileSync(resolve(repositoryRoot, packageDirectory, "package.json")),
     );
+    const filesBeforePack = new Set(readdirSync(temporaryDirectory));
     run("pnpm", [
       "--filter",
       packageJson.name,
@@ -27,16 +34,18 @@ try {
       "--pack-destination",
       temporaryDirectory,
     ]);
-    tarballs.set(
-      packageJson.name,
-      resolve(
-        temporaryDirectory,
-        `tilde-${tarballName}-${packageJson.version}.tgz`,
-      ),
+    const newTarballs = readdirSync(temporaryDirectory).filter(
+      (file) => file.endsWith(".tgz") && !filesBeforePack.has(file),
     );
+    if (newTarballs.length !== 1) {
+      throw new Error(
+        `Expected one tarball for ${packageJson.name}, found ${newTarballs.length}.`,
+      );
+    }
+    tarballs.set(packageJson.name, resolve(temporaryDirectory, newTarballs[0]));
   }
 
-  const apiClientTarball = tarballs.get("@tilde/api-client");
+  const apiClientTarball = tarballs.get("@trytilde/api-client");
   writeFileSync(
     resolve(temporaryDirectory, "package.json"),
     `${JSON.stringify(
@@ -50,10 +59,10 @@ try {
         },
         dependencies: {
           "@ai-sdk/mcp": "1.0.59",
-          "@tilde/api-client": `file:${apiClientTarball}`,
-          "@tilde/harness-sdk": `file:${tarballs.get("@tilde/harness-sdk")}`,
-          "@tilde/harness-sdk-vercel-ai-node": `file:${tarballs.get(
-            "@tilde/harness-sdk-vercel-ai-node",
+          "@trytilde/api-client": `file:${apiClientTarball}`,
+          "@trytilde/harness-sdk": `file:${tarballs.get("@trytilde/harness-sdk")}`,
+          "@trytilde/harness-sdk-vercel-ai-node": `file:${tarballs.get(
+            "@trytilde/harness-sdk-vercel-ai-node",
           )}`,
           ai: "6.0.220",
         },
@@ -62,7 +71,7 @@ try {
         },
         pnpm: {
           overrides: {
-            "@tilde/api-client": `file:${apiClientTarball}`,
+            "@trytilde/api-client": `file:${apiClientTarball}`,
           },
         },
       },
@@ -89,16 +98,16 @@ try {
   );
   writeFileSync(
     resolve(temporaryDirectory, "index.ts"),
-    `import { whoami } from "@tilde/api-client/generated";
+    `import { whoami } from "@trytilde/api-client/generated";
 import {
   createClient,
   createTildeGrpcReverseProxy,
   reverseProxyPath,
-} from "@tilde/harness-sdk";
+} from "@trytilde/harness-sdk";
 import {
   parseChatKitRequestBody,
   type ChatKitRequestBody,
-} from "@tilde/harness-sdk-vercel-ai-node";
+} from "@trytilde/harness-sdk-vercel-ai-node";
 
 const client = createClient({
   apiKey: "smoke-test",

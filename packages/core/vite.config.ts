@@ -22,7 +22,7 @@ export default defineConfig({
   plugins: [
     dts({
       ...nodeEsmDeclarations(fileURLToPath(new URL(".", import.meta.url))),
-      aliasesExclude: [/^@tilde\//],
+      aliasesExclude: [/^@trytilde\//],
       entryRoot: "src",
       include: ["src"],
       insertTypesEntry: true,

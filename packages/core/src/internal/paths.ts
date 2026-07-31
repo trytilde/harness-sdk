@@ -1,4 +1,4 @@
-import { teamPath as tildeTeamPath } from "@tilde/api-client";
+import { teamPath as tildeTeamPath } from "@trytilde/api-client";
 import type { NormalizedConfig } from "../config";
 
 export function teamPath(config: NormalizedConfig, path: string): string {
