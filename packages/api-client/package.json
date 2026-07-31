@@ -1,6 +1,6 @@
 {
   "name": "@trytilde/api-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Generated Tilde API client and helpers.",
   "license": "UNLICENSED",
   "repository": {
