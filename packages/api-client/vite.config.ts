@@ -13,9 +13,6 @@ export default defineConfig({
       formats: ["es"],
       fileName: (_format, entryName) => `${entryName}.js`,
     },
-    rollupOptions: {
-      external: ["@hey-api/client-fetch"],
-    },
     sourcemap: true,
     target: "es2022",
   },
