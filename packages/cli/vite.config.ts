@@ -16,7 +16,7 @@ export default defineConfig({
       external: [
         ...builtinModules,
         ...builtinModules.map((name) => `node:${name}`),
-        "@tilde/harness-sdk",
+        "@trytilde/harness-sdk",
         "ink",
         "react",
       ],

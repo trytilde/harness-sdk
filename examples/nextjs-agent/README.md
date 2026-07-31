@@ -3,7 +3,7 @@
 This example shows a Next.js agent that uses:
 
 - Tilde dynamic MCP through `@ai-sdk/mcp`.
-- Tilde ChatKit inbound webhooks through `@tilde/harness-sdk-vercel-ai-node`.
+- Tilde ChatKit inbound webhooks through `@trytilde/harness-sdk-vercel-ai-node`.
 - A caller-configured OpenAI-compatible model provider through the Vercel AI SDK.
 
 ## Setup
@@ -18,7 +18,7 @@ pnpm tunnel
 Before running the app, create or reuse:
 
 ```ts
-import { createClient, createConfig } from "@tilde/harness-sdk";
+import { createClient, createConfig } from "@trytilde/harness-sdk";
 
 const tilde = createClient(createConfig({
   baseUrl: process.env.TILDE_BASE_URL!,

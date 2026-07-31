@@ -9,7 +9,11 @@ export default defineConfig({
       fileName: () => "index.js",
     },
     rollupOptions: {
-      external: ["@tilde/harness-sdk", "@tilde/harness-sdk-react", "react"],
+      external: [
+        "@trytilde/harness-sdk",
+        "@trytilde/harness-sdk-react",
+        "react",
+      ],
     },
     sourcemap: true,
     target: "es2022",

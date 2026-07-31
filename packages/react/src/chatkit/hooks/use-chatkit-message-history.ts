@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue } from "@tilde/harness-sdk";
+import type { JsonObject, JsonValue } from "@trytilde/harness-sdk";
 import { useCallback, useEffect, useState } from "react";
 import { useChatKit } from "./use-chatkit";
 

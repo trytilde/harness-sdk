@@ -10,8 +10,11 @@ import type {
   LocalMcpTool,
   ToolRegistry,
   ToolResult,
-} from "@tilde/harness-sdk";
-import { configHeaders, wrapMcpClientWithLocalTools } from "@tilde/harness-sdk";
+} from "@trytilde/harness-sdk";
+import {
+  configHeaders,
+  wrapMcpClientWithLocalTools,
+} from "@trytilde/harness-sdk";
 import type { ToolExecutionOptions, ToolSet } from "ai";
 
 export type CreateMCPClientOptions<TTools extends ToolSet = ToolSet> = Omit<

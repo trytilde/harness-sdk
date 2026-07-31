@@ -15,7 +15,7 @@ import {
   type SkillRegistryPaginatedResponse,
   type SkillSummaryPaginatedResponse,
   whoami,
-} from "@tilde/harness-sdk/api";
+} from "@trytilde/harness-sdk/api";
 
 type JsonPrimitive = string | number | boolean | null;
 type JsonValue = JsonPrimitive | JsonObject | JsonValue[] | undefined;

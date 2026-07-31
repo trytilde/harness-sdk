@@ -1,4 +1,4 @@
-import type { JsonObject } from "@tilde/harness-sdk";
+import type { JsonObject } from "@trytilde/harness-sdk";
 import type { UIMessage } from "ai";
 import {
   type ChatKitContextClient,

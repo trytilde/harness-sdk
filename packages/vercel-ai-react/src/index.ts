@@ -1,4 +1,4 @@
-import { useChatKit } from "@tilde/harness-sdk-react";
+import { useChatKit } from "@trytilde/harness-sdk-react";
 
 export {
   TildeProvider,
@@ -7,7 +7,7 @@ export {
   useChatKitMessageHistory,
   useChatKitSessionEvents,
   useTildeClient,
-} from "@tilde/harness-sdk-react";
+} from "@trytilde/harness-sdk-react";
 
 export type UseChatKitVercelUiEndpointOptions = {
   sessionId: string;

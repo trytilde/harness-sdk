@@ -1,4 +1,4 @@
-import { type Client, type Config, createClient } from "@tilde/harness-sdk";
+import { type Client, type Config, createClient } from "@trytilde/harness-sdk";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 
 const TildeContext = createContext<Client | null>(null);

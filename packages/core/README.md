@@ -1,10 +1,10 @@
-# @tilde/harness-sdk
+# @trytilde/harness-sdk
 
 Core TypeScript client for Tilde agents, MCP servers, skills, ChatKit sessions,
 and credential-injecting reverse proxies.
 
 ```bash
-pnpm add @tilde/harness-sdk
+pnpm add @trytilde/harness-sdk
 ```
 
 See the

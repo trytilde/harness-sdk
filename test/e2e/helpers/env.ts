@@ -1,4 +1,4 @@
-import { type Client, createClient } from "@tilde/harness-sdk";
+import { type Client, createClient } from "@trytilde/harness-sdk";
 
 export type E2EEnv = {
   baseUrl?: string;

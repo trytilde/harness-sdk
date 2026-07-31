@@ -1,4 +1,4 @@
-import { ApiError, type Client } from "@tilde/harness-sdk";
+import { ApiError, type Client } from "@trytilde/harness-sdk";
 
 export const DEBUG_TOOL_GROUP_SOURCE_TYPE_ID = "debug_playground";
 export const DEBUG_CREDENTIAL_SOURCE_TYPE_ID = "no_auth";

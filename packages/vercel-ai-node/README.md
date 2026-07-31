@@ -1,10 +1,10 @@
-# @tilde/harness-sdk-vercel-ai-node
+# @trytilde/harness-sdk-vercel-ai-node
 
 Server-side Tilde ChatKit and MCP helpers for applications built with the
 Vercel AI SDK.
 
 ```bash
-pnpm add @tilde/harness-sdk @tilde/harness-sdk-vercel-ai-node
+pnpm add @trytilde/harness-sdk @trytilde/harness-sdk-vercel-ai-node
 ```
 
 See the

@@ -6,11 +6,11 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
-      "@tilde/harness-sdk": `${root}packages/core/src/index.ts`,
+      "@trytilde/harness-sdk": `${root}packages/core/src/index.ts`,
       "@trytilde/cli": `${root}packages/cli/src/index.ts`,
-      "@tilde/harness-sdk-react": `${root}packages/react/src/index.ts`,
-      "@tilde/harness-sdk-vercel-ai-node": `${root}packages/vercel-ai-node/src/index.ts`,
-      "@tilde/harness-sdk-vercel-ai-react": `${root}packages/vercel-ai-react/src/index.ts`,
+      "@trytilde/harness-sdk-react": `${root}packages/react/src/index.ts`,
+      "@trytilde/harness-sdk-vercel-ai-node": `${root}packages/vercel-ai-node/src/index.ts`,
+      "@trytilde/harness-sdk-vercel-ai-react": `${root}packages/vercel-ai-react/src/index.ts`,
     },
   },
   test: {

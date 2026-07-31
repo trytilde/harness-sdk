@@ -17,12 +17,12 @@ importers:
       '@ai-sdk/react':
         specifier: ^3.0.199
         version: 3.0.199(react@19.2.7)(zod@4.4.3)
-      '@tilde/harness-sdk':
+      '@trytilde/harness-sdk':
         specifier: file:../../packages/core
         version: file:../../packages/core
-      '@tilde/harness-sdk-vercel-ai-node':
+      '@trytilde/harness-sdk-vercel-ai-node':
         specifier: file:../../packages/vercel-ai-node
-        version: file:../../packages/vercel-ai-node(@ai-sdk/mcp@1.0.46(zod@4.4.3))(@tilde/harness-sdk@file:../../packages/core)(ai@6.0.197(zod@4.4.3))
+        version: file:../../packages/vercel-ai-node(@ai-sdk/mcp@1.0.46(zod@4.4.3))(@trytilde/harness-sdk@file:../../packages/core)(ai@6.0.197(zod@4.4.3))
       ai:
         specifier: ^6.0.197
         version: 6.0.197(zod@4.4.3)
@@ -306,17 +306,17 @@ packages:
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
 
-  '@tilde/harness-sdk-vercel-ai-node@file:../../packages/vercel-ai-node':
+  '@trytilde/harness-sdk-vercel-ai-node@file:../../packages/vercel-ai-node':
     resolution: {directory: ../../packages/vercel-ai-node, type: directory}
     peerDependencies:
       '@ai-sdk/mcp': ^1.0.46
-      '@tilde/harness-sdk': 0.0.0
+      '@trytilde/harness-sdk': 0.0.0
       ai: '>=5 || >=6'
     peerDependenciesMeta:
       ai:
         optional: true
 
-  '@tilde/harness-sdk@file:../../packages/core':
+  '@trytilde/harness-sdk@file:../../packages/core':
     resolution: {directory: ../../packages/core, type: directory}
 
   '@types/node@24.13.1':
@@ -651,14 +651,14 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@tilde/harness-sdk-vercel-ai-node@file:../../packages/vercel-ai-node(@ai-sdk/mcp@1.0.46(zod@4.4.3))(@tilde/harness-sdk@file:../../packages/core)(ai@6.0.197(zod@4.4.3))':
+  '@trytilde/harness-sdk-vercel-ai-node@file:../../packages/vercel-ai-node(@ai-sdk/mcp@1.0.46(zod@4.4.3))(@trytilde/harness-sdk@file:../../packages/core)(ai@6.0.197(zod@4.4.3))':
     dependencies:
       '@ai-sdk/mcp': 1.0.46(zod@4.4.3)
-      '@tilde/harness-sdk': file:../../packages/core
+      '@trytilde/harness-sdk': file:../../packages/core
     optionalDependencies:
       ai: 6.0.197(zod@4.4.3)
 
-  '@tilde/harness-sdk@file:../../packages/core': {}
+  '@trytilde/harness-sdk@file:../../packages/core': {}
 
   '@types/node@24.13.1':
     dependencies:

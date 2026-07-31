@@ -1,5 +1,5 @@
 {
-  "name": "@tilde/api-client",
+  "name": "@trytilde/api-client",
   "version": "0.1.0",
   "description": "Generated Tilde API client and helpers.",
   "license": "UNLICENSED",

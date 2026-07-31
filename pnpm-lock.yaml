@@ -56,7 +56,7 @@ importers:
 
   packages/cli:
     dependencies:
-      '@tilde/harness-sdk':
+      '@trytilde/harness-sdk':
         specifier: workspace:*
         version: link:../core
       ink:
@@ -75,7 +75,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@tilde/api-client':
+      '@trytilde/api-client':
         specifier: workspace:^
         version: link:../api-client
       nice-grpc:
@@ -87,13 +87,13 @@ importers:
       '@inquirer/checkbox':
         specifier: ^5.2.1
         version: 5.2.1(@types/node@24.13.1)
-      '@tilde/harness-sdk':
+      '@trytilde/harness-sdk':
         specifier: workspace:*
         version: link:../core
 
   packages/react:
     devDependencies:
-      '@tilde/harness-sdk':
+      '@trytilde/harness-sdk':
         specifier: workspace:*
         version: link:../core
       '@types/react':
@@ -115,7 +115,7 @@ importers:
       '@ai-sdk/mcp':
         specifier: ^1.0.46
         version: 1.0.51(zod@4.4.3)
-      '@tilde/harness-sdk':
+      '@trytilde/harness-sdk':
         specifier: workspace:*
         version: link:../core
 
@@ -125,10 +125,10 @@ importers:
         specifier: '>=5 || >=6'
         version: 6.0.197(zod@4.4.3)
     devDependencies:
-      '@tilde/harness-sdk':
+      '@trytilde/harness-sdk':
         specifier: workspace:*
         version: link:../core
-      '@tilde/harness-sdk-react':
+      '@trytilde/harness-sdk-react':
         specifier: workspace:*
         version: link:../react
       '@types/react':

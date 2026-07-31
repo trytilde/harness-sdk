@@ -13,7 +13,7 @@ export default defineConfig({
     rollupOptions: {
       external: [
         "@ai-sdk/mcp",
-        "@tilde/harness-sdk",
+        "@trytilde/harness-sdk",
         "ai",
         "node:child_process",
         "node:crypto",
@@ -32,7 +32,7 @@ export default defineConfig({
   plugins: [
     dts({
       ...nodeEsmDeclarations(fileURLToPath(new URL(".", import.meta.url))),
-      aliasesExclude: [/^@tilde\//],
+      aliasesExclude: [/^@trytilde\//],
       entryRoot: "src",
       include: ["src"],
       insertTypesEntry: true,

@@ -1,5 +1,5 @@
 {
-  "name": "@tilde/harness-sdk-vercel-ai-react",
+  "name": "@trytilde/harness-sdk-vercel-ai-react",
   "version": "0.0.0",
   "description": "React helpers for Tilde ChatKit Vercel AI SDK applications.",
   "license": "UNLICENSED",
@@ -21,8 +21,8 @@
     "test": "vitest run --config ../../vitest.config.ts"
   },
   "peerDependencies": {
-    "@tilde/harness-sdk": "0.0.0",
-    "@tilde/harness-sdk-react": "0.0.0",
+    "@trytilde/harness-sdk": "0.0.0",
+    "@trytilde/harness-sdk-react": "0.0.0",
     "ai": ">=5 || >=6",
     "react": ">=18 || >=19"
   },
@@ -32,8 +32,8 @@
     }
   },
   "devDependencies": {
-    "@tilde/harness-sdk": "workspace:*",
-    "@tilde/harness-sdk-react": "workspace:*",
+    "@trytilde/harness-sdk": "workspace:*",
+    "@trytilde/harness-sdk-react": "workspace:*",
     "@types/react": "^19.0.0",
     "react": "^19.2.7"
   }

@@ -7,7 +7,7 @@ import {
   configHeaders,
   createConfig,
   type JsonObject,
-} from "@tilde/harness-sdk";
+} from "@trytilde/harness-sdk";
 import { ensureHarnessAuth, type HarnessAuthOptions } from "./auth";
 
 export type LocalRuntimeTunnelConnector = {
