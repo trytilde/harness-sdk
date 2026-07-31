@@ -1,6 +1,6 @@
 {
   "name": "@trytilde/harness-sdk-vercel-ai-node",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Node and route-handler helpers for Tilde ChatKit Vercel AI SDK endpoints.",
   "license": "UNLICENSED",
   "repository": {
@@ -35,7 +35,7 @@
   },
   "peerDependencies": {
     "@ai-sdk/mcp": "^1.0.46",
-    "@trytilde/harness-sdk": "^0.1.0",
+    "@trytilde/harness-sdk": "^0.1.1",
     "ai": ">=5 || >=6"
   },
   "peerDependenciesMeta": {

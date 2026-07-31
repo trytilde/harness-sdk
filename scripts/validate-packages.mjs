@@ -17,6 +17,22 @@ for (const packageDirectory of packages) {
     ...exportTargets(packageJson.exports),
   ]);
 
+  for (const dependencyGroup of [
+    "dependencies",
+    "optionalDependencies",
+    "peerDependencies",
+  ]) {
+    for (const [dependency, range] of Object.entries(
+      packageJson[dependencyGroup] ?? {},
+    )) {
+      if (range.startsWith("workspace:")) {
+        throw new Error(
+          `${packageJson.name} has unpublished ${dependencyGroup} range ${dependency}@${range}`,
+        );
+      }
+    }
+  }
+
   for (const target of targets) {
     if (!target) continue;
     const relativeTarget = target.replace(/^\.\//, "");

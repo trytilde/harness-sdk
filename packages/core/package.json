@@ -1,6 +1,6 @@
 {
   "name": "@trytilde/harness-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Core TypeScript SDK for Tilde Harness APIs.",
   "license": "UNLICENSED",
   "repository": {
@@ -38,7 +38,7 @@
     "test": "vitest run --config ../../vitest.config.ts"
   },
   "dependencies": {
-    "@trytilde/api-client": "workspace:^",
+    "@trytilde/api-client": "^0.1.1",
     "nice-grpc": "^2.1.16"
   },
   "devDependencies": {}

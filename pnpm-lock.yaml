@@ -76,7 +76,7 @@ importers:
   packages/core:
     dependencies:
       '@trytilde/api-client':
-        specifier: workspace:^
+        specifier: ^0.1.1
         version: link:../api-client
       nice-grpc:
         specifier: ^2.1.16
