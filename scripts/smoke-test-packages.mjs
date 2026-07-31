@@ -67,6 +67,7 @@ try {
           ai: "6.0.220",
         },
         devDependencies: {
+          "@types/json-schema": "7.0.15",
           typescript: "5.9.3",
         },
         pnpm: {

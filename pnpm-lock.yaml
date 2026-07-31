@@ -48,11 +48,7 @@ importers:
         specifier: ^4.0.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.13.1)(happy-dom@20.10.3)(vite@8.0.16(@types/node@24.13.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
-  packages/api-client:
-    dependencies:
-      '@hey-api/client-fetch':
-        specifier: 0.13.1
-        version: 0.13.1(@hey-api/openapi-ts@0.99.0(typescript@5.9.3))
+  packages/api-client: {}
 
   packages/cli:
     dependencies:
@@ -76,7 +72,7 @@ importers:
   packages/core:
     dependencies:
       '@trytilde/api-client':
-        specifier: ^0.1.1
+        specifier: ^0.1.2
         version: link:../api-client
       nice-grpc:
         specifier: ^2.1.16
