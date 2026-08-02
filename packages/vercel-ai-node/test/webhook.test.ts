@@ -191,6 +191,113 @@ describe("chatKitEndpoint", () => {
     expect(handler).toHaveBeenCalledOnce();
   });
 
+  it("exposes signed agent runtime bindings to the endpoint", async () => {
+    const runtime = {
+      agent_inbox_id: "agent_1",
+      agent_inbox_instance_id: "instance_1",
+      org_id: "org-123",
+      team_id: "team_123",
+      session_id: "session_1",
+      actor: {
+        tilde_user_id: "signed-user",
+        external_user_id: "signed-external-user",
+        external_user_provider: "slack",
+        external_user_provider_account_id: "workspace-1",
+      },
+      configuration: {
+        mcp_server_id: "mcp_1",
+        skill_registry_id: "skills_1",
+        system_prompt: "Operate the company.",
+        model: "gpt-5.4",
+        max_steps: 30,
+        max_history_messages: 250,
+        security_posture: "strict",
+      },
+    } as const;
+    const handler = vi.fn(async (_request: Request, context) => {
+      expect(context.runtime).toEqual(runtime);
+      expect(context.body.tildeContext).toEqual(runtime);
+      expect(context.userId).toBe("signed-user");
+      expect(context.externalUserId).toBe("signed-external-user");
+      expect(context.externalUserProviderAccountId).toBe("workspace-1");
+      return new Response("ok");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      handler,
+    });
+
+    const response = await endpoint(
+      signedRequest({ messages: [], tildeContext: runtime }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("rejects malformed agent runtime bounds", async () => {
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      handler: vi.fn(() => new Response("unexpected")),
+    });
+
+    const response = await endpoint(
+      signedRequest({
+        messages: [],
+        tildeContext: {
+          agent_inbox_id: "agent_1",
+          agent_inbox_instance_id: "instance_1",
+          org_id: "org-123",
+          team_id: "team_123",
+          session_id: "session_1",
+          actor: {},
+          configuration: {
+            mcp_server_id: "mcp_1",
+            max_steps: 0,
+            max_history_messages: 250,
+            security_posture: "auto",
+          },
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "Invalid ChatKit request: body.tildeContext.configuration.max_steps must be a positive integer",
+    });
+  });
+
+  it("rejects unsigned header substitution for configured agents", async () => {
+    const handler = vi.fn(() => new Response("unexpected"));
+    const endpoint = testChatKitEndpoint({ webhookSigningKey: key, handler });
+    const response = await endpoint(
+      signedRequest({
+        messages: [],
+        tildeContext: {
+          agent_inbox_id: "agent_1",
+          agent_inbox_instance_id: "instance_1",
+          org_id: "signed-org",
+          team_id: "team_123",
+          session_id: "session_1",
+          actor: {},
+          configuration: {
+            mcp_server_id: "mcp_1",
+            max_steps: 20,
+            max_history_messages: 200,
+            security_posture: "auto",
+          },
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Signed ChatKit context does not match request headers",
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it("promotes validated GitHub message metadata into typed context", async () => {
     const github = {
       event: "created",

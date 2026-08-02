@@ -441,6 +441,59 @@ export type ChatKitAgentPaginatedResponse = {
 };
 
 /**
+ * Non-secret configuration used by an external agent runtime.
+ */
+export type ChatKitAgentRuntimeConfiguration = {
+    /**
+     * Maximum historical ChatKit messages loaded for one turn.
+     */
+    max_history_messages: number;
+    /**
+     * Maximum model/tool steps for one turn.
+     */
+    max_steps: number;
+    /**
+     * MCP server exposed to the agent runtime.
+     */
+    mcp_server_id: string;
+    /**
+     * Deployment-specific model identifier resolved by the external runtime.
+     */
+    model?: string | null;
+    /**
+     * Runner-level tool approval posture.
+     */
+    security_posture: ChatKitAgentSecurityPosture;
+    skill_registry_id?: null | WrappedUuidV4;
+    /**
+     * Additional operator-authored system instructions.
+     */
+    system_prompt?: string | null;
+};
+
+/**
+ * Signed runtime context attached to one outbound ChatKit agent invocation.
+ */
+export type ChatKitAgentRuntimeContext = {
+    actor: ChatKitAgentInvocationActor;
+    agent_inbox_id: string;
+    agent_inbox_instance_id: string;
+    configuration: ChatKitAgentRuntimeConfiguration;
+    org_id: string;
+    session_id: WrappedUuidV4;
+    team_id: string;
+};
+
+/**
+ * Runtime security posture requested for a ChatKit HTTP agent turn.
+ */
+export enum ChatKitAgentSecurityPosture {
+    AUTO = 'auto',
+    STRICT = 'strict',
+    DANGEROUS = 'dangerous'
+}
+
+/**
  * Persisted queued agent turn.
  */
 export type ChatKitAgentTurnQueueItem = {
@@ -588,6 +641,7 @@ export type ChatMessagePart = {
 export type ChatRequest = {
     chatId?: string | null;
     messages: Array<ChatMessage>;
+    tildeContext?: null | ChatKitAgentRuntimeContext;
 };
 
 /**
@@ -2936,6 +2990,7 @@ export type RegisterHttpVercelAiSdkAgentRequestInner = {
      * Memory banks that should ingest conversations involving this agent.
      */
     memory_bank_ids?: Array<WrappedUuidV4> | null;
+    runtime?: null | ChatKitAgentRuntimeConfiguration;
     streaming?: boolean;
     timeout_ms?: number | null;
 };
@@ -4091,6 +4146,7 @@ export type UpdateHttpVercelAiSdkAgentRequestInner = {
      * Replaces the complete memory-bank selection when present.
      */
     memory_bank_ids?: Array<WrappedUuidV4> | null;
+    runtime?: null | ChatKitAgentRuntimeConfiguration;
     streaming?: boolean | null;
     timeout_ms?: number | null;
 };

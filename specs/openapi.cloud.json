@@ -26950,6 +26950,108 @@
           }
         }
       },
+      "ChatKitAgentRuntimeConfiguration": {
+        "type": "object",
+        "description": "Non-secret configuration used by an external agent runtime.",
+        "required": [
+          "mcp_server_id",
+          "max_steps",
+          "max_history_messages",
+          "security_posture"
+        ],
+        "properties": {
+          "max_history_messages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Maximum historical ChatKit messages loaded for one turn.",
+            "minimum": 0
+          },
+          "max_steps": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Maximum model/tool steps for one turn.",
+            "minimum": 0
+          },
+          "mcp_server_id": {
+            "type": "string",
+            "description": "MCP server exposed to the agent runtime."
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Deployment-specific model identifier resolved by the external runtime."
+          },
+          "security_posture": {
+            "$ref": "#/components/schemas/ChatKitAgentSecurityPosture",
+            "description": "Runner-level tool approval posture."
+          },
+          "skill_registry_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WrappedUuidV4",
+                "description": "Skill registry exposed to the agent runtime."
+              }
+            ]
+          },
+          "system_prompt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Additional operator-authored system instructions."
+          }
+        }
+      },
+      "ChatKitAgentRuntimeContext": {
+        "type": "object",
+        "description": "Signed runtime context attached to one outbound ChatKit agent invocation.",
+        "required": [
+          "agent_inbox_id",
+          "agent_inbox_instance_id",
+          "org_id",
+          "team_id",
+          "session_id",
+          "actor",
+          "configuration"
+        ],
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/ChatKitAgentInvocationActor"
+          },
+          "agent_inbox_id": {
+            "type": "string"
+          },
+          "agent_inbox_instance_id": {
+            "type": "string"
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/ChatKitAgentRuntimeConfiguration"
+          },
+          "org_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/WrappedUuidV4"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ChatKitAgentSecurityPosture": {
+        "type": "string",
+        "description": "Runtime security posture requested for a ChatKit HTTP agent turn.",
+        "enum": [
+          "auto",
+          "strict",
+          "dangerous"
+        ]
+      },
       "ChatKitAgentTurnQueueItem": {
         "type": "object",
         "description": "Persisted queued agent turn.",
@@ -27486,6 +27588,17 @@
             "items": {
               "$ref": "#/components/schemas/ChatMessage"
             }
+          },
+          "tildeContext": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ChatKitAgentRuntimeContext",
+                "description": "Tilde-owned runtime configuration covered by the webhook signature."
+              }
+            ]
           }
         }
       },
@@ -35615,6 +35728,17 @@
             },
             "description": "Memory banks that should ingest conversations involving this agent."
           },
+          "runtime": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ChatKitAgentRuntimeConfiguration",
+                "description": "Typed runtime bindings and limits sent with every signed invocation."
+              }
+            ]
+          },
           "streaming": {
             "type": "boolean"
           },
@@ -39650,6 +39774,17 @@
               "$ref": "#/components/schemas/WrappedUuidV4"
             },
             "description": "Replaces the complete memory-bank selection when present."
+          },
+          "runtime": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ChatKitAgentRuntimeConfiguration",
+                "description": "Replaces the external agent runtime configuration when present."
+              }
+            ]
           },
           "streaming": {
             "type": [

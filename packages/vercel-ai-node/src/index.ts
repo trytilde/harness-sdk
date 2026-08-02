@@ -1,4 +1,9 @@
 export {
+  type AgentRunEvent,
+  type RunAgentOptions,
+  runAgent,
+} from "./agent";
+export {
   type ChatKitAttachmentFilePartHandlerOptions,
   createChatKitAttachmentFilePartHandler,
 } from "./chatkit-attachments";
@@ -45,6 +50,10 @@ export {
   type SlackChatKitMessageMetadata,
 } from "./chatkit-provider-metadata";
 export {
+  type ChatKitAgentInvocationActor,
+  type ChatKitAgentRuntimeConfiguration,
+  type ChatKitAgentRuntimeContext,
+  type ChatKitAgentSecurityPosture,
   type ChatKitRequestApproval,
   type ChatKitRequestBody,
   type ChatKitRequestDataPart,
