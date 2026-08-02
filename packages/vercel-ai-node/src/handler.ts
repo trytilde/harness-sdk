@@ -73,6 +73,8 @@ export type ChatKitEndpointContext = ChatKitEndpointProviderContext & {
 export type ChatKitEndpointOptions = VerifyWebhookOptions & {
   client: Client;
   logger?: ChatKitEndpointLogger | false;
+  /** Maximum handler duration in milliseconds, while preserving incoming aborts. */
+  requestTimeoutMs?: number;
   handler: (
     request: Request,
     context: ChatKitEndpointContext,
@@ -306,11 +308,18 @@ export function chatKitEndpoint(
       },
     };
 
+    const signal =
+      options.requestTimeoutMs === undefined
+        ? request.signal
+        : AbortSignal.any([
+            request.signal,
+            AbortSignal.timeout(options.requestTimeoutMs),
+          ]);
     const forwarded = new Request(request.url, {
       method: request.method,
       headers: request.headers,
       body: verified.rawBody,
-      signal: request.signal,
+      signal,
       duplex: "half",
     } as RequestInit);
 

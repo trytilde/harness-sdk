@@ -97,6 +97,68 @@ describe("verifyWebhookRequest", () => {
 });
 
 describe("chatKitEndpoint", () => {
+  it("adds the configured request timeout to the forwarded signal", async () => {
+    const handler = vi.fn(async (request: Request) => {
+      await new Promise<void>((resolve) => {
+        request.signal.addEventListener("abort", () => resolve(), {
+          once: true,
+        });
+      });
+      expect(request.signal.aborted).toBe(true);
+      expect(request.signal.reason).toBeInstanceOf(DOMException);
+      expect(request.signal.reason.name).toBe("TimeoutError");
+      return new Response("timed out");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      requestTimeoutMs: 10,
+      handler,
+    });
+
+    const response = await endpoint(signedRequest({ messages: [] }));
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("timed out");
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the incoming abort signal when a request timeout is configured", async () => {
+    const controller = new AbortController();
+    const handler = vi.fn(async (request: Request) => {
+      controller.abort(new Error("client disconnected"));
+      await new Promise<void>((resolve) => {
+        if (request.signal.aborted) {
+          resolve();
+          return;
+        }
+        request.signal.addEventListener("abort", () => resolve(), {
+          once: true,
+        });
+      });
+      expect(request.signal.aborted).toBe(true);
+      expect(request.signal.reason).toEqual(new Error("client disconnected"));
+      return new Response("aborted");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      requestTimeoutMs: 60_000,
+      handler,
+    });
+    const signed = signedRequest({ messages: [] });
+    const request = new Request(signed, {
+      signal: controller.signal,
+      duplex: "half",
+    } as RequestInit);
+
+    const response = await endpoint(request);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("aborted");
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
   it("reconstructs the request body after verification", async () => {
     const handler = vi.fn(async (request: Request, context) => {
       expect(context.body).toEqual({ messages: [] });

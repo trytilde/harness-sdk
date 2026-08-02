@@ -149,6 +149,7 @@ import { streamText } from "ai";
 
 export const POST = chatKitEndpoint({
   webhookSigningKey: process.env.TILDE_WEBHOOK_SIGNING_KEY!,
+  requestTimeoutMs: 285_000,
   async handler(_request, context) {
     const result = streamText({
       model,
@@ -159,6 +160,9 @@ export const POST = chatKitEndpoint({
   }
 });
 ```
+
+`requestTimeoutMs` is optional. When configured, the handler request aborts on
+either the incoming request signal or the configured timeout.
 
 ## React ChatKit Hooks
 
