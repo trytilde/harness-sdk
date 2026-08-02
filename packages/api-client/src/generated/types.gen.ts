@@ -15,6 +15,10 @@ export type AddChatKitParticipantRequestInner = {
  * Request body for adding a function to an MCP server instance (excludes instance ID, which comes from path).
  */
 export type AddMcpServerInstanceFunctionBody = {
+    configured_params?: {
+        [key: string]: unknown;
+    };
+    is_async?: boolean;
     tool_description?: string | null;
     tool_group_instance_id: string;
     tool_group_source_type_id: string;
@@ -35,6 +39,17 @@ export type AddProviderSkillsToRegistryRequest = {
 export type AddTeamMemberBody = {
     role: string;
     user_id: string;
+};
+
+/**
+ * Result of an idempotent ontology-template installation.
+ */
+export type ApplyOntologyTemplateResult = {
+    created_page_types: Array<string>;
+    created_relationship_types: Array<string>;
+    existing_page_types: Array<string>;
+    existing_relationship_types: Array<string>;
+    template_key: string;
 };
 
 /**
@@ -119,6 +134,24 @@ export type AutoProvisionToolGroupInstanceResponse = {
     provider_provisioning_response: ProviderAppProvisioningResponse;
     tool_group_instance?: null | ToolGroupInstanceSerialized;
 };
+
+/**
+ * Typed billing bootstrap response for the selected organization.
+ */
+export type BillingContext = {
+    can_manage_billing: boolean;
+    memory_banks: MemoryBankBillingContext;
+    org_id: string;
+    products: Array<ProductBillingContext>;
+};
+
+/**
+ * A separately billed Tilde product whose access is evaluated per organization.
+ */
+export enum BillingProductId {
+    TILDE_CORE = 'tilde_core',
+    TILDE_PAY = 'tilde_pay'
+}
 
 export type BrokerAction = {
     Redirect: BrokerActionRedirect;
@@ -315,6 +348,22 @@ export type CancelHumanApprovalActionRequest = {
 };
 
 /**
+ * Approval information in an HTTP agent tool invocation.
+ */
+export type ChatApproval = {
+    decision: ChatApprovalDecision;
+    reason?: string | null;
+};
+
+/**
+ * Approval decision in an HTTP agent tool invocation.
+ */
+export enum ChatApprovalDecision {
+    APPROVED = 'approved',
+    REJECTED = 'rejected'
+}
+
+/**
  * Provider-specific setup instructions shown to humans.
  */
 export type ChatChannelInstallationInstructions = {
@@ -376,6 +425,16 @@ export enum ChatKitAgentConcurrencyPolicy {
     QUEUE_AND_BATCH = 'queue_and_batch'
 }
 
+/**
+ * Identity context frozen when the triggering user message is queued.
+ */
+export type ChatKitAgentInvocationActor = {
+    external_user_id?: string | null;
+    external_user_provider?: string | null;
+    external_user_provider_account_id?: string | null;
+    tilde_user_id?: string | null;
+};
+
 export type ChatKitAgentPaginatedResponse = {
     items: Array<ChatKitAgent>;
     next_page_token?: string;
@@ -385,6 +444,7 @@ export type ChatKitAgentPaginatedResponse = {
  * Persisted queued agent turn.
  */
 export type ChatKitAgentTurnQueueItem = {
+    actor: ChatKitAgentInvocationActor;
     agent_inbox_id: string;
     agent_inbox_instance_id: string;
     chat_request: ChatRequest;
@@ -470,12 +530,78 @@ export type ChatKitSessionWithParticipants = {
 };
 
 /**
+ * A message sent to an HTTP agent.
+ */
+export type ChatMessage = {
+    id: string;
+    metadata?: null | WrappedJsonValue;
+    parts: Array<ChatMessagePart>;
+    role: MessageRole;
+};
+
+/**
+ * A typed part of an HTTP agent message.
+ */
+export type ChatMessagePart = {
+    text?: string | null;
+    type: 'text';
+} | {
+    text?: string | null;
+    type: 'reasoning';
+} | {
+    filename?: string | null;
+    mediaType: string;
+    providerMetadata?: null | WrappedJsonValue;
+    type: 'file';
+    url: string;
+} | {
+    approval?: null | ChatApproval;
+    errorText?: string | null;
+    input?: null | WrappedJsonValue;
+    output?: null | WrappedJsonValue;
+    state: ChatToolInvocationState;
+    toolCallId: string;
+    toolName: string;
+    type: 'dynamic-tool';
+} | {
+    sourceId: string;
+    title?: string | null;
+    type: 'source-url';
+    url: string;
+} | {
+    filename?: string | null;
+    mediaType: string;
+    sourceId: string;
+    title?: string | null;
+    type: 'source-document';
+} | {
+    type: 'step-start';
+} | {
+    data: WrappedJsonValue;
+    dataType: string;
+    type: 'data';
+};
+
+/**
  * Request body for chat completion in Vercel AI SDK format.
  */
 export type ChatRequest = {
     chatId?: string | null;
-    messages?: Array<unknown>;
+    messages: Array<ChatMessage>;
 };
+
+/**
+ * Tool invocation state in an HTTP agent message.
+ */
+export enum ChatToolInvocationState {
+    INPUT_STREAMING = 'input-streaming',
+    INPUT_AVAILABLE = 'input-available',
+    APPROVAL_REQUESTED = 'approval-requested',
+    APPROVAL_RESPONDED = 'approval-responded',
+    OUTPUT_AVAILABLE = 'output-available',
+    OUTPUT_ERROR = 'output-error',
+    OUTPUT_DENIED = 'output-denied'
+}
 
 export type ClaimTemporaryAccountRequest = {
     pin: string;
@@ -500,11 +626,27 @@ export type CloudWhoamiResponse = {
 };
 
 /**
+ * Public request body for committing a Hindsight reservation.
+ */
+export type CommitMemoryBankReservationBody = {
+    active_banks: number;
+    /**
+     * Required when increasing active_banks by one; omit for a decrease.
+     */
+    reservation_id?: string | null;
+};
+
+/**
  * Request to mark a direct upload as complete.
  */
 export type CompleteAttachmentUploadInner = {
     sha256?: string | null;
     size_bytes?: number | null;
+};
+
+export type CompleteCredentialSetupItemBody = {
+    resource_server_credential_id?: null | WrappedUuidV4;
+    user_credential_id?: null | WrappedUuidV4;
 };
 
 export type CompleteHumanApprovalActionRequest = {
@@ -638,6 +780,7 @@ export type CreateCustomToolProviderRequestInner = {
     display_name: string;
     local_running_endpoint?: boolean;
     local_runtime_path?: string | null;
+    tool_group_instance_id?: string | null;
 };
 
 export type CreateCustomToolProviderResponse = {
@@ -678,6 +821,12 @@ export type CreateManagedUserCredentialBody = {
 export type CreateMcpServerInstanceRequestInner = {
     id: string;
     is_dynamic_tool_discovery?: boolean;
+    memory_bank_ids?: Array<WrappedUuidV4> | null;
+    name: string;
+};
+
+export type CreateMemoryBankBody = {
+    description?: string | null;
     name: string;
 };
 
@@ -722,10 +871,35 @@ export type CreateOrganizationRequest = {
     slug?: string | null;
 };
 
+export type CreatePageTypeBody = {
+    description?: string;
+    key: string;
+    name: string;
+    schema: unknown;
+};
+
+export type CreatePageTypeVersionBody = {
+    schema: unknown;
+};
+
 export type CreatePayWalletRequest = {
     name: string;
     owner_id?: string | null;
     wallet_customer_id: string;
+};
+
+export type CreateRelationshipTypeBody = {
+    description?: string;
+    directionality: RelationshipDirectionality;
+    forward_label: string;
+    inverse_label?: string | null;
+    key: string;
+};
+
+export type CreateRelationshipTypeVersionBody = {
+    schema?: unknown;
+    source_page_type_ids?: Array<WrappedUuidV4>;
+    target_page_type_ids?: Array<WrappedUuidV4>;
 };
 
 export type CreateResourceServerCredentialParamsInner = {
@@ -755,10 +929,7 @@ export type CreateReverseProxyProfileInner = {
      * Provider id from the registry (e.g. `"openai"`).
      */
     provider_id: string;
-    /**
-     * FK into managed-credential's `resource_server_credential` table.
-     */
-    resource_server_credential_id: WrappedUuidV4;
+    resource_server_credential_id?: null | WrappedUuidV4;
     user_credential_id?: null | WrappedUuidV4;
 };
 
@@ -808,6 +979,10 @@ export type CreateSignalProviderInstanceRequestInner = {
     display_name: string;
     id?: string | null;
     ingress_mode: SignalIngressMode;
+    /**
+     * Omitted leaves bindings unchanged; an empty list detaches every bank.
+     */
+    memory_bank_ids?: Array<WrappedUuidV4> | null;
     poll_interval_seconds?: number | null;
     polling_state?: {
         [key: string]: unknown;
@@ -846,6 +1021,7 @@ export type CreateSkillInner = {
 
 export type CreateSkillRegistryBody = {
     description: string;
+    memory_bank_ids?: Array<WrappedUuidV4> | null;
     name: string;
     skill_ids?: Array<WrappedUuidV4>;
 };
@@ -975,9 +1151,91 @@ export type CreateWalletBody = {
 
 export type CreateWalletCustomerBody = {
     account_type?: string;
-    email: string;
     name: string;
     owner_id?: string | null;
+};
+
+export type CreateWalletVirtualAccountBody = {
+    currency: string;
+};
+
+export type CreateWikiAssetBody = {
+    alt_text?: string | null;
+    checksum?: string | null;
+    filename: string;
+    folder_path?: string;
+    media_type: string;
+    size_bytes?: number | null;
+    title?: string | null;
+};
+
+export type CreateWikiInner = {
+    id?: null | WrappedUuidV4;
+    /**
+     * Memory banks that should durably ingest this wiki's content.
+     */
+    memory_bank_ids?: Array<WrappedUuidV4> | null;
+    name: string;
+};
+
+export enum CredentialSetupCredentialKind {
+    RESOURCE_SERVER_CREDENTIAL = 'resource_server_credential',
+    USER_CREDENTIAL = 'user_credential'
+}
+
+export type CredentialSetupFormField = {
+    field_type: string;
+    help_text?: string | null;
+    label: string;
+    name: string;
+    placeholder?: string | null;
+    required?: boolean;
+};
+
+export type CredentialSetupItem = {
+    created_at: WrappedChronoDateTime;
+    credential_source_type_id: string;
+    desired_enabled: boolean;
+    display_name: string;
+    id: string;
+    last_error?: string | null;
+    metadata: WrappedJsonValue;
+    org_id: string;
+    owner_id: string;
+    owner_type: string;
+    provider_display_name?: string | null;
+    provider_icon_key?: string | null;
+    provider_id: string;
+    resource_server_credential_id?: null | WrappedUuidV4;
+    status: CredentialSetupItemStatus;
+    team_id: string;
+    updated_at: WrappedChronoDateTime;
+    user_credential_id?: null | WrappedUuidV4;
+};
+
+export type CredentialSetupItemPaginatedResponse = {
+    items: Array<CredentialSetupItem>;
+    next_page_token?: string;
+};
+
+export enum CredentialSetupItemStatus {
+    PENDING = 'pending',
+    IN_PROGRESS = 'in_progress',
+    CONNECTED = 'connected',
+    FAILED = 'failed'
+}
+
+export type CredentialSetupNextAction = {
+    type: 'redirect';
+    url: string;
+} | {
+    credential_kind: CredentialSetupCredentialKind;
+    fields: Array<CredentialSetupFormField>;
+    submit_label: string;
+    type: 'submit_form';
+} | {
+    message?: string | null;
+    type: 'complete';
 };
 
 export type CredentialSourceSerialized = {
@@ -993,6 +1251,15 @@ export type CredentialSourceSerialized = {
     supports_auto_display_name: boolean;
     type_id: string;
 };
+
+/**
+ * Current caller's seat state. Machine identities never consume seats.
+ */
+export enum CurrentSeatStatus {
+    ACTIVE = 'active',
+    NOT_ASSIGNED = 'not_assigned',
+    NOT_BILLABLE = 'not_billable'
+}
 
 export type CustomToolProviderDetails = {
     provider: CustomToolProviderSerialized;
@@ -1057,6 +1324,10 @@ export type DeleteInboxResponse = {
     success: boolean;
 };
 
+export type DeleteMemoryDocumentBody = {
+    document_id: string;
+};
+
 /**
  * Response for deleting a message
  */
@@ -1076,6 +1347,13 @@ export type DirectTokenPayment = {
     destination_asset?: string | null;
     destination_chain?: string | null;
     slippage_bps?: number | null;
+};
+
+/**
+ * Selects one package file for a lazy download URL.
+ */
+export type DownloadSkillPackageFileRequest = {
+    path: string;
 };
 
 export type EnableToolInstanceParamsInner = {
@@ -1128,6 +1406,8 @@ export type ExchangeOAuthCodeBody = {
     device_code?: string | null;
     grant_type: string;
     redirect_uri?: string | null;
+    refresh_token?: string | null;
+    scope?: string | null;
 };
 
 export type ExchangeOAuthCodeResult = {
@@ -1135,6 +1415,10 @@ export type ExchangeOAuthCodeResult = {
     expires_in: number;
     refresh_token: string;
     token_type: string;
+};
+
+export type ExpectedRevisionBody = {
+    expected_revision: number;
 };
 
 export type ExpireTemporaryAccountsResponse = {
@@ -1170,6 +1454,12 @@ export type FillFormResponse = {
     submitted: boolean;
 };
 
+export type GenerateLocalRuntimeTunnelApiKeyResponse = {
+    api_key: string;
+    api_key_id: string;
+    created_at: WrappedChronoDateTime;
+};
+
 export type GenerateTemporaryAccountClaimUrlResponse = {
     claim_pin_required: boolean;
     claim_token_expires_at: WrappedChronoDateTime;
@@ -1199,6 +1489,7 @@ export type GetCryptoDepositInformationResponse = {
 };
 
 export type GetFiatDepositInformationResponse = {
+    currency: string;
     fiat: WrappedJsonValue;
     wallet_id: string;
 };
@@ -1301,6 +1592,15 @@ export type Identity = (Machine & {
     type: 'machine_on_behalf_of_human';
 } | {
     type: 'unauthenticated';
+};
+
+export type ImportMemoryBankTemplateBody = {
+    dry_run?: boolean;
+    manifest: unknown;
+};
+
+export type ImportMemoryBankTemplateResponse = {
+    result: unknown;
 };
 
 /**
@@ -1441,12 +1741,22 @@ export type ListApiKeysResponse = {
     next_page_token?: string | null;
 };
 
+export type ListProviderSetupCatalogResponse = {
+    domain: string;
+    providers: Array<ProviderSetupDescriptor>;
+};
+
 export type ListProxiedSkillProvidersResponse = {
     items: Array<ProxiedSkillProvider>;
 };
 
 export type ListReverseProxyProvidersResponse = {
     items: Array<ReverseProxyProviderInfo>;
+};
+
+export type LocalRuntimeTunnelApiKey = {
+    api_key_id?: string | null;
+    created_at?: null | WrappedChronoDateTime;
 };
 
 export type LocalRuntimeTunnelConnector = {
@@ -1485,16 +1795,82 @@ export type Machine = {
 
 export type MakeMppPaymentRequest = {
     body?: unknown;
+    headers?: {
+        [key: string]: string;
+    };
+    max_amount?: string | null;
+    max_amount_atomic?: string | null;
     method?: string | null;
     payment?: null | DirectTokenPayment;
+    preferred_assets?: Array<string>;
+    /**
+     * Payment-channel contract addresses the caller explicitly permits.
+     * Stateful methods that sign a server-selected channel, such as the
+     * Stellar `channel` intent, require this pin on their first use. A
+     * validated `session_snapshot` pins subsequent requests.
+     */
+    preferred_channels?: Array<string>;
+    preferred_networks?: Array<string>;
+    preferred_recipients?: Array<string>;
+    /**
+     * Session lifecycle action (`open`, `voucher`, `commit`, `topUp`, or
+     * `close`). Omit to open when no snapshot is supplied and voucher
+     * otherwise.
+     */
+    session_action?: string | null;
+    /**
+     * Incremental session amount in atomic units. Required for voucher and
+     * commit actions unless the challenge pins an increment.
+     */
+    session_amount_atomic?: string | null;
+    /**
+     * Delivery identifier required by a metered `commit` action.
+     */
+    session_delivery_id?: string | null;
+    session_snapshot?: null | PaymentSessionSnapshot;
+    /**
+     * Preferred method-specific settlement mode. Methods that negotiate
+     * client versus server broadcast currently accept `push` or `pull`.
+     */
+    settlement_mode?: string | null;
+    /**
+     * Payment transport. Defaults to `http`; use `mcp` for MCP's nested
+     * payment metadata or `jsonrpc` for the generic root `_meta` binding.
+     * Tempo session challenges also support `sse` and `websocket` (`ws`) for
+     * metered streaming with in-band voucher and receipt handling.
+     */
+    transport?: string | null;
     url: string;
     wallet_id: string;
 };
 
 export type MakeX402PaymentRequest = {
     body?: unknown;
+    headers?: {
+        [key: string]: string;
+    };
+    max_amount?: string | null;
+    max_amount_atomic?: string | null;
     method?: string | null;
     payment?: null | DirectTokenPayment;
+    preferred_assets?: Array<string>;
+    preferred_networks?: Array<string>;
+    preferred_recipients?: Array<string>;
+    /**
+     * Stateful scheme action (`open`, `voucher`, or `refund`). Omit to open
+     * when no snapshot is supplied and voucher otherwise.
+     */
+    session_action?: string | null;
+    /**
+     * Incremental amount for voucher/close actions, in atomic units.
+     */
+    session_amount_atomic?: string | null;
+    session_snapshot?: null | PaymentSessionSnapshot;
+    /**
+     * Payment transport. Defaults to `http`; use `mcp` when `body` is the
+     * JSON-RPC MCP tool-call request that should be retried with x402 metadata.
+     */
+    transport?: string | null;
     url: string;
     wallet_id: string;
 };
@@ -1585,20 +1961,169 @@ export type McpServerInstanceSerializedWithFunctionsPaginatedResponse = {
 
 export type McpServerInstanceToolSerialized = {
     bound_params?: null | WrappedJsonValue;
+    configured_params?: {
+        [key: string]: unknown;
+    };
     created_at: WrappedChronoDateTime;
     disabled_reason?: string | null;
+    is_async?: boolean;
     mcp_server_instance_id: string;
-    org_id?: string;
+    org_id: string;
     status?: string;
-    team_id?: string;
+    team_id: string;
     tool_description?: string | null;
     tool_group_deployment_deployment_id: string;
+    tool_group_instance_display_name?: string | null;
     tool_group_instance_id: string;
     tool_group_source_type_id: string;
     tool_name: string;
     tool_source_type_id: string;
     updated_at: WrappedChronoDateTime;
 };
+
+/**
+ * Identity attached to a source change and propagated to retained documents.
+ */
+export type MemoryActorContext = {
+    external_user_id?: string | null;
+    external_user_provider?: string | null;
+    external_user_provider_account_id?: string | null;
+    tilde_user_id?: string | null;
+};
+
+export type MemoryBank = {
+    created_at: WrappedChronoDateTime;
+    description?: string | null;
+    id: WrappedUuidV4;
+    name: string;
+    org_id: string;
+    provider: MemoryProvider;
+    provider_bank_id: string;
+    status: MemoryBankStatus;
+    status_message?: string | null;
+    team_id: string;
+    tool_group_instance_id?: string | null;
+    updated_at: WrappedChronoDateTime;
+};
+
+/**
+ * Organization-level Hindsight memory-bank capacity.
+ */
+export type MemoryBankBillingContext = {
+    active: number;
+    billable: number;
+    can_create: boolean;
+    confirmed_billable: number;
+    included: number;
+    payment_url?: string | null;
+    pending_reservations: number;
+    requires_payment_method: boolean;
+};
+
+export type MemoryBankConfig = {
+    /**
+     * Fully resolved configuration, including inherited defaults.
+     */
+    config: unknown;
+    /**
+     * Only values explicitly overridden for this bank.
+     */
+    overrides: unknown;
+};
+
+/**
+ * A short-lived paid-capacity reservation returned to the Hindsight owner.
+ * The owner must commit it after resource creation or release it on failure.
+ */
+export type MemoryBankCreationReservation = {
+    billing: MemoryBankBillingContext;
+    expires_at: string;
+    reservation_id: string;
+};
+
+export type MemoryBankDocumentList = {
+    items: Array<unknown>;
+    limit: number;
+    offset: number;
+    total: number;
+};
+
+export type MemoryBankHealth = {
+    bank_id: WrappedUuidV4;
+    provider_reachable: boolean;
+    status: MemoryBankStatus;
+    status_message?: string | null;
+};
+
+export type MemoryBankPaginatedResponse = {
+    items: Array<MemoryBank>;
+    next_page_token?: string;
+};
+
+export enum MemoryBankStatus {
+    PROVISIONING = 'provisioning',
+    ACTIVE = 'active',
+    ERROR = 'error',
+    DELETING = 'deleting'
+}
+
+export type MemoryBankTemplate = {
+    /**
+     * Portable versioned manifest containing bank overrides, mental models, and directives.
+     */
+    manifest: unknown;
+};
+
+export type MemoryDocument = {
+    actor?: null | MemoryActorContext;
+    content: string;
+    document_id: string;
+    metadata?: unknown;
+    /**
+     * Explicit Hindsight observation scopes. Each inner list is consolidated
+     * independently, preventing observations from crossing actor boundaries.
+     */
+    observation_scopes?: Array<Array<string>>;
+    tags?: Array<string>;
+};
+
+export type MemoryOperationResponse = {
+    result: unknown;
+};
+
+export enum MemoryProvider {
+    HINDSIGHT = 'hindsight'
+}
+
+export type MemorySourceBinding = {
+    created_at: WrappedChronoDateTime;
+    /**
+     * True while a detached source is waiting for provider document cleanup.
+     */
+    detached: boolean;
+    generation: number;
+    id: WrappedUuidV4;
+    last_error?: string | null;
+    last_synced_generation?: number | null;
+    memory_bank_id: WrappedUuidV4;
+    org_id: string;
+    source_id: string;
+    source_kind: MemorySourceKind;
+    team_id: string;
+    updated_at: WrappedChronoDateTime;
+};
+
+export enum MemorySourceKind {
+    CHATKIT_CHANNEL = 'chatkit_channel',
+    CHATKIT_SESSION = 'chatkit_session',
+    SIGNAL_PROVIDER = 'signal_provider',
+    SIGNAL_DELIVERY = 'signal_delivery',
+    SKILL_REGISTRY = 'skill_registry',
+    SKILL = 'skill',
+    MCP_SERVER = 'mcp_server',
+    WIKI = 'wiki',
+    WIKI_PAGE = 'wiki_page'
+}
 
 /**
  * A message in an inbox - can be either a simple text message or a rich UI message
@@ -1646,6 +2171,13 @@ export type Metadata = {
     [key: string]: unknown;
 };
 
+export type MigrateWikiPageBody = {
+    data: unknown;
+    expected_revision: number;
+    page_type_id: WrappedUuidV4;
+    page_type_version_id: WrappedUuidV4;
+};
+
 /**
  * Paginated sessions payload for "show more".
  */
@@ -1690,11 +2222,43 @@ export type MissionControlSidebarResponse = {
     next_page_token?: string | null;
 };
 
+export type MoveWikiPageBody = {
+    expected_revision: number;
+    path: string;
+};
+
+/**
+ * A page type bundled by an ontology template.
+ */
+export type OntologyPageTypeDefinition = {
+    description: string;
+    key: string;
+    name: string;
+    schema: unknown;
+};
+
+/**
+ * A relationship type bundled by an ontology template.
+ */
+export type OntologyRelationshipTypeDefinition = {
+    description: string;
+    directionality: RelationshipDirectionality;
+    forward_label: string;
+    inverse_label?: string | null;
+    key: string;
+    schema: unknown;
+    source_page_type_keys: Array<string>;
+    target_page_type_keys: Array<string>;
+};
+
 export type OrgOidcProvider = {
     authorization_endpoint: string;
     client_id: string;
     created_at: WrappedChronoDateTime;
     discovery_endpoint?: string | null;
+    dns_verification_record_name?: string | null;
+    dns_verification_record_value?: string | null;
+    dns_verified_at?: null | WrappedChronoDateTime;
     email_domain: string;
     id: string;
     issuer: string;
@@ -1714,6 +2278,7 @@ export type OrgOidcProviderPaginatedResponse = {
 
 export enum OrgOidcProviderStatus {
     DRAFT = 'draft',
+    PENDING_VERIFICATION = 'pending_verification',
     ACTIVE = 'active',
     DISABLED = 'disabled'
 }
@@ -1727,6 +2292,36 @@ export type Organization = {
     updated_at: WrappedChronoDateTime;
 };
 
+export type PageRelationshipView = {
+    inverse: boolean;
+    label: string;
+    other_page_id: WrappedUuidV4;
+    relationship: WikiPageRelationship;
+    relationship_type: WikiRelationshipType;
+};
+
+/**
+ * A live page that would not validate against a proposed schema version.
+ */
+export type PageTypeMigrationIssue = {
+    errors: Array<string>;
+    page_id: WrappedUuidV4;
+    path: string;
+};
+
+/**
+ * Read-only impact report for explicitly migrating pages to a schema version.
+ */
+export type PageTypeMigrationPreview = {
+    incompatible_pages: Array<PageTypeMigrationIssue>;
+    total_pages: number;
+};
+
+export type PageTypeValidationResult = {
+    errors: Array<string>;
+    valid: boolean;
+};
+
 /**
  * State for streaming parts
  */
@@ -1735,23 +2330,31 @@ export enum PartState {
     DONE = 'done'
 }
 
-export type PayOnboardingStatusResponse = {
-    customer?: null | WalletCustomer;
-    kyc?: null | GetWalletCustomerKycResponse;
-    next_step: PayOnboardingStep;
-    wallet?: null | Wallet;
-};
-
 export enum PayOnboardingStep {
+    ENTER_DETAILS = 'enter_details',
     COMPLETE_KYC = 'complete_kyc',
-    CREATE_WALLET = 'create_wallet',
     READY = 'ready'
 }
 
 export type PayPaymentRequest = {
     body?: unknown;
+    headers?: {
+        [key: string]: string;
+    };
+    max_amount?: string | null;
+    max_amount_atomic?: string | null;
     method?: string | null;
     payment?: null | DirectTokenPayment;
+    preferred_assets?: Array<string>;
+    preferred_channels?: Array<string>;
+    preferred_networks?: Array<string>;
+    preferred_recipients?: Array<string>;
+    session_action?: string | null;
+    session_amount_atomic?: string | null;
+    session_delivery_id?: string | null;
+    session_snapshot?: null | PaymentSessionSnapshot;
+    settlement_mode?: string | null;
+    transport?: string | null;
     url: string;
     wallet_id: string;
 };
@@ -1774,6 +2377,55 @@ export type PaymentResponse = {
     response: WrappedJsonValue;
     wallet_id: string;
 };
+
+/**
+ * Opaque-enough client state needed to safely resume a stateful payment
+ * scheme after a process restart. Every field is authenticated again against
+ * the next server challenge before it is used.
+ */
+export type PaymentSessionSnapshot = {
+    authorized_signer: string;
+    channel_id: string;
+    cumulative_amount: string;
+    deposit_amount: string;
+    expires_at: number;
+    metadata?: unknown;
+    method: string;
+    network: string;
+    nonce: number;
+    protocol: string;
+};
+
+/**
+ * UI and enforcement projection for one product.
+ */
+export type ProductBillingContext = {
+    confirmed_seats: number;
+    current_period_end?: string | null;
+    current_seat_status: CurrentSeatStatus;
+    desired_seats: number;
+    effective_access: boolean;
+    last_synced_at?: string | null;
+    payment_method_present: boolean;
+    payment_url?: string | null;
+    plan_id: string;
+    product_id: BillingProductId;
+    subscription_status: ProductSubscriptionStatus;
+    trial_ends_at?: string | null;
+};
+
+/**
+ * Effective state of an organization's subscription to one Tilde product.
+ */
+export enum ProductSubscriptionStatus {
+    INACTIVE = 'inactive',
+    SYNC_PENDING = 'sync_pending',
+    TRIALING = 'trialing',
+    ACTIVE = 'active',
+    PAST_DUE = 'past_due',
+    SUSPENDED = 'suspended',
+    CANCELED = 'canceled'
+}
 
 /**
  * Response for setup or app provisioning lifecycle calls.
@@ -1811,11 +2463,19 @@ export type ProviderAuthAdapterConfig = (ProviderAuthAdapterApiKey & {
     type: 'oauth_jwt_bearer';
 }) | (ProviderAuthAdapterNoAuth & {
     type: 'no_auth';
+}) | (ProviderAuthAdapterCustomJsonSchema & {
+    type: 'custom_json_schema';
 }) | (ProviderAuthAdapterCustom & {
     type: 'custom';
 });
 
 export type ProviderAuthAdapterCustom = {
+    account_name: ProviderAuthAccountNameDisplay;
+    display_name: string;
+    provider_provisioner_id?: string | null;
+};
+
+export type ProviderAuthAdapterCustomJsonSchema = {
     account_name: ProviderAuthAccountNameDisplay;
     display_name: string;
     provider_provisioner_id?: string | null;
@@ -1918,6 +2578,18 @@ export enum ProviderProvisionerSetupKind {
 }
 
 /**
+ * Authenticated, expiring browser handoff for a provider provisioning flow.
+ */
+export type ProviderProvisioningHumanAction = {
+    action: ProviderProvisioningNextAction;
+    app_display_name: string;
+    expires_at: WrappedChronoDateTime;
+    provider_id: string;
+    state_id: string;
+    target_provider_id: string;
+};
+
+/**
  * Generic input used when a provider returns to Tilde during setup.
  */
 export type ProviderProvisioningInput = {
@@ -1950,6 +2622,112 @@ export type ProviderProvisioningNextAction = {
 } | {
     redirect_url?: string | null;
     type: 'complete';
+};
+
+/**
+ * Auth method descriptor for a provider setup workflow.
+ */
+export type ProviderSetupAuthMethod = {
+    credential_source_type_id: string;
+    description: string;
+    display_name: string;
+    fields?: Array<ProviderSetupField>;
+    id: string;
+    primary_action_label?: string | null;
+    setup_kind: string;
+};
+
+/**
+ * Provider card and workflow contract for one domain/provider pair.
+ */
+export type ProviderSetupDescriptor = {
+    account_name_label?: string | null;
+    auth_methods?: Array<ProviderSetupAuthMethod>;
+    description: string;
+    display_name: string;
+    domain: string;
+    fields?: Array<ProviderSetupField>;
+    icon_key?: string | null;
+    primary_action_label?: string | null;
+    provider_id: string;
+    subscription_options?: Array<ProviderSetupOption>;
+    target_resource?: null | WrappedJsonValue;
+};
+
+/**
+ * Generic setup field descriptor rendered by the frontend without
+ * provider-specific branching.
+ */
+export type ProviderSetupField = {
+    field_type: string;
+    help_text?: string | null;
+    label: string;
+    name: string;
+    placeholder?: string | null;
+    required?: boolean;
+};
+
+/**
+ * Generic next action understood by provider configuration screens.
+ */
+export type ProviderSetupNextAction = {
+    type: 'redirect';
+    url: string;
+} | {
+    fields?: Array<ProviderSetupField>;
+    manifest?: null | WrappedJsonValue;
+    markdown: string;
+    type: 'render_instructions';
+} | {
+    fields: Array<ProviderSetupField>;
+    submit_label: string;
+    type: 'submit_form';
+} | {
+    setup_item_id: string;
+    type: 'configure_credential';
+} | {
+    type: 'download_secret_outputs';
+} | {
+    message?: string | null;
+    redirect_url?: string | null;
+    type: 'complete';
+};
+
+/**
+ * Generic setup option such as an auth method or event subscription.
+ */
+export type ProviderSetupOption = {
+    default_enabled?: boolean;
+    description?: string | null;
+    display_name: string;
+    id: string;
+};
+
+export type ProviderSetupResponse = {
+    next_action: ProviderSetupNextAction;
+    outputs?: null | WrappedJsonValue;
+    resource?: null | WrappedJsonValue;
+    setup_id?: string | null;
+};
+
+export type ProvisionPayBrowserResponse = {
+    browser_definition_id: string;
+    enabled_tool_ids: Array<string>;
+};
+
+export type ProvisionTildePayRequest = {
+    account_type?: string | null;
+    name?: string | null;
+    owner_id?: string | null;
+};
+
+export type ProvisionTildePayResponse = {
+    browser?: null | ProvisionPayBrowserResponse;
+    customer?: null | WalletCustomer;
+    kyc?: null | GetWalletCustomerKycResponse;
+    mcp?: null | SetupPayMcpResponse;
+    next_step: PayOnboardingStep;
+    wallet?: null | Wallet;
 };
 
 /**
@@ -2062,6 +2840,12 @@ export type ProxyCredentialTemplate = {
      */
     prefix_value?: string | null;
 } | {
+    kind: 'basic_auth';
+    /**
+     * Username paired with the stored secret as the password.
+     */
+    username: string;
+} | {
     /**
      * Cookie name; the value is the credential secret.
      */
@@ -2084,6 +2868,15 @@ export type ReasoningUiPart = {
     text?: string | null;
 };
 
+export type RecallMemoryBody = {
+    max_tokens?: number | null;
+    query: string;
+};
+
+export type ReflectMemoryBody = {
+    query: string;
+};
+
 export type RefreshCustomToolProviderResponse = {
     changed: boolean;
     deployment_id: string;
@@ -2102,6 +2895,13 @@ export type RefreshTokenRequest = {
      * The refresh token. If not provided, will be read from cookie.
      */
     refresh_token?: string | null;
+};
+
+export type RefreshWalletTransactionHistoryResponse = {
+    inserted_or_updated: number;
+    linked_transactions: number;
+    scanned_chains: Array<string>;
+    wallet_id: string;
 };
 
 /**
@@ -2132,6 +2932,10 @@ export type RegisterHttpVercelAiSdkAgentRequestInner = {
     id?: string | null;
     local_running_endpoint?: boolean;
     local_runtime_path?: string | null;
+    /**
+     * Memory banks that should ingest conversations involving this agent.
+     */
+    memory_bank_ids?: Array<WrappedUuidV4> | null;
     streaming?: boolean;
     timeout_ms?: number | null;
 };
@@ -2204,6 +3008,11 @@ export type RegisterVercelUiChatProviderRequestInner = {
     id?: string | null;
 };
 
+export enum RelationshipDirectionality {
+    DIRECTED = 'directed',
+    SYMMETRIC = 'symmetric'
+}
+
 /**
  * Response for removing a ChatKit participant.
  */
@@ -2220,6 +3029,12 @@ export type RenameMissionControlThreadRequestInner = {
 
 export type ReorderChatKitAgentTurnQueueItemRequestInner = {
     queue_position: number;
+};
+
+export type ReplaceMemoryBankBindingsBody = {
+    memory_bank_ids: Array<WrappedUuidV4>;
+    source_id: string;
+    source_kind: MemorySourceKind;
 };
 
 export type ResolveLoginProviderResponse = {
@@ -2247,11 +3062,22 @@ export type ResourceServerCredentialSerializedPaginatedResponse = {
     next_page_token?: string;
 };
 
+export type ResumeCredentialSetupItemBody = {
+    broker_state_id?: string | null;
+    callback_url?: string | null;
+    input?: null | BrokerInput;
+};
+
 /**
  * Request body to resume app provisioning.
  */
 export type ResumeProviderAppProvisioningBody = {
     input: ProviderProvisioningInput;
+};
+
+export type ResumeProviderSetupBody = {
+    input?: null | WrappedJsonValue;
+    return_url?: string | null;
 };
 
 export type ResumeUserCredentialBrokeringParams = {
@@ -2263,6 +3089,15 @@ export type ResumeUserCredentialBrokeringParams = {
      */
     org_id?: string;
     team_id?: string;
+};
+
+export type RetainMemoryBody = {
+    document: MemoryDocument;
+};
+
+export type RetryMemorySourceBody = {
+    source_id: string;
+    source_kind: MemorySourceKind;
 };
 
 export type ReturnAddress = ReturnAddressUrl & {
@@ -2296,10 +3131,7 @@ export type ReverseProxyProfile = {
      * Foreign key to the `ReverseProxyProviderRegistry` (e.g. `"openai"`).
      */
     provider_id: string;
-    /**
-     * FK into managed-credential's `resource_server_credential` table.
-     */
-    resource_server_credential_id: WrappedUuidV4;
+    resource_server_credential_id?: null | WrappedUuidV4;
     team_id: string;
     updated_at: WrappedChronoDateTime;
     user_credential_id?: null | WrappedUuidV4;
@@ -2332,9 +3164,13 @@ export type RotateCustomToolProviderSigningKeyResponse = {
 export type RuntimeConfig = {
     clerk_domain?: string | null;
     debug_auth_profiles_enabled: boolean;
+    org_context_in_header: boolean;
+    posthog_api_host: string;
+    posthog_product: BillingProductId;
     posthog_project_id: string;
     posthog_project_key: string;
     sentry_dsn: string;
+    sentry_react_dsn?: string | null;
 };
 
 /**
@@ -2387,11 +3223,6 @@ export type SessionPaginatedResponse = {
  */
 export type SetChatKitResourceStatusRequest = {
     status: InboxStatus;
-};
-
-export type SetupPayMcpRequest = {
-    server_id?: string | null;
-    server_name?: string | null;
 };
 
 export type SetupPayMcpResponse = {
@@ -2639,6 +3470,39 @@ export type SkillDiscoverySearchResponse = {
     items: Array<SkillSummary>;
 };
 
+/**
+ * One file in an immutable skill package.
+ */
+export type SkillPackageFile = {
+    checksum_sha256: string;
+    executable: boolean;
+    media_type: string;
+    path: string;
+    size_bytes: number;
+};
+
+/**
+ * A short-lived URL for one immutable package file.
+ */
+export type SkillPackageFileDownload = {
+    expires_at: WrappedChronoDateTime;
+    path: string;
+    url: string;
+};
+
+/**
+ * The file tree and Git provenance for a materializable skill package.
+ */
+export type SkillPackageManifest = {
+    content_hash: string;
+    created_at: WrappedChronoDateTime;
+    files: Array<SkillPackageFile>;
+    id: WrappedUuidV4;
+    provider_id: string;
+    source_commit_hash: string;
+    source_path: string;
+};
+
 export type SkillPaginatedResponse = {
     items: Array<Skill>;
     next_page_token?: string;
@@ -2685,14 +3549,6 @@ export type SlackInstallationNextAction = {
 };
 
 /**
- * Slack webhook event endpoint response.
- */
-export type SlackWebhookResponse = {
-    challenge?: string | null;
-    ok: boolean;
-};
-
-/**
  * Source document UI part - represents a source reference via document
  */
 export type SourceDocumentUiPart = {
@@ -2719,6 +3575,16 @@ export type StartBrokeringBodyExternal = {
     resource_server_credential_id?: null | WrappedUuidV4;
 };
 
+export type StartCredentialSetupItemBody = {
+    return_url?: string | null;
+};
+
+export type StartCredentialSetupItemResponse = {
+    brokering_response?: null | UserCredentialBrokeringResponse;
+    item: CredentialSetupItem;
+    next_action?: null | CredentialSetupNextAction;
+};
+
 export type StartOAuthDeviceCodeBody = {
     client_id: string;
 };
@@ -2730,19 +3596,6 @@ export type StartOAuthDeviceCodeResult = {
     user_code: string;
     verification_uri: string;
     verification_uri_complete: string;
-};
-
-export type StartPayOnboardingRequest = {
-    account_type?: string;
-    email: string;
-    name: string;
-    owner_id?: string | null;
-};
-
-export type StartPayOnboardingResponse = {
-    customer: WalletCustomer;
-    kyc: GetWalletCustomerKycResponse;
-    next_step: PayOnboardingStep;
 };
 
 /**
@@ -2761,6 +3614,19 @@ export type StartProviderAppProvisioningBody = {
     template_id?: string | null;
 };
 
+export type StartProviderSetupBody = {
+    auth_method_id?: string | null;
+    domain: string;
+    form_values?: WrappedJsonValue;
+    /**
+     * Optional memory banks to bind atomically when setup creates a resource.
+     */
+    memory_bank_ids?: Array<WrappedUuidV4> | null;
+    provider_id: string;
+    return_url?: string | null;
+    target_resource?: null | WrappedJsonValue;
+};
+
 export type StartProxiedMcpServerOauthRequestInner = {
     auth_uri: string;
     client_id: string;
@@ -2777,6 +3643,10 @@ export type StartProxiedMcpServerOauthResponse = {
     callback_url: string;
     discovered_tool_count: number;
     tool_group_instance: ToolGroupInstanceSerialized;
+};
+
+export type StartSlackOauthRequestInner = {
+    return_url?: string | null;
 };
 
 export type SteerChatKitAgentTurnQueueItemResponse = {
@@ -3008,8 +3878,8 @@ export type ToolInstanceListItem = ToolInstanceSerialized & {
 export type ToolInstanceSerialized = {
     bound_params?: null | WrappedJsonValue;
     created_at: WrappedChronoDateTime;
-    org_id?: string;
-    team_id?: string;
+    org_id: string;
+    team_id: string;
     tool_group_deployment_deployment_id: string;
     tool_group_instance_id: string;
     tool_group_source_type_id: string;
@@ -3217,6 +4087,10 @@ export type UpdateHttpVercelAiSdkAgentRequestInner = {
     endpoint_url?: string | null;
     local_running_endpoint?: boolean | null;
     local_runtime_path?: string | null;
+    /**
+     * Replaces the complete memory-bank selection when present.
+     */
+    memory_bank_ids?: Array<WrappedUuidV4> | null;
     streaming?: boolean | null;
     timeout_ms?: number | null;
 };
@@ -3232,6 +4106,10 @@ export type UpdateManagedUserCredentialBody = {
  */
 export type UpdateMcpServerInstanceBody = {
     is_dynamic_tool_discovery: boolean;
+    /**
+     * Replaces synchronized memory-bank bindings when present; omission preserves them.
+     */
+    memory_bank_ids?: Array<WrappedUuidV4> | null;
     name: string;
 };
 
@@ -3239,8 +4117,24 @@ export type UpdateMcpServerInstanceBody = {
  * Request body for updating a tool in an MCP server instance (key fields come from path).
  */
 export type UpdateMcpServerInstanceToolBody = {
+    configured_params?: {
+        [key: string]: unknown;
+    };
+    is_async?: boolean;
     tool_description?: string | null;
     tool_name: string;
+};
+
+export type UpdateMemoryBankBody = {
+    description?: string | null;
+    name?: string | null;
+};
+
+export type UpdateMemoryBankConfigBody = {
+    /**
+     * Provider-neutral configuration keys supported by the selected provider.
+     */
+    updates: unknown;
 };
 
 export type UpdateOrgOidcProviderRequest = {
@@ -3263,6 +4157,18 @@ export type UpdateOrganizationRequest = {
     metadata?: unknown;
     name: string;
     slug?: string | null;
+};
+
+export type UpdatePageTypeBody = {
+    archived?: boolean | null;
+    description?: string;
+    name: string;
+};
+
+export type UpdateRelationshipTypeBody = {
+    description?: string;
+    forward_label: string;
+    inverse_label?: string | null;
 };
 
 export type UpdateReverseProxyProfileInner = {
@@ -3289,6 +4195,10 @@ export type UpdateSignalProviderInstanceRequestInner = {
         [key: string]: unknown;
     };
     display_name: string;
+    /**
+     * Omitted leaves bindings unchanged; an empty list detaches every bank.
+     */
+    memory_bank_ids?: Array<WrappedUuidV4> | null;
     poll_interval_seconds?: number | null;
     polling_state: {
         [key: string]: unknown;
@@ -3312,6 +4222,7 @@ export type UpdateSkillBody = {
 
 export type UpdateSkillRegistryBody = {
     description?: string | null;
+    memory_bank_ids?: Array<WrappedUuidV4> | null;
     name?: string | null;
     skill_ids?: Array<WrappedUuidV4> | null;
 };
@@ -3332,6 +4243,48 @@ export type UpdateTrustedRuntimeBody = {
     description?: string | null;
     name?: string | null;
     status?: null | TrustedRuntimeStatus;
+};
+
+export type UpdateWikiAssetBody = {
+    alt_text?: string | null;
+    filename?: string | null;
+    folder_path?: string | null;
+    title?: string | null;
+};
+
+export type UpdateWikiBody = {
+    /**
+     * Replaces the complete memory-bank selection when present; an empty list clears it.
+     */
+    memory_bank_ids?: Array<WrappedUuidV4> | null;
+    name: string;
+};
+
+export type UpsertPageRelationshipBody = {
+    confidence?: number | null;
+    context?: string | null;
+    data?: unknown;
+    evidence?: Array<WikiRelationshipEvidence>;
+    expected_revision?: number | null;
+    relationship_type_id: WrappedUuidV4;
+    relationship_type_version_id?: null | WrappedUuidV4;
+    source_page_id: WrappedUuidV4;
+    target_page_id: WrappedUuidV4;
+};
+
+export type UpsertWikiPageBody = {
+    /**
+     * Explicit media attachments shown beneath the page content.
+     */
+    asset_ids?: Array<WrappedUuidV4> | null;
+    data?: unknown;
+    expected_revision?: number | null;
+    markdown: string;
+    page_type_id?: null | WrappedUuidV4;
+    page_type_version_id?: null | WrappedUuidV4;
+    path: string;
+    tags?: Array<string>;
+    title: string;
 };
 
 export type UserCredentialBrokeringResponse = (BrokerState & {
@@ -3383,6 +4336,11 @@ export type UserTeam = {
     user_id: string;
 };
 
+export type ValidatePageTypeDataBody = {
+    data: unknown;
+    page_type_version_id: WrappedUuidV4;
+};
+
 export type Vec = Array<{
     description: string;
     display_name: string;
@@ -3415,12 +4373,10 @@ export type WaitUntilBalanceResponse = {
 
 export type Wallet = {
     cached_compose_balances?: null | WrappedJsonValue;
-    cached_compose_deposit_info?: null | WrappedJsonValue;
     compose_customer_id: string;
     compose_deposit_chain: string;
     compose_deposit_currency: string;
     compose_deposit_wallet_id?: string | null;
-    compose_virtual_account_id: string;
     created_at: WrappedChronoDateTime;
     id: string;
     last_compose_sync_at?: null | WrappedChronoDateTime;
@@ -3441,7 +4397,6 @@ export type WalletCustomer = {
     compose_customer_payload: WrappedJsonValue;
     compose_kyc_payload?: null | WrappedJsonValue;
     created_at: WrappedChronoDateTime;
-    email: string;
     id: string;
     kyc_flow_link?: string | null;
     kyc_verified: boolean;
@@ -3457,9 +4412,68 @@ export type WalletCustomerPaginatedResponse = {
     next_page_token?: string;
 };
 
+export type WalletMerchant = {
+    created_at: WrappedChronoDateTime;
+    favicon_url?: string | null;
+    icon_fetched_at?: null | WrappedChronoDateTime;
+    icon_media_type?: string | null;
+    icon_sha256?: string | null;
+    id: string;
+    merchant_url: string;
+    name?: string | null;
+    org_id: string;
+    origin: string;
+    raw_metadata: WrappedJsonValue;
+    team_id: string;
+    updated_at: WrappedChronoDateTime;
+};
+
 export type WalletPaginatedResponse = {
     items: Array<Wallet>;
     next_page_token?: string;
+};
+
+export type WalletTransactionHistoryItem = {
+    amount?: string | null;
+    amount_decimals?: number | null;
+    amount_raw?: string | null;
+    asset?: string | null;
+    chain?: string | null;
+    counterparty_address?: string | null;
+    created_at: WrappedChronoDateTime;
+    direction: string;
+    id: string;
+    item_type: string;
+    merchant?: null | WalletMerchant;
+    merchant_id?: string | null;
+    occurred_at: WrappedChronoDateTime;
+    org_id: string;
+    raw_payload: WrappedJsonValue;
+    scanned_at?: null | WrappedChronoDateTime;
+    status: string;
+    team_id: string;
+    updated_at: WrappedChronoDateTime;
+    wallet_id: string;
+};
+
+export type WalletTransactionHistoryItemPaginatedResponse = {
+    items: Array<WalletTransactionHistoryItem>;
+    next_page_token?: string;
+};
+
+export type WalletVirtualAccount = {
+    cached_compose_deposit_info?: null | WrappedJsonValue;
+    compose_customer_id: string;
+    compose_virtual_account_id: string;
+    created_at: WrappedChronoDateTime;
+    currency: string;
+    id: string;
+    org_id: string;
+    status?: string | null;
+    team_id: string;
+    updated_at: WrappedChronoDateTime;
+    wallet_customer_id: string;
+    wallet_id: string;
 };
 
 /**
@@ -3473,6 +4487,243 @@ export type WebhookSigningKeyMetadata = {
     status: string;
     updated_at: WrappedChronoDateTime;
 };
+
+export type Wiki = {
+    created_at: WrappedChronoDateTime;
+    id: WrappedUuidV4;
+    name: string;
+    org_id: string;
+    status: WikiStatus;
+    status_message?: string | null;
+    team_id: string;
+    tool_group_instance_id?: string | null;
+    updated_at: WrappedChronoDateTime;
+};
+
+export type WikiAsset = {
+    actor_id: string;
+    alt_text?: string | null;
+    checksum?: string | null;
+    created_at: WrappedChronoDateTime;
+    filename: string;
+    folder_path: string;
+    id: WrappedUuidV4;
+    media_type: string;
+    size_bytes?: number | null;
+    stable_uri: string;
+    status: WikiAssetStatus;
+    status_message?: string | null;
+    title?: string | null;
+    updated_at: WrappedChronoDateTime;
+    wiki_id: WrappedUuidV4;
+};
+
+export type WikiAssetDownloadResponse = {
+    asset: WikiAsset;
+    download_url: string;
+    expires_at: WrappedChronoDateTime;
+};
+
+export type WikiAssetPaginatedResponse = {
+    items: Array<WikiAsset>;
+    next_page_token?: string;
+};
+
+export type WikiAssetReferences = {
+    asset_id: WrappedUuidV4;
+    page_ids: Array<WrappedUuidV4>;
+};
+
+export enum WikiAssetStatus {
+    PENDING = 'pending',
+    READY = 'ready',
+    ERROR = 'error',
+    DELETING = 'deleting'
+}
+
+export type WikiAssetUploadResponse = {
+    asset: WikiAsset;
+    expires_at: WrappedChronoDateTime;
+    upload_headers: {
+        [key: string]: string;
+    };
+    upload_url: string;
+};
+
+export type WikiGraph = {
+    pages: Array<WikiPage>;
+    relationships: Array<WikiPageRelationship>;
+};
+
+export type WikiOntologyInstallation = {
+    actor_id: string;
+    id: WrappedUuidV4;
+    installed_at: WrappedChronoDateTime;
+    source_name: string;
+    source_url: string;
+    template_key: string;
+    template_version: number;
+    wiki_id: WrappedUuidV4;
+};
+
+/**
+ * A reusable group of page schemas and relationship definitions.
+ */
+export type WikiOntologyTemplate = {
+    description: string;
+    editable_after_install: boolean;
+    icon_key: string;
+    icon_url: string;
+    key: string;
+    name: string;
+    page_types: Array<OntologyPageTypeDefinition>;
+    relationship_types: Array<OntologyRelationshipTypeDefinition>;
+    source_name: string;
+    source_url: string;
+    version: number;
+};
+
+export type WikiPage = {
+    actor_id: string;
+    checksum: string;
+    created_at: WrappedChronoDateTime;
+    data: unknown;
+    id: WrappedUuidV4;
+    markdown: string;
+    org_id: string;
+    page_type_id: WrappedUuidV4;
+    page_type_key: string;
+    page_type_version_id: WrappedUuidV4;
+    path: string;
+    revision: number;
+    tags: Array<string>;
+    team_id: string;
+    title: string;
+    updated_at: WrappedChronoDateTime;
+    wiki_id: WrappedUuidV4;
+};
+
+export type WikiPagePaginatedResponse = {
+    items: Array<WikiPage>;
+    next_page_token?: string;
+};
+
+export type WikiPageRelationship = {
+    actor_id: string;
+    confidence?: number | null;
+    context?: string | null;
+    created_at: WrappedChronoDateTime;
+    data: unknown;
+    evidence: Array<WikiRelationshipEvidence>;
+    id: WrappedUuidV4;
+    relationship_type_id: WrappedUuidV4;
+    relationship_type_version_id: WrappedUuidV4;
+    revision: number;
+    source_page_id: WrappedUuidV4;
+    target_page_id: WrappedUuidV4;
+    updated_at: WrappedChronoDateTime;
+    wiki_id: WrappedUuidV4;
+};
+
+export type WikiPageRevision = {
+    actor_id: string;
+    checksum: string;
+    created_at: WrappedChronoDateTime;
+    data: unknown;
+    /**
+     * Whether this immutable revision is the deletion tombstone.
+     */
+    deleted: boolean;
+    id: WrappedUuidV4;
+    markdown: string;
+    page_id: WrappedUuidV4;
+    page_type_id: WrappedUuidV4;
+    page_type_key: string;
+    page_type_version_id: WrappedUuidV4;
+    path: string;
+    revision: number;
+    tags: Array<string>;
+    title: string;
+    wiki_id: WrappedUuidV4;
+};
+
+export type WikiPageRevisionPaginatedResponse = {
+    items: Array<WikiPageRevision>;
+    next_page_token?: string;
+};
+
+export type WikiPageType = {
+    actor_id: string;
+    archived: boolean;
+    created_at: WrappedChronoDateTime;
+    current_version: number;
+    description: string;
+    id: WrappedUuidV4;
+    key: string;
+    name: string;
+    updated_at: WrappedChronoDateTime;
+    wiki_id: WrappedUuidV4;
+};
+
+export type WikiPageTypeVersion = {
+    actor_id: string;
+    created_at: WrappedChronoDateTime;
+    id: WrappedUuidV4;
+    page_type_id: WrappedUuidV4;
+    schema: unknown;
+    schema_checksum: string;
+    version: number;
+    wiki_id: WrappedUuidV4;
+};
+
+export type WikiPaginatedResponse = {
+    items: Array<Wiki>;
+    next_page_token?: string;
+};
+
+export type WikiRelationshipEvidence = {
+    kind: 'page';
+    label?: string | null;
+    page_id: WrappedUuidV4;
+} | {
+    kind: 'url';
+    label?: string | null;
+    url: string;
+};
+
+export type WikiRelationshipType = {
+    actor_id: string;
+    created_at: WrappedChronoDateTime;
+    current_version: number;
+    description: string;
+    directionality: RelationshipDirectionality;
+    forward_label: string;
+    id: WrappedUuidV4;
+    inverse_label?: string | null;
+    key: string;
+    updated_at: WrappedChronoDateTime;
+    wiki_id: WrappedUuidV4;
+};
+
+export type WikiRelationshipTypeVersion = {
+    actor_id: string;
+    created_at: WrappedChronoDateTime;
+    id: WrappedUuidV4;
+    relationship_type_id: WrappedUuidV4;
+    schema: unknown;
+    schema_checksum: string;
+    source_page_type_ids: Array<WrappedUuidV4>;
+    target_page_type_ids: Array<WrappedUuidV4>;
+    version: number;
+    wiki_id: WrappedUuidV4;
+};
+
+export enum WikiStatus {
+    PROVISIONING = 'provisioning',
+    ACTIVE = 'active',
+    ERROR = 'error',
+    DELETING = 'deleting'
+}
 
 export type WrappedChronoDateTime = string;
 
@@ -3565,6 +4816,193 @@ export type BillingAutumnBridgePostResponses = {
     200: unknown;
 };
 
+export type BillingContextGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/billing/context';
+};
+
+export type BillingContextGetErrors = {
+    /**
+     * Authentication failed
+     */
+    401: Error;
+    /**
+     * Organization membership required
+     */
+    403: Error;
+};
+
+export type BillingContextGetError = BillingContextGetErrors[keyof BillingContextGetErrors];
+
+export type BillingContextGetResponses = {
+    /**
+     * Organization billing context
+     */
+    200: BillingContext;
+};
+
+export type BillingContextGetResponse = BillingContextGetResponses[keyof BillingContextGetResponses];
+
+export type BillingMemoryBankReservationCommitData = {
+    body: CommitMemoryBankReservationBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/billing/internal/memory-banks/quantity';
+};
+
+export type BillingMemoryBankReservationCommitErrors = {
+    /**
+     * Invalid quantity transition
+     */
+    400: Error;
+    /**
+     * Authentication failed
+     */
+    401: Error;
+    /**
+     * System administrator required
+     */
+    403: Error;
+    /**
+     * Reservation expired or consumed
+     */
+    410: Error;
+};
+
+export type BillingMemoryBankReservationCommitError = BillingMemoryBankReservationCommitErrors[keyof BillingMemoryBankReservationCommitErrors];
+
+export type BillingMemoryBankReservationCommitResponses = {
+    /**
+     * Updated memory-bank billing context
+     */
+    200: MemoryBankBillingContext;
+};
+
+export type BillingMemoryBankReservationCommitResponse = BillingMemoryBankReservationCommitResponses[keyof BillingMemoryBankReservationCommitResponses];
+
+export type BillingMemoryBankReservationCreateData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/billing/internal/memory-banks/reservations';
+};
+
+export type BillingMemoryBankReservationCreateErrors = {
+    /**
+     * Authentication failed
+     */
+    401: Error;
+    /**
+     * Stripe payment action required
+     */
+    402: Error;
+    /**
+     * System administrator required
+     */
+    403: Error;
+    /**
+     * Concurrent reconciliation in progress
+     */
+    503: Error;
+};
+
+export type BillingMemoryBankReservationCreateError = BillingMemoryBankReservationCreateErrors[keyof BillingMemoryBankReservationCreateErrors];
+
+export type BillingMemoryBankReservationCreateResponses = {
+    /**
+     * Reserved memory-bank capacity
+     */
+    200: MemoryBankCreationReservation;
+};
+
+export type BillingMemoryBankReservationCreateResponse = BillingMemoryBankReservationCreateResponses[keyof BillingMemoryBankReservationCreateResponses];
+
+export type BillingMemoryBankReservationReleaseData = {
+    body?: never;
+    path: {
+        /**
+         * Reservation id
+         */
+        reservation_id: string;
+    };
+    query?: never;
+    url: '/api/v1/billing/internal/memory-banks/reservations/{reservation_id}';
+};
+
+export type BillingMemoryBankReservationReleaseErrors = {
+    /**
+     * Authentication failed
+     */
+    401: Error;
+    /**
+     * System administrator required
+     */
+    403: Error;
+    /**
+     * Reservation missing or no longer pending
+     */
+    410: Error;
+};
+
+export type BillingMemoryBankReservationReleaseError = BillingMemoryBankReservationReleaseErrors[keyof BillingMemoryBankReservationReleaseErrors];
+
+export type BillingMemoryBankReservationReleaseResponses = {
+    /**
+     * Updated memory-bank billing context
+     */
+    200: MemoryBankBillingContext;
+};
+
+export type BillingMemoryBankReservationReleaseResponse = BillingMemoryBankReservationReleaseResponses[keyof BillingMemoryBankReservationReleaseResponses];
+
+export type BillingProductEnrollCurrentHumanData = {
+    body?: never;
+    path: {
+        /**
+         * tilde_core or tilde_pay
+         */
+        product_id: string;
+    };
+    query?: never;
+    url: '/api/v1/billing/products/{product_id}/enroll';
+};
+
+export type BillingProductEnrollCurrentHumanErrors = {
+    /**
+     * Unknown product or machine caller
+     */
+    400: Error;
+    /**
+     * Authentication failed
+     */
+    401: Error;
+    /**
+     * Stripe payment action required
+     */
+    402: Error;
+    /**
+     * Organization membership required
+     */
+    403: Error;
+    /**
+     * Billing reconciliation did not complete before the bounded wait expired
+     */
+    503: Error;
+};
+
+export type BillingProductEnrollCurrentHumanError = BillingProductEnrollCurrentHumanErrors[keyof BillingProductEnrollCurrentHumanErrors];
+
+export type BillingProductEnrollCurrentHumanResponses = {
+    /**
+     * Updated organization billing context
+     */
+    200: BillingContext;
+};
+
+export type BillingProductEnrollCurrentHumanResponse = BillingProductEnrollCurrentHumanResponses[keyof BillingProductEnrollCurrentHumanResponses];
+
 export type BillingRedirectData = {
     body?: never;
     path?: never;
@@ -3632,69 +5070,21 @@ export type AutumnWebhookHandlerResponses = {
     200: unknown;
 };
 
-export type ChatkitSlackTildeManagedEventsWebhookData = {
-    /**
-     * Raw Slack Events API payload
-     */
-    body: string;
+export type BillingWebhookStripeDeprecatedData = {
+    body?: never;
     path?: never;
     query?: never;
-    url: '/api/v1/chatkit/webhooks/slack/tilde-managed/events';
+    url: '/api/v1/billing/webhooks/stripe';
 };
 
-export type ChatkitSlackTildeManagedEventsWebhookErrors = {
+export type BillingWebhookStripeDeprecatedResponses = {
     /**
-     * Bad Request
+     * Deprecated direct Stripe webhook acknowledged
      */
-    400: Error;
-    /**
-     * Internal Server Error
-     */
-    500: Error;
+    204: void;
 };
 
-export type ChatkitSlackTildeManagedEventsWebhookError = ChatkitSlackTildeManagedEventsWebhookErrors[keyof ChatkitSlackTildeManagedEventsWebhookErrors];
-
-export type ChatkitSlackTildeManagedEventsWebhookResponses = {
-    /**
-     * Handle Tilde-managed Slack Events API webhook
-     */
-    200: SlackWebhookResponse;
-};
-
-export type ChatkitSlackTildeManagedEventsWebhookResponse = ChatkitSlackTildeManagedEventsWebhookResponses[keyof ChatkitSlackTildeManagedEventsWebhookResponses];
-
-export type ChatkitSlackTildeManagedInteractivityWebhookData = {
-    /**
-     * Raw Slack interactivity payload
-     */
-    body: string;
-    path?: never;
-    query?: never;
-    url: '/api/v1/chatkit/webhooks/slack/tilde-managed/interactivity';
-};
-
-export type ChatkitSlackTildeManagedInteractivityWebhookErrors = {
-    /**
-     * Bad Request
-     */
-    400: Error;
-    /**
-     * Internal Server Error
-     */
-    500: Error;
-};
-
-export type ChatkitSlackTildeManagedInteractivityWebhookError = ChatkitSlackTildeManagedInteractivityWebhookErrors[keyof ChatkitSlackTildeManagedInteractivityWebhookErrors];
-
-export type ChatkitSlackTildeManagedInteractivityWebhookResponses = {
-    /**
-     * Handle Tilde-managed Slack interactivity webhook
-     */
-    200: SlackWebhookResponse;
-};
-
-export type ChatkitSlackTildeManagedInteractivityWebhookResponse = ChatkitSlackTildeManagedInteractivityWebhookResponses[keyof ChatkitSlackTildeManagedInteractivityWebhookResponses];
+export type BillingWebhookStripeDeprecatedResponse = BillingWebhookStripeDeprecatedResponses[keyof BillingWebhookStripeDeprecatedResponses];
 
 export type GetRuntimeConfigData = {
     body?: never;
@@ -4784,6 +6174,52 @@ export type UpdateOrgOidcProviderResponses = {
 
 export type UpdateOrgOidcProviderResponse = UpdateOrgOidcProviderResponses[keyof UpdateOrgOidcProviderResponses];
 
+export type VerifyOrgOidcProviderDomainData = {
+    body?: never;
+    path: {
+        /**
+         * Organization ID
+         */
+        organization_id: string;
+        /**
+         * OIDC provider ID
+         */
+        provider_id: string;
+    };
+    query?: never;
+    url: '/api/v1/identity/organizations/{organization_id}/oidc-providers/{provider_id}/verify-domain';
+};
+
+export type VerifyOrgOidcProviderDomainErrors = {
+    /**
+     * DNS TXT record is missing or invalid
+     */
+    400: Error;
+    /**
+     * Unauthorized
+     */
+    401: Error;
+    /**
+     * Forbidden
+     */
+    403: Error;
+    /**
+     * Not found
+     */
+    404: Error;
+};
+
+export type VerifyOrgOidcProviderDomainError = VerifyOrgOidcProviderDomainErrors[keyof VerifyOrgOidcProviderDomainErrors];
+
+export type VerifyOrgOidcProviderDomainResponses = {
+    /**
+     * Organization OIDC provider domain verified
+     */
+    200: OrgOidcProvider;
+};
+
+export type VerifyOrgOidcProviderDomainResponse = VerifyOrgOidcProviderDomainResponses[keyof VerifyOrgOidcProviderDomainResponses];
+
 export type ListTeamsData = {
     body?: never;
     path: {
@@ -4861,9 +6297,11 @@ export type RouteListApiKeysData = {
          */
         team_id: string;
     };
-    query: {
-        page_size: number;
-        next_page_token?: string;
+    query?: {
+        page_size?: number | null;
+        next_page_token?: string | null;
+        user_id?: string | null;
+        user_type?: string | null;
     };
     url: '/api/v1/identity/team/{team_id}/api-key';
 };
@@ -4981,6 +6419,112 @@ export type RouteDeleteApiKeyResponses = {
 };
 
 export type RouteDeleteApiKeyResponse = RouteDeleteApiKeyResponses[keyof RouteDeleteApiKeyResponses];
+
+export type RevokeLocalRuntimeTunnelApiKeyData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/api/v1/identity/team/{team_id}/local-runtime/api-key';
+};
+
+export type RevokeLocalRuntimeTunnelApiKeyErrors = {
+    /**
+     * Unauthorized
+     */
+    401: Error;
+    /**
+     * Forbidden
+     */
+    403: Error;
+};
+
+export type RevokeLocalRuntimeTunnelApiKeyError = RevokeLocalRuntimeTunnelApiKeyErrors[keyof RevokeLocalRuntimeTunnelApiKeyErrors];
+
+export type RevokeLocalRuntimeTunnelApiKeyResponses = {
+    /**
+     * Dev tunnel API key revoked
+     */
+    200: TupleUnit;
+};
+
+export type RevokeLocalRuntimeTunnelApiKeyResponse = RevokeLocalRuntimeTunnelApiKeyResponses[keyof RevokeLocalRuntimeTunnelApiKeyResponses];
+
+export type GetLocalRuntimeTunnelApiKeyData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/api/v1/identity/team/{team_id}/local-runtime/api-key';
+};
+
+export type GetLocalRuntimeTunnelApiKeyErrors = {
+    /**
+     * Unauthorized
+     */
+    401: Error;
+    /**
+     * Forbidden
+     */
+    403: Error;
+};
+
+export type GetLocalRuntimeTunnelApiKeyError = GetLocalRuntimeTunnelApiKeyErrors[keyof GetLocalRuntimeTunnelApiKeyErrors];
+
+export type GetLocalRuntimeTunnelApiKeyResponses = {
+    /**
+     * Dev tunnel API key metadata
+     */
+    200: LocalRuntimeTunnelApiKey;
+};
+
+export type GetLocalRuntimeTunnelApiKeyResponse = GetLocalRuntimeTunnelApiKeyResponses[keyof GetLocalRuntimeTunnelApiKeyResponses];
+
+export type GenerateLocalRuntimeTunnelApiKeyData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/api/v1/identity/team/{team_id}/local-runtime/api-key';
+};
+
+export type GenerateLocalRuntimeTunnelApiKeyErrors = {
+    /**
+     * Unauthorized
+     */
+    401: Error;
+    /**
+     * Forbidden
+     */
+    403: Error;
+    /**
+     * Local runtime tunnels unavailable
+     */
+    503: Error;
+};
+
+export type GenerateLocalRuntimeTunnelApiKeyError = GenerateLocalRuntimeTunnelApiKeyErrors[keyof GenerateLocalRuntimeTunnelApiKeyErrors];
+
+export type GenerateLocalRuntimeTunnelApiKeyResponses = {
+    /**
+     * Dev tunnel API key generated
+     */
+    200: GenerateLocalRuntimeTunnelApiKeyResponse;
+};
+
+export type GenerateLocalRuntimeTunnelApiKeyResponse2 = GenerateLocalRuntimeTunnelApiKeyResponses[keyof GenerateLocalRuntimeTunnelApiKeyResponses];
 
 export type DeleteTeamData = {
     body?: never;
@@ -6173,7 +7717,7 @@ export type ChatkitCreateSlackChannelInstallationResponses = {
 export type ChatkitCreateSlackChannelInstallationResponse = ChatkitCreateSlackChannelInstallationResponses[keyof ChatkitCreateSlackChannelInstallationResponses];
 
 export type ChatkitStartSlackOauthData = {
-    body?: never;
+    body: StartSlackOauthRequestInner;
     path: {
         /**
          * Team ID
@@ -7715,88 +9259,6 @@ export type ChatkitRemoveSessionParticipantResponses = {
 
 export type ChatkitRemoveSessionParticipantResponse = ChatkitRemoveSessionParticipantResponses[keyof ChatkitRemoveSessionParticipantResponses];
 
-export type ChatkitSlackSelfManagedEventsWebhookData = {
-    /**
-     * Raw Slack Events API payload
-     */
-    body: string;
-    path: {
-        /**
-         * Team ID
-         */
-        team_id: string;
-        /**
-         * Configured Slack chat provider ID
-         */
-        chat_provider_id: string;
-    };
-    query?: never;
-    url: '/api/v1/team/{team_id}/chatkit/webhooks/slack/{chat_provider_id}/events';
-};
-
-export type ChatkitSlackSelfManagedEventsWebhookErrors = {
-    /**
-     * Bad Request
-     */
-    400: Error;
-    /**
-     * Internal Server Error
-     */
-    500: Error;
-};
-
-export type ChatkitSlackSelfManagedEventsWebhookError = ChatkitSlackSelfManagedEventsWebhookErrors[keyof ChatkitSlackSelfManagedEventsWebhookErrors];
-
-export type ChatkitSlackSelfManagedEventsWebhookResponses = {
-    /**
-     * Handle self-managed Slack Events API webhook
-     */
-    200: SlackWebhookResponse;
-};
-
-export type ChatkitSlackSelfManagedEventsWebhookResponse = ChatkitSlackSelfManagedEventsWebhookResponses[keyof ChatkitSlackSelfManagedEventsWebhookResponses];
-
-export type ChatkitSlackSelfManagedInteractivityWebhookData = {
-    /**
-     * Raw Slack interactivity payload
-     */
-    body: string;
-    path: {
-        /**
-         * Team ID
-         */
-        team_id: string;
-        /**
-         * Configured Slack chat provider ID
-         */
-        chat_provider_id: string;
-    };
-    query?: never;
-    url: '/api/v1/team/{team_id}/chatkit/webhooks/slack/{chat_provider_id}/interactivity';
-};
-
-export type ChatkitSlackSelfManagedInteractivityWebhookErrors = {
-    /**
-     * Bad Request
-     */
-    400: Error;
-    /**
-     * Internal Server Error
-     */
-    500: Error;
-};
-
-export type ChatkitSlackSelfManagedInteractivityWebhookError = ChatkitSlackSelfManagedInteractivityWebhookErrors[keyof ChatkitSlackSelfManagedInteractivityWebhookErrors];
-
-export type ChatkitSlackSelfManagedInteractivityWebhookResponses = {
-    /**
-     * Handle self-managed Slack interactivity webhook
-     */
-    200: SlackWebhookResponse;
-};
-
-export type ChatkitSlackSelfManagedInteractivityWebhookResponse = ChatkitSlackSelfManagedInteractivityWebhookResponses[keyof ChatkitSlackSelfManagedInteractivityWebhookResponses];
-
 export type ResumeUserCredentialBrokeringData = {
     body: ResumeUserCredentialBrokeringParams;
     path: {
@@ -7860,6 +9322,28 @@ export type StartProviderAppProvisioningResponses = {
 };
 
 export type StartProviderAppProvisioningResponse = StartProviderAppProvisioningResponses[keyof StartProviderAppProvisioningResponses];
+
+export type GetProviderProvisioningHumanActionData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        state_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/credential/provider-provisioning/{state_id}/action';
+};
+
+export type GetProviderProvisioningHumanActionResponses = {
+    /**
+     * Provider provisioning browser action
+     */
+    200: ProviderProvisioningHumanAction;
+};
+
+export type GetProviderProvisioningHumanActionResponse = GetProviderProvisioningHumanActionResponses[keyof GetProviderProvisioningHumanActionResponses];
 
 export type ResumeProviderAppProvisioningData = {
     body: ResumeProviderAppProvisioningBody;
@@ -7970,6 +9454,119 @@ export type UpdateResourceServerCredentialResponses = {
 };
 
 export type UpdateResourceServerCredentialResponse = UpdateResourceServerCredentialResponses[keyof UpdateResourceServerCredentialResponses];
+
+export type ListCredentialSetupItemsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: {
+        page_size?: number;
+        next_page_token?: string | null;
+        status?: null | CredentialSetupItemStatus;
+    };
+    url: '/api/v1/team/{team_id}/credential/setup-items';
+};
+
+export type ListCredentialSetupItemsResponses = {
+    /**
+     * Credential setup items
+     */
+    200: CredentialSetupItemPaginatedResponse;
+};
+
+export type ListCredentialSetupItemsResponse = ListCredentialSetupItemsResponses[keyof ListCredentialSetupItemsResponses];
+
+export type GetCredentialSetupItemData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/credential/setup-items/{id}';
+};
+
+export type GetCredentialSetupItemResponses = {
+    /**
+     * Credential setup item
+     */
+    200: CredentialSetupItem;
+};
+
+export type GetCredentialSetupItemResponse = GetCredentialSetupItemResponses[keyof GetCredentialSetupItemResponses];
+
+export type CompleteCredentialSetupItemData = {
+    body: CompleteCredentialSetupItemBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/credential/setup-items/{id}/complete';
+};
+
+export type CompleteCredentialSetupItemResponses = {
+    /**
+     * Credential setup completion response
+     */
+    200: StartCredentialSetupItemResponse;
+};
+
+export type CompleteCredentialSetupItemResponse = CompleteCredentialSetupItemResponses[keyof CompleteCredentialSetupItemResponses];
+
+export type ResumeCredentialSetupItemData = {
+    body: ResumeCredentialSetupItemBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/credential/setup-items/{id}/resume';
+};
+
+export type ResumeCredentialSetupItemResponses = {
+    /**
+     * Credential setup resume response
+     */
+    200: StartCredentialSetupItemResponse;
+};
+
+export type ResumeCredentialSetupItemResponse = ResumeCredentialSetupItemResponses[keyof ResumeCredentialSetupItemResponses];
+
+export type StartCredentialSetupItemData = {
+    body: StartCredentialSetupItemBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/credential/setup-items/{id}/start';
+};
+
+export type StartCredentialSetupItemResponses = {
+    /**
+     * Credential setup start response
+     */
+    200: StartCredentialSetupItemResponse;
+};
+
+export type StartCredentialSetupItemResponse2 = StartCredentialSetupItemResponses[keyof StartCredentialSetupItemResponses];
 
 export type CreateResourceServerCredentialData = {
     body: CreateResourceServerCredentialParamsInner;
@@ -10180,6 +11777,471 @@ export type GetToolsOpenapiSpecResponses = {
 
 export type GetToolsOpenapiSpecResponse = GetToolsOpenapiSpecResponses[keyof GetToolsOpenapiSpecResponses];
 
+export type ListMemoryBanksData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: {
+        page_size?: number;
+        next_page_token?: string | null;
+    };
+    url: '/api/v1/team/{team_id}/memory/banks';
+};
+
+export type ListMemoryBanksResponses = {
+    200: MemoryBankPaginatedResponse;
+};
+
+export type ListMemoryBanksResponse = ListMemoryBanksResponses[keyof ListMemoryBanksResponses];
+
+export type CreateMemoryBankData = {
+    body: CreateMemoryBankBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks';
+};
+
+export type CreateMemoryBankResponses = {
+    200: MemoryBank;
+};
+
+export type CreateMemoryBankResponse = CreateMemoryBankResponses[keyof CreateMemoryBankResponses];
+
+export type DeleteMemoryBankData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}';
+};
+
+export type DeleteMemoryBankResponses = {
+    200: unknown;
+};
+
+export type GetMemoryBankData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}';
+};
+
+export type GetMemoryBankResponses = {
+    200: MemoryBank;
+};
+
+export type GetMemoryBankResponse = GetMemoryBankResponses[keyof GetMemoryBankResponses];
+
+export type UpdateMemoryBankData = {
+    body: UpdateMemoryBankBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}';
+};
+
+export type UpdateMemoryBankResponses = {
+    200: MemoryBank;
+};
+
+export type UpdateMemoryBankResponse = UpdateMemoryBankResponses[keyof UpdateMemoryBankResponses];
+
+export type ResetMemoryBankConfigData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/config';
+};
+
+export type ResetMemoryBankConfigResponses = {
+    200: MemoryBankConfig;
+};
+
+export type ResetMemoryBankConfigResponse = ResetMemoryBankConfigResponses[keyof ResetMemoryBankConfigResponses];
+
+export type GetMemoryBankConfigData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/config';
+};
+
+export type GetMemoryBankConfigResponses = {
+    200: MemoryBankConfig;
+};
+
+export type GetMemoryBankConfigResponse = GetMemoryBankConfigResponses[keyof GetMemoryBankConfigResponses];
+
+export type UpdateMemoryBankConfigData = {
+    body: UpdateMemoryBankConfigBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/config';
+};
+
+export type UpdateMemoryBankConfigResponses = {
+    200: MemoryBankConfig;
+};
+
+export type UpdateMemoryBankConfigResponse = UpdateMemoryBankConfigResponses[keyof UpdateMemoryBankConfigResponses];
+
+export type DeleteMemoryDocumentData = {
+    body: DeleteMemoryDocumentBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/documents';
+};
+
+export type DeleteMemoryDocumentResponses = {
+    200: unknown;
+};
+
+export type ListMemoryBankDocumentsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: {
+        limit?: number;
+        offset?: number;
+        q?: string | null;
+    };
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/documents';
+};
+
+export type ListMemoryBankDocumentsResponses = {
+    200: MemoryBankDocumentList;
+};
+
+export type ListMemoryBankDocumentsResponse = ListMemoryBankDocumentsResponses[keyof ListMemoryBankDocumentsResponses];
+
+export type GetMemoryBankDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+        document_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/documents/{document_id}';
+};
+
+export type GetMemoryBankDocumentResponses = {
+    200: unknown;
+};
+
+export type CheckMemoryBankHealthData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/health';
+};
+
+export type CheckMemoryBankHealthResponses = {
+    200: MemoryBankHealth;
+};
+
+export type CheckMemoryBankHealthResponse = CheckMemoryBankHealthResponses[keyof CheckMemoryBankHealthResponses];
+
+export type RecallMemoryData = {
+    body: RecallMemoryBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/recall';
+};
+
+export type RecallMemoryResponses = {
+    200: MemoryOperationResponse;
+};
+
+export type RecallMemoryResponse = RecallMemoryResponses[keyof RecallMemoryResponses];
+
+export type ReflectMemoryData = {
+    body: ReflectMemoryBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/reflect';
+};
+
+export type ReflectMemoryResponses = {
+    200: MemoryOperationResponse;
+};
+
+export type ReflectMemoryResponse = ReflectMemoryResponses[keyof ReflectMemoryResponses];
+
+export type RetainMemoryDocumentData = {
+    body: RetainMemoryBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/retain';
+};
+
+export type RetainMemoryDocumentResponses = {
+    200: MemoryOperationResponse;
+};
+
+export type RetainMemoryDocumentResponse = RetainMemoryDocumentResponses[keyof RetainMemoryDocumentResponses];
+
+export type ExportMemoryBankTemplateData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/template';
+};
+
+export type ExportMemoryBankTemplateResponses = {
+    200: MemoryBankTemplate;
+};
+
+export type ExportMemoryBankTemplateResponse = ExportMemoryBankTemplateResponses[keyof ExportMemoryBankTemplateResponses];
+
+export type ImportMemoryBankTemplateData = {
+    body: ImportMemoryBankTemplateBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{bank_id}/template';
+};
+
+export type ImportMemoryBankTemplateResponses = {
+    200: ImportMemoryBankTemplateResponse;
+};
+
+export type ImportMemoryBankTemplateResponse2 = ImportMemoryBankTemplateResponses[keyof ImportMemoryBankTemplateResponses];
+
+export type ListMemoryBankSourceBindingsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        memory_bank_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/banks/{memory_bank_id}/source-bindings';
+};
+
+export type ListMemoryBankSourceBindingsResponses = {
+    200: Array<MemorySourceBinding>;
+};
+
+export type ListMemoryBankSourceBindingsResponse = ListMemoryBankSourceBindingsResponses[keyof ListMemoryBankSourceBindingsResponses];
+
+export type ListMemorySourceBindingsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query: {
+        source_kind: MemorySourceKind;
+        source_id: string;
+    };
+    url: '/api/v1/team/{team_id}/memory/source-bindings';
+};
+
+export type ListMemorySourceBindingsResponses = {
+    200: Array<MemorySourceBinding>;
+};
+
+export type ListMemorySourceBindingsResponse = ListMemorySourceBindingsResponses[keyof ListMemorySourceBindingsResponses];
+
+export type ReplaceMemorySourceBindingsData = {
+    body: ReplaceMemoryBankBindingsBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/source-bindings';
+};
+
+export type ReplaceMemorySourceBindingsResponses = {
+    200: Array<MemorySourceBinding>;
+};
+
+export type ReplaceMemorySourceBindingsResponse = ReplaceMemorySourceBindingsResponses[keyof ReplaceMemorySourceBindingsResponses];
+
+export type RetryMemorySourceSyncData = {
+    body: RetryMemorySourceBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/memory/source-bindings/retry';
+};
+
+export type RetryMemorySourceSyncResponses = {
+    200: Array<MemorySourceBinding>;
+};
+
+export type RetryMemorySourceSyncResponse = RetryMemorySourceSyncResponses[keyof RetryMemorySourceSyncResponses];
+
+export type ProviderSetupCatalogData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query: {
+        domain: string;
+    };
+    url: '/api/v1/team/{team_id}/provider-setup/catalog';
+};
+
+export type ProviderSetupCatalogResponses = {
+    /**
+     * Provider setup catalog
+     */
+    200: ListProviderSetupCatalogResponse;
+};
+
+export type ProviderSetupCatalogResponse = ProviderSetupCatalogResponses[keyof ProviderSetupCatalogResponses];
+
+export type ProviderSetupStartData = {
+    body: StartProviderSetupBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/provider-setup/start';
+};
+
+export type ProviderSetupStartResponses = {
+    /**
+     * Provider setup response
+     */
+    200: ProviderSetupResponse;
+};
+
+export type ProviderSetupStartResponse = ProviderSetupStartResponses[keyof ProviderSetupStartResponses];
+
+export type ProviderSetupResumeData = {
+    body: ResumeProviderSetupBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        setup_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/provider-setup/{setup_id}/resume';
+};
+
+export type ProviderSetupResumeResponses = {
+    /**
+     * Provider setup response
+     */
+    200: ProviderSetupResponse;
+};
+
+export type ProviderSetupResumeResponse = ProviderSetupResumeResponses[keyof ProviderSetupResumeResponses];
+
 export type ReverseProxyListProfilesData = {
     body?: never;
     path: {
@@ -10357,7 +12419,7 @@ export type ReverseProxyProxyGetData = {
         rest: string;
     };
     query?: never;
-    url: '/api/v1/team/{team_id}/reverse-proxy/{profile_id}/{rest}';
+    url: '/api/v1/team/{team_id}/reverse-proxy/{profile_id}/{*rest}';
 };
 
 export type ReverseProxyProxyGetResponses = {
@@ -10384,7 +12446,7 @@ export type ReverseProxyProxyPostData = {
         rest: string;
     };
     query?: never;
-    url: '/api/v1/team/{team_id}/reverse-proxy/{profile_id}/{rest}';
+    url: '/api/v1/team/{team_id}/reverse-proxy/{profile_id}/{*rest}';
 };
 
 export type ReverseProxyProxyPostResponses = {
@@ -11330,68 +13392,96 @@ export type UpdateSkillResponses = {
 
 export type UpdateSkillResponse = UpdateSkillResponses[keyof UpdateSkillResponses];
 
-export type TildePayMcpSetupData = {
-    body: SetupPayMcpRequest;
-    path: {
-        /**
-         * Team ID
-         */
-        team_id: string;
-    };
-    query?: never;
-    url: '/api/v1/team/{team_id}/tilde-pay/mcp/setup';
-};
-
-export type TildePayMcpSetupResponses = {
-    /**
-     * Tilde Pay MCP setup
-     */
-    200: SetupPayMcpResponse;
-};
-
-export type TildePayMcpSetupResponse = TildePayMcpSetupResponses[keyof TildePayMcpSetupResponses];
-
-export type TildePayOnboardingStartData = {
-    body: StartPayOnboardingRequest;
-    path: {
-        /**
-         * Team ID
-         */
-        team_id: string;
-    };
-    query?: never;
-    url: '/api/v1/team/{team_id}/tilde-pay/onboarding/start';
-};
-
-export type TildePayOnboardingStartResponses = {
-    /**
-     * Tilde Pay onboarding state
-     */
-    200: StartPayOnboardingResponse;
-};
-
-export type TildePayOnboardingStartResponse = TildePayOnboardingStartResponses[keyof TildePayOnboardingStartResponses];
-
-export type TildePayOnboardingStatusData = {
+export type GetSkillPackageData = {
     body?: never;
     path: {
         /**
          * Team ID
          */
         team_id: string;
+        id: string;
     };
     query?: never;
-    url: '/api/v1/team/{team_id}/tilde-pay/onboarding/status';
+    url: '/api/v1/team/{team_id}/skill/{id}/package';
 };
 
-export type TildePayOnboardingStatusResponses = {
+export type GetSkillPackageErrors = {
     /**
-     * Tilde Pay onboarding status
+     * Unauthorized
      */
-    200: PayOnboardingStatusResponse;
+    401: Error;
+    /**
+     * Package not found
+     */
+    404: Error;
 };
 
-export type TildePayOnboardingStatusResponse = TildePayOnboardingStatusResponses[keyof TildePayOnboardingStatusResponses];
+export type GetSkillPackageError = GetSkillPackageErrors[keyof GetSkillPackageErrors];
+
+export type GetSkillPackageResponses = {
+    /**
+     * Immutable skill package manifest
+     */
+    200: SkillPackageManifest;
+};
+
+export type GetSkillPackageResponse = GetSkillPackageResponses[keyof GetSkillPackageResponses];
+
+export type DownloadSkillPackageFileData = {
+    body: DownloadSkillPackageFileRequest;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/skill/{id}/package/download';
+};
+
+export type DownloadSkillPackageFileErrors = {
+    /**
+     * Unauthorized
+     */
+    401: Error;
+    /**
+     * Package file not found
+     */
+    404: Error;
+};
+
+export type DownloadSkillPackageFileError = DownloadSkillPackageFileErrors[keyof DownloadSkillPackageFileErrors];
+
+export type DownloadSkillPackageFileResponses = {
+    /**
+     * Short-lived package file download
+     */
+    200: SkillPackageFileDownload;
+};
+
+export type DownloadSkillPackageFileResponse = DownloadSkillPackageFileResponses[keyof DownloadSkillPackageFileResponses];
+
+export type TildePayProvisionData = {
+    body: ProvisionTildePayRequest;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/tilde-pay/onboarding';
+};
+
+export type TildePayProvisionResponses = {
+    /**
+     * Fully reconciled Tilde Pay onboarding state
+     */
+    200: ProvisionTildePayResponse;
+};
+
+export type TildePayProvisionResponse = TildePayProvisionResponses[keyof TildePayProvisionResponses];
 
 export type TildePayPaymentMppData = {
     body: PayPaymentRequest;
@@ -11908,7 +13998,9 @@ export type WalletGetFiatDepositInformationData = {
          */
         wallet_id: string;
     };
-    query?: never;
+    query?: {
+        currency?: string | null;
+    };
     url: '/api/v1/team/{team_id}/wallet/{wallet_id}/deposit-information/fiat';
 };
 
@@ -11971,6 +14063,105 @@ export type WalletMakeX402PaymentResponses = {
 
 export type WalletMakeX402PaymentResponse = WalletMakeX402PaymentResponses[keyof WalletMakeX402PaymentResponses];
 
+export type WalletTransactionHistoryListData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Wallet ID
+         */
+        wallet_id: string;
+    };
+    query?: {
+        page_size?: number;
+        next_page_token?: string | null;
+    };
+    url: '/api/v1/team/{team_id}/wallet/{wallet_id}/transaction-history';
+};
+
+export type WalletTransactionHistoryListResponses = {
+    /**
+     * Wallet transaction history
+     */
+    200: WalletTransactionHistoryItemPaginatedResponse;
+};
+
+export type WalletTransactionHistoryListResponse = WalletTransactionHistoryListResponses[keyof WalletTransactionHistoryListResponses];
+
+export type WalletTransactionHistoryRefreshData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Wallet ID
+         */
+        wallet_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wallet/{wallet_id}/transaction-history/refresh';
+};
+
+export type WalletTransactionHistoryRefreshResponses = {
+    /**
+     * Wallet transaction history refresh result
+     */
+    200: RefreshWalletTransactionHistoryResponse;
+};
+
+export type WalletTransactionHistoryRefreshResponse = WalletTransactionHistoryRefreshResponses[keyof WalletTransactionHistoryRefreshResponses];
+
+export type WalletVirtualAccountCreateData = {
+    body: CreateWalletVirtualAccountBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Wallet ID
+         */
+        wallet_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wallet/{wallet_id}/virtual-account';
+};
+
+export type WalletVirtualAccountCreateErrors = {
+    /**
+     * Invalid request
+     */
+    400: Error;
+    /**
+     * Authentication failed
+     */
+    401: Error;
+    /**
+     * Forbidden
+     */
+    403: Error;
+    /**
+     * Upstream provider error
+     */
+    502: Error;
+};
+
+export type WalletVirtualAccountCreateError = WalletVirtualAccountCreateErrors[keyof WalletVirtualAccountCreateErrors];
+
+export type WalletVirtualAccountCreateResponses = {
+    /**
+     * Created wallet virtual account
+     */
+    200: WalletVirtualAccount;
+};
+
+export type WalletVirtualAccountCreateResponse = WalletVirtualAccountCreateResponses[keyof WalletVirtualAccountCreateResponses];
+
 export type WalletWaitUntilBalanceData = {
     body: WaitUntilBalanceRequest;
     path: {
@@ -11995,3 +14186,1204 @@ export type WalletWaitUntilBalanceResponses = {
 };
 
 export type WalletWaitUntilBalanceResponse = WalletWaitUntilBalanceResponses[keyof WalletWaitUntilBalanceResponses];
+
+export type ListWikiOntologyTemplatesData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wiki-ontology-templates';
+};
+
+export type ListWikiOntologyTemplatesResponses = {
+    200: Array<WikiOntologyTemplate>;
+};
+
+export type ListWikiOntologyTemplatesResponse = ListWikiOntologyTemplatesResponses[keyof ListWikiOntologyTemplatesResponses];
+
+export type ListWikisData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: {
+        page_size?: number;
+        next_page_token?: string | null;
+    };
+    url: '/api/v1/team/{team_id}/wikis';
+};
+
+export type ListWikisResponses = {
+    200: WikiPaginatedResponse;
+};
+
+export type ListWikisResponse = ListWikisResponses[keyof ListWikisResponses];
+
+export type CreateWikiData = {
+    body: CreateWikiInner;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis';
+};
+
+export type CreateWikiResponses = {
+    200: Wiki;
+};
+
+export type CreateWikiResponse = CreateWikiResponses[keyof CreateWikiResponses];
+
+export type DeleteWikiData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}';
+};
+
+export type DeleteWikiResponses = {
+    200: unknown;
+};
+
+export type GetWikiData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}';
+};
+
+export type GetWikiResponses = {
+    200: Wiki;
+};
+
+export type GetWikiResponse = GetWikiResponses[keyof GetWikiResponses];
+
+export type UpdateWikiData = {
+    body: UpdateWikiBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}';
+};
+
+export type UpdateWikiResponses = {
+    200: Wiki;
+};
+
+export type UpdateWikiResponse = UpdateWikiResponses[keyof UpdateWikiResponses];
+
+export type ListWikiAssetsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: {
+        page_size?: number;
+        next_page_token?: string | null;
+        folder_path?: string | null;
+        query?: string | null;
+    };
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/assets';
+};
+
+export type ListWikiAssetsResponses = {
+    200: WikiAssetPaginatedResponse;
+};
+
+export type ListWikiAssetsResponse = ListWikiAssetsResponses[keyof ListWikiAssetsResponses];
+
+export type CreateWikiAssetUploadData = {
+    body: CreateWikiAssetBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/assets';
+};
+
+export type CreateWikiAssetUploadResponses = {
+    200: WikiAssetUploadResponse;
+};
+
+export type CreateWikiAssetUploadResponse = CreateWikiAssetUploadResponses[keyof CreateWikiAssetUploadResponses];
+
+export type DeleteWikiAssetData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        asset_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/assets/{asset_id}';
+};
+
+export type DeleteWikiAssetErrors = {
+    /**
+     * Asset is still referenced
+     */
+    409: unknown;
+};
+
+export type DeleteWikiAssetResponses = {
+    200: unknown;
+};
+
+export type UpdateWikiAssetData = {
+    body: UpdateWikiAssetBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        asset_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/assets/{asset_id}';
+};
+
+export type UpdateWikiAssetResponses = {
+    200: WikiAsset;
+};
+
+export type UpdateWikiAssetResponse = UpdateWikiAssetResponses[keyof UpdateWikiAssetResponses];
+
+export type CompleteWikiAssetUploadData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        asset_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/assets/{asset_id}/complete';
+};
+
+export type CompleteWikiAssetUploadResponses = {
+    200: WikiAsset;
+};
+
+export type CompleteWikiAssetUploadResponse = CompleteWikiAssetUploadResponses[keyof CompleteWikiAssetUploadResponses];
+
+export type DownloadWikiAssetContentData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        asset_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/assets/{asset_id}/content';
+};
+
+export type DownloadWikiAssetContentErrors = {
+    /**
+     * Asset not found
+     */
+    404: unknown;
+};
+
+export type DownloadWikiAssetContentResponses = {
+    200: Blob | File;
+};
+
+export type DownloadWikiAssetContentResponse = DownloadWikiAssetContentResponses[keyof DownloadWikiAssetContentResponses];
+
+export type UploadWikiAssetContentData = {
+    body: Array<number>;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        asset_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/assets/{asset_id}/content';
+};
+
+export type UploadWikiAssetContentErrors = {
+    /**
+     * Invalid upload
+     */
+    400: unknown;
+    /**
+     * Asset not found
+     */
+    404: unknown;
+};
+
+export type UploadWikiAssetContentResponses = {
+    200: unknown;
+};
+
+export type DownloadWikiAssetData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        asset_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/assets/{asset_id}/download';
+};
+
+export type DownloadWikiAssetResponses = {
+    200: WikiAssetDownloadResponse;
+};
+
+export type DownloadWikiAssetResponse = DownloadWikiAssetResponses[keyof DownloadWikiAssetResponses];
+
+export type InspectWikiAssetReferencesData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        asset_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/assets/{asset_id}/references';
+};
+
+export type InspectWikiAssetReferencesResponses = {
+    200: WikiAssetReferences;
+};
+
+export type InspectWikiAssetReferencesResponse = InspectWikiAssetReferencesResponses[keyof InspectWikiAssetReferencesResponses];
+
+export type TraverseWikiGraphData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query: {
+        start_page_id: WrappedUuidV4;
+        depth?: number;
+        relationship_type_id?: null | WrappedUuidV4;
+        direction?: string;
+        max_nodes?: number;
+        max_edges?: number;
+    };
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/graph';
+};
+
+export type TraverseWikiGraphResponses = {
+    200: WikiGraph;
+};
+
+export type TraverseWikiGraphResponse = TraverseWikiGraphResponses[keyof TraverseWikiGraphResponses];
+
+export type ListWikiOntologyInstallationsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/ontology-installations';
+};
+
+export type ListWikiOntologyInstallationsResponses = {
+    200: Array<WikiOntologyInstallation>;
+};
+
+export type ListWikiOntologyInstallationsResponse = ListWikiOntologyInstallationsResponses[keyof ListWikiOntologyInstallationsResponses];
+
+export type ApplyWikiOntologyTemplateData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        template_key: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/ontology-templates/{template_key}';
+};
+
+export type ApplyWikiOntologyTemplateResponses = {
+    200: ApplyOntologyTemplateResult;
+};
+
+export type ApplyWikiOntologyTemplateResponse = ApplyWikiOntologyTemplateResponses[keyof ApplyWikiOntologyTemplateResponses];
+
+export type ListWikiPageTypesData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: {
+        include_archived?: boolean;
+    };
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/page-types';
+};
+
+export type ListWikiPageTypesResponses = {
+    200: Array<WikiPageType>;
+};
+
+export type ListWikiPageTypesResponse = ListWikiPageTypesResponses[keyof ListWikiPageTypesResponses];
+
+export type CreateWikiPageTypeData = {
+    body: CreatePageTypeBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/page-types';
+};
+
+export type CreateWikiPageTypeResponses = {
+    200: WikiPageType;
+};
+
+export type CreateWikiPageTypeResponse = CreateWikiPageTypeResponses[keyof CreateWikiPageTypeResponses];
+
+export type DeleteWikiPageTypeData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_type_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/page-types/{page_type_id}';
+};
+
+export type DeleteWikiPageTypeErrors = {
+    /**
+     * Page type is in use or ontology-managed
+     */
+    409: unknown;
+};
+
+export type DeleteWikiPageTypeResponses = {
+    204: void;
+};
+
+export type DeleteWikiPageTypeResponse = DeleteWikiPageTypeResponses[keyof DeleteWikiPageTypeResponses];
+
+export type GetWikiPageTypeData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_type_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/page-types/{page_type_id}';
+};
+
+export type GetWikiPageTypeResponses = {
+    200: WikiPageType;
+};
+
+export type GetWikiPageTypeResponse = GetWikiPageTypeResponses[keyof GetWikiPageTypeResponses];
+
+export type UpdateWikiPageTypeData = {
+    body: UpdatePageTypeBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_type_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/page-types/{page_type_id}';
+};
+
+export type UpdateWikiPageTypeErrors = {
+    /**
+     * Ontology template page types are immutable
+     */
+    409: unknown;
+};
+
+export type UpdateWikiPageTypeResponses = {
+    200: WikiPageType;
+};
+
+export type UpdateWikiPageTypeResponse = UpdateWikiPageTypeResponses[keyof UpdateWikiPageTypeResponses];
+
+export type ValidateWikiPageTypeDataData = {
+    body: ValidatePageTypeDataBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_type_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/page-types/{page_type_id}/validate';
+};
+
+export type ValidateWikiPageTypeDataResponses = {
+    200: PageTypeValidationResult;
+};
+
+export type ValidateWikiPageTypeDataResponse = ValidateWikiPageTypeDataResponses[keyof ValidateWikiPageTypeDataResponses];
+
+export type ListWikiPageTypeVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_type_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/page-types/{page_type_id}/versions';
+};
+
+export type ListWikiPageTypeVersionsResponses = {
+    200: Array<WikiPageTypeVersion>;
+};
+
+export type ListWikiPageTypeVersionsResponse = ListWikiPageTypeVersionsResponses[keyof ListWikiPageTypeVersionsResponses];
+
+export type CreateWikiPageTypeVersionData = {
+    body: CreatePageTypeVersionBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_type_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/page-types/{page_type_id}/versions';
+};
+
+export type CreateWikiPageTypeVersionErrors = {
+    /**
+     * Ontology template page types are immutable
+     */
+    409: unknown;
+};
+
+export type CreateWikiPageTypeVersionResponses = {
+    200: WikiPageTypeVersion;
+};
+
+export type CreateWikiPageTypeVersionResponse = CreateWikiPageTypeVersionResponses[keyof CreateWikiPageTypeVersionResponses];
+
+export type DeleteWikiPageTypeVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_type_id: WrappedUuidV4;
+        version_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/page-types/{page_type_id}/versions/{version_id}';
+};
+
+export type DeleteWikiPageTypeVersionErrors = {
+    /**
+     * Version is current, in use, or ontology-managed
+     */
+    409: unknown;
+};
+
+export type DeleteWikiPageTypeVersionResponses = {
+    204: void;
+};
+
+export type DeleteWikiPageTypeVersionResponse = DeleteWikiPageTypeVersionResponses[keyof DeleteWikiPageTypeVersionResponses];
+
+export type GetWikiPageTypeVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_type_id: WrappedUuidV4;
+        version_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/page-types/{page_type_id}/versions/{version_id}';
+};
+
+export type GetWikiPageTypeVersionResponses = {
+    200: WikiPageTypeVersion;
+};
+
+export type GetWikiPageTypeVersionResponse = GetWikiPageTypeVersionResponses[keyof GetWikiPageTypeVersionResponses];
+
+export type PreviewWikiPageTypeMigrationData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_type_id: WrappedUuidV4;
+        version_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/page-types/{page_type_id}/versions/{version_id}/migration-preview';
+};
+
+export type PreviewWikiPageTypeMigrationErrors = {
+    /**
+     * Page type version not found
+     */
+    404: unknown;
+};
+
+export type PreviewWikiPageTypeMigrationResponses = {
+    200: PageTypeMigrationPreview;
+};
+
+export type PreviewWikiPageTypeMigrationResponse = PreviewWikiPageTypeMigrationResponses[keyof PreviewWikiPageTypeMigrationResponses];
+
+export type ListWikiPagesData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: {
+        page_size?: number;
+        next_page_token?: string | null;
+        query?: string | null;
+    };
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/pages';
+};
+
+export type ListWikiPagesResponses = {
+    200: WikiPagePaginatedResponse;
+};
+
+export type ListWikiPagesResponse = ListWikiPagesResponses[keyof ListWikiPagesResponses];
+
+export type CreateWikiPageData = {
+    body: UpsertWikiPageBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/pages';
+};
+
+export type CreateWikiPageResponses = {
+    200: WikiPage;
+};
+
+export type CreateWikiPageResponse = CreateWikiPageResponses[keyof CreateWikiPageResponses];
+
+export type DeleteWikiPageData = {
+    body: ExpectedRevisionBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/pages/{page_id}';
+};
+
+export type DeleteWikiPageErrors = {
+    /**
+     * Revision conflict
+     */
+    409: unknown;
+};
+
+export type DeleteWikiPageResponses = {
+    200: unknown;
+};
+
+export type GetWikiPageData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/pages/{page_id}';
+};
+
+export type GetWikiPageResponses = {
+    200: WikiPage;
+};
+
+export type GetWikiPageResponse = GetWikiPageResponses[keyof GetWikiPageResponses];
+
+export type UpdateWikiPageData = {
+    body: UpsertWikiPageBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/pages/{page_id}';
+};
+
+export type UpdateWikiPageErrors = {
+    /**
+     * Revision conflict
+     */
+    409: unknown;
+};
+
+export type UpdateWikiPageResponses = {
+    200: WikiPage;
+};
+
+export type UpdateWikiPageResponse = UpdateWikiPageResponses[keyof UpdateWikiPageResponses];
+
+export type ListWikiPageAssetsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/pages/{page_id}/assets';
+};
+
+export type ListWikiPageAssetsResponses = {
+    200: Array<WikiAsset>;
+};
+
+export type ListWikiPageAssetsResponse = ListWikiPageAssetsResponses[keyof ListWikiPageAssetsResponses];
+
+export type GetWikiPageBacklinksData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_id: WrappedUuidV4;
+    };
+    query?: {
+        relationship_type_id?: null | WrappedUuidV4;
+    };
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/pages/{page_id}/backlinks';
+};
+
+export type GetWikiPageBacklinksResponses = {
+    200: Array<PageRelationshipView>;
+};
+
+export type GetWikiPageBacklinksResponse = GetWikiPageBacklinksResponses[keyof GetWikiPageBacklinksResponses];
+
+export type MigrateWikiPageTypeData = {
+    body: MigrateWikiPageBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/pages/{page_id}/migrate';
+};
+
+export type MigrateWikiPageTypeErrors = {
+    /**
+     * Revision conflict
+     */
+    409: unknown;
+};
+
+export type MigrateWikiPageTypeResponses = {
+    200: WikiPage;
+};
+
+export type MigrateWikiPageTypeResponse = MigrateWikiPageTypeResponses[keyof MigrateWikiPageTypeResponses];
+
+export type MoveWikiPageData = {
+    body: MoveWikiPageBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/pages/{page_id}/move';
+};
+
+export type MoveWikiPageErrors = {
+    /**
+     * Revision conflict
+     */
+    409: unknown;
+};
+
+export type MoveWikiPageResponses = {
+    200: WikiPage;
+};
+
+export type MoveWikiPageResponse = MoveWikiPageResponses[keyof MoveWikiPageResponses];
+
+export type GetWikiPageNeighborhoodData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_id: WrappedUuidV4;
+    };
+    query?: {
+        depth?: number;
+        relationship_type_id?: null | WrappedUuidV4;
+        direction?: string;
+        max_nodes?: number;
+        max_edges?: number;
+    };
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/pages/{page_id}/neighborhood';
+};
+
+export type GetWikiPageNeighborhoodResponses = {
+    200: WikiGraph;
+};
+
+export type GetWikiPageNeighborhoodResponse = GetWikiPageNeighborhoodResponses[keyof GetWikiPageNeighborhoodResponses];
+
+export type ListWikiPageRevisionsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        page_id: WrappedUuidV4;
+    };
+    query?: {
+        page_size?: number;
+        next_page_token?: string | null;
+    };
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/pages/{page_id}/revisions';
+};
+
+export type ListWikiPageRevisionsResponses = {
+    200: WikiPageRevisionPaginatedResponse;
+};
+
+export type ListWikiPageRevisionsResponse = ListWikiPageRevisionsResponses[keyof ListWikiPageRevisionsResponses];
+
+export type ListWikiRelationshipTypesData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationship-types';
+};
+
+export type ListWikiRelationshipTypesResponses = {
+    200: Array<WikiRelationshipType>;
+};
+
+export type ListWikiRelationshipTypesResponse = ListWikiRelationshipTypesResponses[keyof ListWikiRelationshipTypesResponses];
+
+export type CreateWikiRelationshipTypeData = {
+    body: CreateRelationshipTypeBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationship-types';
+};
+
+export type CreateWikiRelationshipTypeResponses = {
+    200: WikiRelationshipType;
+};
+
+export type CreateWikiRelationshipTypeResponse = CreateWikiRelationshipTypeResponses[keyof CreateWikiRelationshipTypeResponses];
+
+export type DeleteWikiRelationshipTypeData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        type_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationship-types/{type_id}';
+};
+
+export type DeleteWikiRelationshipTypeErrors = {
+    /**
+     * Relationship type is in use or ontology-managed
+     */
+    409: unknown;
+};
+
+export type DeleteWikiRelationshipTypeResponses = {
+    200: unknown;
+};
+
+export type GetWikiRelationshipTypeData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        type_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationship-types/{type_id}';
+};
+
+export type GetWikiRelationshipTypeResponses = {
+    200: WikiRelationshipType;
+};
+
+export type GetWikiRelationshipTypeResponse = GetWikiRelationshipTypeResponses[keyof GetWikiRelationshipTypeResponses];
+
+export type UpdateWikiRelationshipTypeData = {
+    body: UpdateRelationshipTypeBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        type_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationship-types/{type_id}';
+};
+
+export type UpdateWikiRelationshipTypeErrors = {
+    /**
+     * Ontology template relationship types are immutable
+     */
+    409: unknown;
+};
+
+export type UpdateWikiRelationshipTypeResponses = {
+    200: WikiRelationshipType;
+};
+
+export type UpdateWikiRelationshipTypeResponse = UpdateWikiRelationshipTypeResponses[keyof UpdateWikiRelationshipTypeResponses];
+
+export type ListWikiRelationshipTypeVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        type_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationship-types/{type_id}/versions';
+};
+
+export type ListWikiRelationshipTypeVersionsResponses = {
+    200: Array<WikiRelationshipTypeVersion>;
+};
+
+export type ListWikiRelationshipTypeVersionsResponse = ListWikiRelationshipTypeVersionsResponses[keyof ListWikiRelationshipTypeVersionsResponses];
+
+export type CreateWikiRelationshipTypeVersionData = {
+    body: CreateRelationshipTypeVersionBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        type_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationship-types/{type_id}/versions';
+};
+
+export type CreateWikiRelationshipTypeVersionErrors = {
+    /**
+     * Ontology template relationship types are immutable
+     */
+    409: unknown;
+};
+
+export type CreateWikiRelationshipTypeVersionResponses = {
+    200: WikiRelationshipTypeVersion;
+};
+
+export type CreateWikiRelationshipTypeVersionResponse = CreateWikiRelationshipTypeVersionResponses[keyof CreateWikiRelationshipTypeVersionResponses];
+
+export type GetWikiRelationshipTypeVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        type_id: WrappedUuidV4;
+        version_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationship-types/{type_id}/versions/{version_id}';
+};
+
+export type GetWikiRelationshipTypeVersionResponses = {
+    200: WikiRelationshipTypeVersion;
+};
+
+export type GetWikiRelationshipTypeVersionResponse = GetWikiRelationshipTypeVersionResponses[keyof GetWikiRelationshipTypeVersionResponses];
+
+export type ListWikiPageRelationshipsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: {
+        page_id?: null | WrappedUuidV4;
+        relationship_type_id?: null | WrappedUuidV4;
+    };
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationships';
+};
+
+export type ListWikiPageRelationshipsResponses = {
+    200: Array<PageRelationshipView>;
+};
+
+export type ListWikiPageRelationshipsResponse = ListWikiPageRelationshipsResponses[keyof ListWikiPageRelationshipsResponses];
+
+export type UpsertWikiPageRelationshipData = {
+    body: UpsertPageRelationshipBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationships';
+};
+
+export type UpsertWikiPageRelationshipErrors = {
+    /**
+     * Duplicate relationship
+     */
+    409: unknown;
+};
+
+export type UpsertWikiPageRelationshipResponses = {
+    200: WikiPageRelationship;
+};
+
+export type UpsertWikiPageRelationshipResponse = UpsertWikiPageRelationshipResponses[keyof UpsertWikiPageRelationshipResponses];
+
+export type DeleteWikiPageRelationshipData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        relationship_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationships/{relationship_id}';
+};
+
+export type DeleteWikiPageRelationshipResponses = {
+    200: unknown;
+};
+
+export type GetWikiPageRelationshipData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        relationship_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationships/{relationship_id}';
+};
+
+export type GetWikiPageRelationshipResponses = {
+    200: WikiPageRelationship;
+};
+
+export type GetWikiPageRelationshipResponse = GetWikiPageRelationshipResponses[keyof GetWikiPageRelationshipResponses];
+
+export type UpdateWikiPageRelationshipData = {
+    body: UpsertPageRelationshipBody;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+        relationship_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/relationships/{relationship_id}';
+};
+
+export type UpdateWikiPageRelationshipResponses = {
+    200: WikiPageRelationship;
+};
+
+export type UpdateWikiPageRelationshipResponse = UpdateWikiPageRelationshipResponses[keyof UpdateWikiPageRelationshipResponses];
+
+export type RetryWikiData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        wiki_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/wikis/{wiki_id}/retry';
+};
+
+export type RetryWikiResponses = {
+    200: Wiki;
+};
+
+export type RetryWikiResponse = RetryWikiResponses[keyof RetryWikiResponses];

@@ -28,7 +28,16 @@ export {
   createTildeGrpcReverseProxy,
   type TildeGrpcReverseProxy,
 } from "./grpc";
-export { type SkillItem, type SkillRegistry, SkillsClient } from "./skills";
+export {
+  type MaterializedSkillPackage,
+  type SkillItem,
+  SkillPackage,
+  type SkillPackageFile,
+  type SkillPackageFileDownload,
+  type SkillPackageManifest,
+  type SkillRegistry,
+  SkillsClient,
+} from "./skills";
 export {
   type AddMcpServerFunctionInput,
   type AvailableToolGroup,

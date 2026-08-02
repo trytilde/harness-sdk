@@ -1,3 +1,6 @@
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, configHeaders, createClient, createConfig } from "../src";
 
@@ -272,6 +275,118 @@ describe("skills", () => {
       "https://api.example.test/api/v1/team/team-1/skill-registry/registry-1",
       "https://api.example.test/api/v1/team/team-1/skill-registry/registry-1/skill/by-title/website-seo-setup",
     ]);
+  });
+
+  it("lazily downloads package files without forwarding Tilde auth to R2", async () => {
+    const content = new TextEncoder().encode("print('hello')\n");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          path: "scripts/run.py",
+          url: "https://r2.example.test/skills/blob",
+          expires_at: "2026-07-14T00:15:00Z",
+        }),
+      )
+      .mockResolvedValueOnce(new Response(content));
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      teamId: "team-1",
+      apiKey: "test-key",
+      fetch: fetchMock,
+    });
+
+    await expect(
+      client.skills.package("skill-1").download("scripts/run.py"),
+    ).resolves.toEqual(content);
+
+    const [apiRequest] = fetchMock.mock.calls[0] as [Request];
+    expect(apiRequest.url).toBe(
+      "https://api.example.test/api/v1/team/team-1/skill/skill-1/package/download",
+    );
+    expect(apiRequest.headers.get("authorization")).toBe("Bearer test-key");
+    const [r2Url, r2Init] = fetchMock.mock.calls[1] as [
+      string,
+      RequestInit | undefined,
+    ];
+    expect(r2Url).toBe("https://r2.example.test/skills/blob");
+    expect(r2Init).toBeUndefined();
+  });
+
+  it("materializes every package file with integrity and executable bits", async () => {
+    const skillBody = "skill body\n";
+    const script = "#!/bin/sh\necho hi\n";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          id: "package-1",
+          provider_id: "qm",
+          source_path: "skills-seed/demo/SKILL.md",
+          source_commit_hash: "abc123",
+          content_hash: "package-hash",
+          created_at: "2026-07-14T00:00:00Z",
+          files: [
+            {
+              path: "SKILL.md",
+              media_type: "text/markdown; charset=utf-8",
+              size_bytes: 11,
+              checksum_sha256:
+                "15a14c2a8756d91be222a8ceaa6715d8e0cccaa12a0e8540df9343d4c0688616",
+              executable: false,
+            },
+            {
+              path: "scripts/run.sh",
+              media_type: "application/octet-stream",
+              size_bytes: 18,
+              checksum_sha256:
+                "299001868fb8c02fd431c336c6d058f5558c5dff5b5af5e6fe04b870a6a9cbba",
+              executable: true,
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          path: "SKILL.md",
+          url: "https://r2.example.test/skill",
+          expires_at: "2026-07-14T00:15:00Z",
+        }),
+      )
+      .mockResolvedValueOnce(new Response(skillBody))
+      .mockResolvedValueOnce(
+        Response.json({
+          path: "scripts/run.sh",
+          url: "https://r2.example.test/script",
+          expires_at: "2026-07-14T00:15:00Z",
+        }),
+      )
+      .mockResolvedValueOnce(new Response(script));
+    const client = createClient({
+      baseUrl: "https://api.example.test",
+      teamId: "team-1",
+      apiKey: "test-key",
+      fetch: fetchMock,
+    });
+    const root = await mkdtemp(join(tmpdir(), "tilde-skill-package-test-"));
+    const destination = join(root, "demo");
+    try {
+      const result = await client.skills
+        .package("skill-1")
+        .materialize(destination);
+      expect(result.directory).toBe(destination);
+      await expect(
+        readFile(join(destination, "SKILL.md"), "utf8"),
+      ).resolves.toBe(skillBody);
+      await expect(
+        readFile(join(destination, "scripts/run.sh"), "utf8"),
+      ).resolves.toBe(script);
+      expect(
+        (await stat(join(destination, "scripts/run.sh"))).mode & 0o111,
+      ).toBe(0o111);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
