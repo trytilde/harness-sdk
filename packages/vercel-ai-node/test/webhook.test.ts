@@ -97,6 +97,68 @@ describe("verifyWebhookRequest", () => {
 });
 
 describe("chatKitEndpoint", () => {
+  it("adds the configured request timeout to the forwarded signal", async () => {
+    const handler = vi.fn(async (request: Request) => {
+      await new Promise<void>((resolve) => {
+        request.signal.addEventListener("abort", () => resolve(), {
+          once: true,
+        });
+      });
+      expect(request.signal.aborted).toBe(true);
+      expect(request.signal.reason).toBeInstanceOf(DOMException);
+      expect(request.signal.reason.name).toBe("TimeoutError");
+      return new Response("timed out");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      requestTimeoutMs: 10,
+      handler,
+    });
+
+    const response = await endpoint(signedRequest({ messages: [] }));
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("timed out");
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the incoming abort signal when a request timeout is configured", async () => {
+    const controller = new AbortController();
+    const handler = vi.fn(async (request: Request) => {
+      controller.abort(new Error("client disconnected"));
+      await new Promise<void>((resolve) => {
+        if (request.signal.aborted) {
+          resolve();
+          return;
+        }
+        request.signal.addEventListener("abort", () => resolve(), {
+          once: true,
+        });
+      });
+      expect(request.signal.aborted).toBe(true);
+      expect(request.signal.reason).toEqual(new Error("client disconnected"));
+      return new Response("aborted");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: { apiKey: "test-key" },
+      requestTimeoutMs: 60_000,
+      handler,
+    });
+    const signed = signedRequest({ messages: [] });
+    const request = new Request(signed, {
+      signal: controller.signal,
+      duplex: "half",
+    } as RequestInit);
+
+    const response = await endpoint(request);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("aborted");
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
   it("reconstructs the request body after verification", async () => {
     const handler = vi.fn(async (request: Request, context) => {
       expect(context.body).toEqual({ messages: [] });
@@ -703,6 +765,44 @@ describe("chatKitEndpoint", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
+  it("keeps signal messages in typed session history", async () => {
+    const signalMessage = {
+      id: "signal_1",
+      role: "system",
+      type: "signal",
+      summary: "Sentry issue created: API-1 - request failed",
+      data: {
+        action: "created",
+        data: { issue: { id: "1", title: "request failed" } },
+      },
+      metadata: { signal_type: "sentry.issue.created" },
+      created_at: "2026-07-04T13:00:01Z",
+    };
+    const fetchMock = vi.fn(async () =>
+      Response.json({ items: [signalMessage] }),
+    );
+    const handler = vi.fn(async (_request: Request, context) => {
+      await expect(context.session.history()).resolves.toEqual({
+        items: [signalMessage],
+      });
+      return new Response("ok");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: {
+        baseUrl: "https://api.example.test",
+        apiKey: "test-key",
+        fetch: fetchMock as typeof fetch,
+      },
+      handler,
+    });
+
+    const response = await endpoint(signedRequest({ messages: [] }));
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
   it("uses an explicit cache callback instead of the default endpoint cache", async () => {
     const fetchMock = vi.fn(async () => Response.json({ success: true }));
     const onCacheMessage = vi.fn(async () => undefined);
@@ -953,13 +1053,15 @@ describe("ChatKit AI SDK converters", () => {
             ],
           },
         ],
-        onUnprocessedFileUpload({ part }) {
-          return {
-            type: "file",
-            mediaType: part.media_type,
-            filename: part.filename ?? undefined,
-            data: { file_id: "file_123" },
-          } as never;
+        onUnprocessed: {
+          fileUpload({ part }) {
+            return {
+              type: "file",
+              mediaType: part.media_type,
+              filename: part.filename ?? undefined,
+              data: { file_id: "file_123" },
+            } as never;
+          },
         },
       }),
     ).resolves.toMatchObject([
@@ -978,6 +1080,88 @@ describe("ChatKit AI SDK converters", () => {
         ],
       },
     ]);
+  });
+
+  it("dispatches Sentry signals to the handler for their signal type", async () => {
+    const onCreated = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `${signal.data.action}:${signal.data.data.issue.title}`,
+        },
+      ],
+    }));
+    const onResolved = vi.fn(() => null);
+
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_1",
+            role: "system",
+            type: "signal",
+            summary: "Sentry issue created: API-1 - request failed",
+            data: {
+              action: "created",
+              data: {
+                issue: {
+                  id: "1",
+                  shortId: "API-1",
+                  title: "request failed",
+                },
+              },
+            },
+            metadata: { signal_type: "sentry.issue.created" },
+          },
+        ],
+        onUnprocessed: {
+          sentry: {
+            "sentry.issue.created": onCreated,
+            "sentry.issue.resolved": onResolved,
+          },
+        },
+      }),
+    ).resolves.toEqual([
+      {
+        id: "signal_1",
+        role: "user",
+        parts: [{ type: "text", text: "created:request failed" }],
+      },
+    ]);
+    expect(onCreated).toHaveBeenCalledOnce();
+    expect(onResolved).not.toHaveBeenCalled();
+  });
+
+  it("drops unhandled and malformed Sentry signals", async () => {
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_unhandled",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "resolved",
+              data: { issue: { id: "1", title: "request failed" } },
+            },
+            metadata: { signal_type: "sentry.issue.resolved" },
+          },
+          {
+            id: "signal_malformed",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "assigned",
+              data: { issue: { id: "1" } },
+            },
+            metadata: { signal_type: "sentry.issue.assigned" },
+          },
+        ],
+        onUnprocessed: { sentry: {} },
+      }),
+    ).resolves.toEqual([]);
   });
 
   it("hydrates cached agent representations before converting raw parts", async () => {

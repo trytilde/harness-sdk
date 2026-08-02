@@ -43,10 +43,9 @@ export const POST = chatKitEndpoint({
     const history = await context.session.history();
     const messages = await convertToAiSdkMessages({
       messages: [...history.items, ...context.messages],
-      onUnprocessedFileUpload: createChatKitAttachmentFilePartHandler(
-        client,
-        context,
-      ),
+      onUnprocessed: {
+        fileUpload: createChatKitAttachmentFilePartHandler(client, context),
+      },
     });
 
     const provider = modelProvider();
