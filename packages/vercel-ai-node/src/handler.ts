@@ -8,7 +8,10 @@ import {
   type ChatKitConvertedMessage,
   runWithChatKitContext,
 } from "./chatkit-context";
-import { type ChatKitMessage, isChatKitMessage } from "./chatkit-message";
+import {
+  type ChatKitHistoryMessage,
+  isChatKitHistoryMessage,
+} from "./chatkit-message";
 import {
   type ChatKitEndpointProviderContext,
   chatKitProviderContext,
@@ -42,7 +45,7 @@ export type ChatKitSessionHistoryOptions = {
 };
 
 export type ChatKitSessionHistory = {
-  items: ChatKitMessage[];
+  items: ChatKitHistoryMessage[];
   nextPageToken?: string;
 };
 
@@ -435,9 +438,9 @@ function messageId(value: JsonValue): string | null {
 function normalizeHistoryItems(
   items: JsonValue[],
   currentRequestMessageIds: Set<string>,
-): ChatKitMessage[] {
+): ChatKitHistoryMessage[] {
   const normalized = items
-    .filter(isChatKitMessage)
+    .filter(isChatKitHistoryMessage)
     .sort(compareChatKitMessagesByCreatedAt);
   if (currentRequestMessageIds.size === 0) return normalized;
   return normalized.filter((item) => {
@@ -451,8 +454,8 @@ function isRecord(value: unknown): value is JsonObject {
 }
 
 function compareChatKitMessagesByCreatedAt(
-  left: ChatKitMessage,
-  right: ChatKitMessage,
+  left: ChatKitHistoryMessage,
+  right: ChatKitHistoryMessage,
 ): number {
   if (!left.created_at || !right.created_at) return 0;
   return left.created_at.localeCompare(right.created_at);

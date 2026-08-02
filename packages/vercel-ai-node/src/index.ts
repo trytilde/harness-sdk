@@ -3,9 +3,11 @@ export {
   createChatKitAttachmentFilePartHandler,
 } from "./chatkit-attachments";
 export {
+  type ChatKitHistoryMessage,
   type ChatKitMessage,
   type ChatKitMessageBase,
   type ChatKitMessageRole,
+  type ChatKitSignalMessage,
   type ChatKitTextMessage,
   type ChatKitUiFilePart,
   type ChatKitUiMessage,
@@ -18,9 +20,21 @@ export {
   type ConvertToAiSdkMessageInput,
   type ConvertToAiSdkMessageOptions,
   type ConvertToAiSdkMessagesOptions,
+  type ConvertToAiSdkSentryHandlers,
+  type ConvertToAiSdkUnprocessedHandlers,
   convertToAiSdkMessage,
   convertToAiSdkMessages,
+  isChatKitHistoryMessage,
   isChatKitMessage,
+  isChatKitSignalMessage,
+  type SentryIssueSignalAction,
+  type SentryIssueSignalType,
+  type SentryIssueWebhook,
+  type SentrySignalByType,
+  type SentrySignalMessage,
+  type SentryWebhookIssue,
+  type SentryWebhookOrganization,
+  type SentryWebhookProject,
 } from "./chatkit-message";
 export {
   type ChatKitEndpointProviderContext,

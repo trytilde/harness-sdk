@@ -69,6 +69,76 @@ export type ChatKitUiMessage = ChatKitMessageBase & {
 
 export type ChatKitMessage = ChatKitTextMessage | ChatKitUiMessage;
 
+export type ChatKitSignalMessage = ChatKitMessageBase & {
+  type: "signal";
+  role: "system";
+  summary?: string | null;
+  data?: JsonObject | null;
+};
+
+export type ChatKitHistoryMessage = ChatKitMessage | ChatKitSignalMessage;
+
+export type SentryIssueSignalAction =
+  | "created"
+  | "assigned"
+  | "resolved"
+  | "unresolved"
+  | "ignored";
+
+export type SentryIssueSignalType = `sentry.issue.${SentryIssueSignalAction}`;
+
+export type SentryWebhookProject = {
+  id: unknown;
+  slug: string;
+  name?: string | null;
+};
+
+export type SentryWebhookOrganization = {
+  id: unknown;
+  slug: string;
+  name?: string | null;
+};
+
+export type SentryWebhookIssue = JsonObject & {
+  id: string;
+  shortId?: string | null;
+  title: string;
+  culprit?: string | null;
+  permalink?: string | null;
+  status?: string | null;
+  level?: string | null;
+  platform?: string | null;
+  project?: SentryWebhookProject | null;
+};
+
+export type SentryIssueWebhook<TAction extends SentryIssueSignalAction> = {
+  action: TAction;
+  installation?: { uuid: string } | null;
+  actor?: { type: string; id: unknown; name: string } | null;
+  data: {
+    issue: SentryWebhookIssue;
+    project?: SentryWebhookProject | null;
+    organization?: SentryWebhookOrganization | null;
+    event?: unknown;
+  };
+};
+
+export type SentrySignalMessage<
+  TType extends SentryIssueSignalType = SentryIssueSignalType,
+> = ChatKitSignalMessage & {
+  metadata: JsonObject & { signal_type: TType };
+  data: SentryIssueWebhook<SentryActionForSignalType<TType>>;
+};
+
+export type SentrySignalByType = {
+  [TType in SentryIssueSignalType]: SentrySignalMessage<TType>;
+};
+
+type SentryActionForSignalType<TType extends SentryIssueSignalType> =
+  TType extends `sentry.issue.${infer TAction extends SentryIssueSignalAction}`
+    ? TAction
+    : never;
+
 export type ConvertToAiSdkFileUploadHandler = (input: {
   message: ConvertToAiSdkMessageInput;
   part: ChatKitUiFilePart;
@@ -84,15 +154,26 @@ export type ConvertToAiSdkHydrateHandler = (input: {
   cachedAgentRepresentation: JsonObject;
 }) => Awaitable<UIMessage | null>;
 
+export type ConvertToAiSdkSentryHandlers = {
+  [TType in SentryIssueSignalType]?: (
+    signal: SentrySignalByType[TType],
+  ) => Awaitable<UIMessage | null>;
+};
+
+export type ConvertToAiSdkUnprocessedHandlers = {
+  fileUpload?: ConvertToAiSdkFileUploadHandler;
+  sentry?: ConvertToAiSdkSentryHandlers;
+};
+
 export type ConvertToAiSdkMessageInput =
-  | ChatKitMessage
+  | ChatKitHistoryMessage
   | ChatKitRequestMessage
   | UIMessage;
 
 export type ConvertToAiSdkMessageOptions = {
   message: ConvertToAiSdkMessageInput;
   chatkit?: ChatKitContextClient;
-  onUnprocessedFileUpload?: ConvertToAiSdkFileUploadHandler;
+  onUnprocessed?: ConvertToAiSdkUnprocessedHandlers;
   onCacheMessage?: ConvertToAiSdkCacheHandler;
   onHydrateMessage?: ConvertToAiSdkHydrateHandler;
 };
@@ -127,18 +208,54 @@ export function isChatKitMessage(value: unknown): value is ChatKitMessage {
   return false;
 }
 
+export function isChatKitSignalMessage(
+  value: unknown,
+): value is ChatKitSignalMessage {
+  if (!isRecord(value)) return false;
+  if (value.type !== "signal" || value.role !== "system") return false;
+  if (typeof value.id !== "string") return false;
+  if (
+    value.summary !== undefined &&
+    value.summary !== null &&
+    typeof value.summary !== "string"
+  ) {
+    return false;
+  }
+  if (
+    value.data !== undefined &&
+    value.data !== null &&
+    !isRecord(value.data)
+  ) {
+    return false;
+  }
+  return (
+    value.metadata === undefined ||
+    value.metadata === null ||
+    isRecord(value.metadata)
+  );
+}
+
+export function isChatKitHistoryMessage(
+  value: unknown,
+): value is ChatKitHistoryMessage {
+  return isChatKitMessage(value) || isChatKitSignalMessage(value);
+}
+
 /** Convert one ChatKit message into a Vercel AI SDK UIMessage. */
 export async function convertToAiSdkMessage(
   options: ConvertToAiSdkMessageOptions,
-): Promise<UIMessage> {
+): Promise<UIMessage | null> {
   return convertToAiSdkMessageInternal(options);
 }
 
 async function convertToAiSdkMessageInternal(
   options: InternalConvertToAiSdkMessageOptions,
-): Promise<UIMessage> {
+): Promise<UIMessage | null> {
   const { message } = options;
   if (!isChatKitMessage(message)) {
+    if (isChatKitSignalMessage(message)) {
+      return convertSignalToAiSdkMessage(message, options);
+    }
     if (isChatKitRequestMessage(message)) {
       return convertRequestMessageToAiSdkMessage(message, options);
     }
@@ -201,8 +318,8 @@ async function convertRequestPartToAiSdkPart(
       text: part.text ?? "",
     } as UIMessage["parts"][number];
   }
-  if (part.type === "file" && options.onUnprocessedFileUpload) {
-    return options.onUnprocessedFileUpload({
+  if (part.type === "file" && options.onUnprocessed?.fileUpload) {
+    return options.onUnprocessed.fileUpload({
       message,
       part: requestFilePartToChatKitFilePart(part),
     });
@@ -237,14 +354,13 @@ export async function convertToAiSdkMessages(
   const converted: UIMessage[] = [];
   const cacheEntries: ChatKitConvertedMessage[] = [];
   for (const message of options.messages) {
-    converted.push(
-      await convertToAiSdkMessageInternal({
-        ...options,
-        message,
-        deferCache: true,
-        cacheEntries,
-      }),
-    );
+    const convertedMessage = await convertToAiSdkMessageInternal({
+      ...options,
+      message,
+      deferCache: true,
+      cacheEntries,
+    });
+    if (convertedMessage) converted.push(convertedMessage);
   }
   if (cacheEntries.length > 0) {
     const chatkit = options.chatkit ?? currentChatKitContext();
@@ -296,8 +412,8 @@ async function convertPartToAiSdkPart(
       text: part.text ?? "",
     } as UIMessage["parts"][number];
   }
-  return options.onUnprocessedFileUpload
-    ? options.onUnprocessedFileUpload({ message, part })
+  return options.onUnprocessed?.fileUpload
+    ? options.onUnprocessed.fileUpload({ message, part })
     : null;
 }
 
@@ -325,14 +441,27 @@ async function convertUiPartToAiSdkPart(
   if (
     isRecord(part) &&
     part.type === "file" &&
-    options.onUnprocessedFileUpload
+    options.onUnprocessed?.fileUpload
   ) {
-    return options.onUnprocessedFileUpload({
+    return options.onUnprocessed.fileUpload({
       message,
       part: jsonObjectToChatKitUiFilePart(part),
     });
   }
   return part;
+}
+
+async function convertSignalToAiSdkMessage(
+  message: ChatKitSignalMessage,
+  options: ConvertToAiSdkMessageOptions,
+): Promise<UIMessage | null> {
+  const signalType = message.metadata?.signal_type;
+  if (!isSentryIssueSignalType(signalType)) return null;
+  if (!isSentrySignalMessage(message, signalType)) return null;
+  const handler = options.onUnprocessed?.sentry?.[signalType] as
+    | ((signal: SentrySignalMessage) => Awaitable<UIMessage | null>)
+    | undefined;
+  return handler ? handler(message) : null;
 }
 
 async function cacheConvertedMessage(
@@ -401,6 +530,33 @@ function isUiMessage(value: JsonObject): boolean {
 
 function isAiSdkRole(value: unknown): value is UIMessage["role"] {
   return value === "system" || value === "user" || value === "assistant";
+}
+
+function isSentryIssueSignalType(
+  value: unknown,
+): value is SentryIssueSignalType {
+  return (
+    value === "sentry.issue.created" ||
+    value === "sentry.issue.assigned" ||
+    value === "sentry.issue.resolved" ||
+    value === "sentry.issue.unresolved" ||
+    value === "sentry.issue.ignored"
+  );
+}
+
+function isSentrySignalMessage<TType extends SentryIssueSignalType>(
+  message: ChatKitSignalMessage,
+  signalType: TType,
+): message is SentrySignalMessage<TType> {
+  const action = signalType.slice("sentry.issue.".length);
+  const data = message.data;
+  if (!data || data.action !== action || !isRecord(data.data)) return false;
+  const issue = data.data.issue;
+  return (
+    isRecord(issue) &&
+    typeof issue.id === "string" &&
+    typeof issue.title === "string"
+  );
 }
 
 function isRecord(value: unknown): value is JsonObject {

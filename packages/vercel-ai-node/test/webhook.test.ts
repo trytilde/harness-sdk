@@ -765,6 +765,44 @@ describe("chatKitEndpoint", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
+  it("keeps signal messages in typed session history", async () => {
+    const signalMessage = {
+      id: "signal_1",
+      role: "system",
+      type: "signal",
+      summary: "Sentry issue created: API-1 - request failed",
+      data: {
+        action: "created",
+        data: { issue: { id: "1", title: "request failed" } },
+      },
+      metadata: { signal_type: "sentry.issue.created" },
+      created_at: "2026-07-04T13:00:01Z",
+    };
+    const fetchMock = vi.fn(async () =>
+      Response.json({ items: [signalMessage] }),
+    );
+    const handler = vi.fn(async (_request: Request, context) => {
+      await expect(context.session.history()).resolves.toEqual({
+        items: [signalMessage],
+      });
+      return new Response("ok");
+    });
+    const endpoint = testChatKitEndpoint({
+      webhookSigningKey: key,
+      client: {
+        baseUrl: "https://api.example.test",
+        apiKey: "test-key",
+        fetch: fetchMock as typeof fetch,
+      },
+      handler,
+    });
+
+    const response = await endpoint(signedRequest({ messages: [] }));
+
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
   it("uses an explicit cache callback instead of the default endpoint cache", async () => {
     const fetchMock = vi.fn(async () => Response.json({ success: true }));
     const onCacheMessage = vi.fn(async () => undefined);
@@ -1015,13 +1053,15 @@ describe("ChatKit AI SDK converters", () => {
             ],
           },
         ],
-        onUnprocessedFileUpload({ part }) {
-          return {
-            type: "file",
-            mediaType: part.media_type,
-            filename: part.filename ?? undefined,
-            data: { file_id: "file_123" },
-          } as never;
+        onUnprocessed: {
+          fileUpload({ part }) {
+            return {
+              type: "file",
+              mediaType: part.media_type,
+              filename: part.filename ?? undefined,
+              data: { file_id: "file_123" },
+            } as never;
+          },
         },
       }),
     ).resolves.toMatchObject([
@@ -1040,6 +1080,88 @@ describe("ChatKit AI SDK converters", () => {
         ],
       },
     ]);
+  });
+
+  it("dispatches Sentry signals to the handler for their signal type", async () => {
+    const onCreated = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `${signal.data.action}:${signal.data.data.issue.title}`,
+        },
+      ],
+    }));
+    const onResolved = vi.fn(() => null);
+
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_1",
+            role: "system",
+            type: "signal",
+            summary: "Sentry issue created: API-1 - request failed",
+            data: {
+              action: "created",
+              data: {
+                issue: {
+                  id: "1",
+                  shortId: "API-1",
+                  title: "request failed",
+                },
+              },
+            },
+            metadata: { signal_type: "sentry.issue.created" },
+          },
+        ],
+        onUnprocessed: {
+          sentry: {
+            "sentry.issue.created": onCreated,
+            "sentry.issue.resolved": onResolved,
+          },
+        },
+      }),
+    ).resolves.toEqual([
+      {
+        id: "signal_1",
+        role: "user",
+        parts: [{ type: "text", text: "created:request failed" }],
+      },
+    ]);
+    expect(onCreated).toHaveBeenCalledOnce();
+    expect(onResolved).not.toHaveBeenCalled();
+  });
+
+  it("drops unhandled and malformed Sentry signals", async () => {
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_unhandled",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "resolved",
+              data: { issue: { id: "1", title: "request failed" } },
+            },
+            metadata: { signal_type: "sentry.issue.resolved" },
+          },
+          {
+            id: "signal_malformed",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "assigned",
+              data: { issue: { id: "1" } },
+            },
+            metadata: { signal_type: "sentry.issue.assigned" },
+          },
+        ],
+        onUnprocessed: { sentry: {} },
+      }),
+    ).resolves.toEqual([]);
   });
 
   it("hydrates cached agent representations before converting raw parts", async () => {
