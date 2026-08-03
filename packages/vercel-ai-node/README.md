@@ -24,6 +24,12 @@ requires approval for every tool, while Dangerous posture disables content
 screening without bypassing hard-deny, auth, tenant, credential, or audit
 boundaries.
 
+The workspace sandbox binding is authoritative. An unbound workspace exposes
+E2B creation but not existing-sandbox operations or account-wide enumeration.
+After the first create result is durably bound, creation and enumeration are
+hidden and supported sandbox ID fields are replaced with the signed workspace
+ID before execution.
+
 When signed workspace context contains memory banks, the runner recalls
 relevant durable context before the model turn and exposes scoped search,
 reflection, retention, and deletion tools. Read operations span the configured

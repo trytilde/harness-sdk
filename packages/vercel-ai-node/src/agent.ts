@@ -627,6 +627,7 @@ export function applyRuntimePolicy(
   return Object.fromEntries(
     Object.entries(tools)
       .filter(([name]) => !matchesPolicyTool(name, deniedTools))
+      .filter(([name]) => workspaceSandboxToolIsAvailable(name, workspace))
       .map(([name, value]) => {
         const executable = value as ToolSet[string] & {
           execute?: (
@@ -644,8 +645,7 @@ export function applyRuntimePolicy(
         if (
           executable.execute &&
           (deniedPatterns.length > 0 ||
-            workspace?.sandbox?.sandboxId ||
-            (workspace?.sandbox && isSandboxCreateTool(name)) ||
+            workspace?.sandbox ||
             (effectivePosture === "auto" && screenSecurity))
         ) {
           const execute = executable.execute;
@@ -768,6 +768,50 @@ function isSandboxCreateTool(name: string): boolean {
   return name === "e2b_create_sandbox" || name.endsWith("__e2b_create_sandbox");
 }
 
+const WORKSPACE_SANDBOX_BOUND_TOOL_IDS = new Set([
+  "e2b_apply_patch",
+  "e2b_connect_sandbox",
+  "e2b_delete_file",
+  "e2b_delete_sandbox",
+  "e2b_exec_command",
+  "e2b_get_sandbox",
+  "e2b_get_sandbox_events",
+  "e2b_get_sandbox_logs",
+  "e2b_get_sandbox_metrics",
+  "e2b_list_dir",
+  "e2b_pause_sandbox",
+  "e2b_read_file",
+  "e2b_refresh_sandbox",
+  "e2b_set_sandbox_timeout",
+  "e2b_stat",
+  "e2b_write_file",
+]);
+
+const WORKSPACE_SANDBOX_GLOBAL_TOOL_IDS = new Set([
+  "e2b_get_team_metric_max",
+  "e2b_get_team_metrics",
+  "e2b_list_sandboxes",
+  "e2b_list_sandboxes_metrics",
+  "e2b_list_team_sandbox_events",
+]);
+
+/** Restrict a workspace-bound E2B provider to creating or using exactly one sandbox. */
+function workspaceSandboxToolIsAvailable(
+  name: string,
+  workspace?: AgentWorkspaceInvocationContext,
+): boolean {
+  if (!workspace?.sandbox) return true;
+  const toolId = policyToolId(name);
+  if (WORKSPACE_SANDBOX_GLOBAL_TOOL_IDS.has(toolId)) return false;
+  if (workspace.sandbox.sandboxId) return !isSandboxCreateTool(name);
+  return !WORKSPACE_SANDBOX_BOUND_TOOL_IDS.has(toolId);
+}
+
+function policyToolId(name: string): string {
+  const separator = name.lastIndexOf("__");
+  return separator === -1 ? name : name.slice(separator + 2);
+}
+
 function findSandboxId(value: unknown, depth = 0): string | undefined {
   if (depth > 5 || value === null || value === undefined) return undefined;
   if (Array.isArray(value)) {
@@ -823,6 +867,7 @@ function bindSandboxInput(input: unknown, sandboxId?: string | null): unknown {
     return input;
   }
   const record = input as Record<string, unknown>;
+  if ("sandboxID" in record) return { ...record, sandboxID: sandboxId };
   if ("sandboxId" in record) return { ...record, sandboxId };
   if ("sandbox_id" in record) return { ...record, sandbox_id: sandboxId };
   return input;

@@ -228,6 +228,9 @@ describe("workspace runtime policy", () => {
       run.execute({ sandbox_id: "caller-id", command: "pwd" }, {}),
     ).resolves.toEqual({ sandbox_id: "workspace-sandbox", command: "pwd" });
     await expect(
+      run.execute({ sandboxID: "caller-id", command: "pwd" }, {}),
+    ).resolves.toEqual({ sandboxID: "workspace-sandbox", command: "pwd" });
+    await expect(
       run.execute({ sandbox_id: "caller-id", command: "rm -rf /tmp/x" }, {}),
     ).rejects.toThrow("denied command pattern");
     expect(onEvent).toHaveBeenCalledWith(
@@ -236,6 +239,49 @@ describe("workspace runtime policy", () => {
         toolName: "e2b_exec_command",
       }),
     );
+  });
+
+  it("exposes only sandbox creation until the workspace has a binding", () => {
+    const tools = applyRuntimePolicy(
+      {
+        e2b_create_sandbox: { description: "create" },
+        e2b_exec_command: { description: "execute" },
+        e2b_get_sandbox_logs: { description: "logs" },
+        e2b_list_sandboxes: { description: "list" },
+        slack_send_message: { description: "slack" },
+      } as never,
+      "auto",
+      {
+        ...workspace(),
+        sandbox: {
+          toolProviderInstanceId: "e2b-company-agent",
+          sandboxId: null,
+          scratch: false,
+        },
+      },
+    );
+
+    expect(tools.e2b_create_sandbox).toBeDefined();
+    expect(tools.e2b_exec_command).toBeUndefined();
+    expect(tools.e2b_get_sandbox_logs).toBeUndefined();
+    expect(tools.e2b_list_sandboxes).toBeUndefined();
+    expect(tools.slack_send_message).toBeDefined();
+  });
+
+  it("hides sandbox creation and global enumeration after binding", () => {
+    const tools = applyRuntimePolicy(
+      {
+        provider__e2b_create_sandbox: { description: "create" },
+        provider__e2b_exec_command: { description: "execute" },
+        provider__e2b_list_sandboxes_metrics: { description: "metrics" },
+      } as never,
+      "auto",
+      workspace(),
+    );
+
+    expect(tools.provider__e2b_create_sandbox).toBeUndefined();
+    expect(tools.provider__e2b_exec_command).toBeDefined();
+    expect(tools.provider__e2b_list_sandboxes_metrics).toBeUndefined();
   });
 
   it("captures a newly created sandbox for durable workspace binding", async () => {
