@@ -177,6 +177,12 @@ also forwards the short-lived Tilde delegation token together with the agent
 API key, so MCP authenticates the call as machine-on-behalf-of-human. If the
 workspace has no durable-computer ID yet, the first E2B create result is
 persisted through the workspace binding endpoint and reused on later turns.
+Signed workspace memory-bank IDs are also materialized as `memory_search`,
+`memory_reflect`, `memory_remember`, and `memory_forget` tools. The runner
+performs a bounded recall for the current human request, writes only to the
+first (narrowest) configured bank, pairs invoking-actor delegation with the
+agent API key, and screens recalled content in Auto posture before prompt
+injection.
 
 ## React ChatKit Hooks
 

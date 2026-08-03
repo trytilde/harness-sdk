@@ -24,6 +24,13 @@ requires approval for every tool, while Dangerous posture disables content
 screening without bypassing hard-deny, auth, tenant, credential, or audit
 boundaries.
 
+When signed workspace context contains memory banks, the runner recalls
+relevant durable context before the model turn and exposes scoped search,
+reflection, retention, and deletion tools. Read operations span the configured
+banks while writes target only the first bank, so broader read scopes cannot be
+accidentally selected for persistence. Bank IDs are never accepted from model
+input or an unsigned request body.
+
 Start, policy-denial, security-screen, and finish lifecycle records are emitted as
 non-transient `data-agent-run` stream chunks. ChatKit persists those structured
 parts with the assistant message, while `onEvent` remains available for logs

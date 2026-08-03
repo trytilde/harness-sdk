@@ -15,6 +15,7 @@ export type AgentHarnessCapability =
   | "tool-approval"
   | "workspace-policy"
   | "security-screening"
+  | "scoped-memory"
   | "provider-sessions";
 
 export type AgentHarnessProfile = {
@@ -70,6 +71,7 @@ export function createVercelAiAgentHarness(
         "tool-approval",
         "workspace-policy",
         "security-screening",
+        "scoped-memory",
       ]),
     },
     {
