@@ -14,6 +14,7 @@ export type AgentHarnessCapability =
   | "streaming"
   | "tool-approval"
   | "workspace-policy"
+  | "security-screening"
   | "provider-sessions";
 
 export type AgentHarnessProfile = {
@@ -68,6 +69,7 @@ export function createVercelAiAgentHarness(
         "streaming",
         "tool-approval",
         "workspace-policy",
+        "security-screening",
       ]),
     },
     {

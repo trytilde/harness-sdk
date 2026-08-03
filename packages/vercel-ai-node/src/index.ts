@@ -111,6 +111,18 @@ export {
   type TildeMCPClientHandle,
 } from "./mcp";
 export {
+  boundedSecurityPayload,
+  modelSecurityScreen,
+  parseSecurityScreenVerdict,
+  SECURITY_SCREEN_SYSTEM_PROMPT,
+  type SecurityScreener,
+  type SecurityScreenHook,
+  type SecurityScreenInput,
+  type SecurityScreenVerdict,
+  screenSecurityWithRetry,
+  unscreenedNotice,
+} from "./security-screen";
+export {
   DEFAULT_TOLERANCE_SECONDS,
   signBody,
   TILDE_WEBHOOK_ID_HEADER,

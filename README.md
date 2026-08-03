@@ -168,7 +168,11 @@ Configured ChatKit agents can use `runAgent(request, context, { model })`. The
 runner accepts only webhook-verified runtime context, restores bounded history,
 loads skill packages progressively, and connects the assigned MCP server. When
 tilde-api resolves an `AgentWorkspace`, the runner enforces its hard-deny,
-approval, command, sandbox, and wall-clock policy. An invoking-actor workspace
+approval, command, sandbox, and wall-clock policy. In Auto posture it also
+screens provenance-labelled shared history before model access and screens
+every tool result before returning it to the model. Suspicious content is
+quarantined, while unavailable or oversized screens are explicitly labelled as
+untrusted and recorded as durable run events. An invoking-actor workspace
 also forwards the short-lived Tilde delegation token together with the agent
 API key, so MCP authenticates the call as machine-on-behalf-of-human. If the
 workspace has no durable-computer ID yet, the first E2B create result is

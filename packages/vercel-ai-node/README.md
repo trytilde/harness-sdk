@@ -17,9 +17,14 @@ for a complete endpoint.
 signed by the Tilde API. It restores bounded durable history, progressively
 exposes the configured skills registry, connects the assigned MCP server with
 actor context, applies the approval posture, limits model/tool steps, reports
-aggregate usage, and closes MCP resources when streaming finishes.
+aggregate usage, and closes MCP resources when streaming finishes. Auto
+posture screens provenance-labelled shared history and each tool result with a
+bounded classifier before the model can act on that content. Strict posture
+requires approval for every tool, while Dangerous posture disables content
+screening without bypassing hard-deny, auth, tenant, credential, or audit
+boundaries.
 
-Start, policy-denial, and finish lifecycle records are also emitted as
+Start, policy-denial, security-screen, and finish lifecycle records are emitted as
 non-transient `data-agent-run` stream chunks. ChatKit persists those structured
 parts with the assistant message, while `onEvent` remains available for logs
 and metrics.
