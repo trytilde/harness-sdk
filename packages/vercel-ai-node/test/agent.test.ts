@@ -15,7 +15,11 @@ vi.mock("../src/mcp", () => ({
   createMCPClient: mocks.createMCPClient,
 }));
 
-import { applyRuntimePolicy, runAgent } from "../src/agent";
+import {
+  applyRuntimePolicy,
+  runAgent,
+  workspaceCapabilityPrompt,
+} from "../src/agent";
 import { createVercelAiAgentHarness } from "../src/agent-harness";
 
 describe("runAgent", () => {
@@ -194,6 +198,18 @@ describe("runAgent", () => {
 });
 
 describe("workspace runtime policy", () => {
+  it("makes disabled publishing and automation explicit to the model", () => {
+    const prompt = workspaceCapabilityPrompt({
+      ...workspace(),
+      automationEnabled: false,
+      appPublishingEnabled: false,
+    });
+
+    expect(prompt).toContain("Durable automation is disabled");
+    expect(prompt).toContain("Internal-app publishing is disabled");
+    expect(prompt).toContain("do not claim a deployment or invent a URL");
+  });
+
   it("removes denied tools and marks selected tools for approval", () => {
     const tools = applyRuntimePolicy(
       {
