@@ -19,6 +19,11 @@ exposes the configured skills registry, connects the assigned MCP server with
 actor context, applies the approval posture, limits model/tool steps, reports
 aggregate usage, and closes MCP resources when streaming finishes.
 
+Start, policy-denial, and finish lifecycle records are also emitted as
+non-transient `data-agent-run` stream chunks. ChatKit persists those structured
+parts with the assistant message, while `onEvent` remains available for logs
+and metrics.
+
 ```ts
 import { openai } from "@ai-sdk/openai";
 import { createClient } from "@trytilde/harness-sdk";

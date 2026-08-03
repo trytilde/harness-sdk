@@ -8,12 +8,14 @@ import {
 import {
   consumeStream,
   convertToModelMessages,
+  createUIMessageStreamResponse,
   jsonSchema,
   type LanguageModel,
   stepCountIs,
   streamText,
   type ToolSet,
   tool,
+  type UIMessageChunk,
 } from "ai";
 import { convertToAiSdkMessages } from "./chatkit-message";
 import type {
@@ -87,6 +89,11 @@ export async function runAgent(
     ...options.tools,
   };
   let mcpHandle: Awaited<ReturnType<typeof createMCPClient>> | undefined;
+  const auditEvents: AgentRunEvent[] = [];
+  const emitEvent = async (event: AgentRunEvent) => {
+    auditEvents.push(event);
+    await options.onEvent?.(event);
+  };
 
   try {
     mcpHandle = await createMCPClient({
@@ -102,7 +109,7 @@ export async function runAgent(
       (await mcpHandle.mcp.tools()) as ToolSet,
       runtime.security_posture,
       context.runtime.workspace ?? undefined,
-      options.onEvent,
+      emitEvent,
       async (sandboxId) => {
         await bindWorkspaceSandbox(context, sandboxId);
         const sandbox = context.runtime?.workspace?.sandbox;
@@ -113,7 +120,7 @@ export async function runAgent(
       typeof options.model === "function"
         ? options.model(runtime.model ?? undefined)
         : options.model;
-    await options.onEvent?.({
+    await emitEvent({
       type: "started",
       ...(runtime.model ? { model: runtime.model } : {}),
       historyMessageCount: messages.length,
@@ -139,27 +146,54 @@ export async function runAgent(
       stopWhen: stepCountIs(runtime.max_steps),
       abortSignal,
       async onFinish(event) {
-        await options.onEvent?.({
+        await emitEvent({
           type: "finished",
           usage: event.totalUsage as unknown as JsonObject,
         });
       },
     });
 
-    return result.toUIMessageStreamResponse({
-      async onFinish() {
-        await mcpHandle?.closeMcp();
-      },
+    let emittedAuditEvents = 0;
+    const stream = result.toUIMessageStream().pipeThrough(
+      new TransformStream<UIMessageChunk, UIMessageChunk>({
+        transform(chunk, controller) {
+          while (emittedAuditEvents < auditEvents.length) {
+            const event = auditEvents[emittedAuditEvents++];
+            if (!event) break;
+            controller.enqueue(agentRunEventChunk(event));
+          }
+          controller.enqueue(chunk);
+        },
+        async flush(controller) {
+          while (emittedAuditEvents < auditEvents.length) {
+            const event = auditEvents[emittedAuditEvents++];
+            if (!event) break;
+            controller.enqueue(agentRunEventChunk(event));
+          }
+          await mcpHandle?.closeMcp();
+        },
+      }),
+    );
+    return createUIMessageStreamResponse({
+      stream,
       consumeSseStream: consumeStream,
     });
   } catch (error) {
     await mcpHandle?.closeMcp();
-    await options.onEvent?.({
+    await emitEvent({
       type: "failed",
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;
   }
+}
+
+function agentRunEventChunk(event: AgentRunEvent): UIMessageChunk {
+  return {
+    type: "data-agent-run",
+    data: event,
+    transient: false,
+  };
 }
 
 async function createSkillRuntime(context: ChatKitEndpointContext): Promise<{

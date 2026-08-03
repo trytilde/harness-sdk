@@ -107,9 +107,12 @@ describe("runAgent", () => {
       runtimeContext,
       { model: resolveModel, onEvent },
     );
-    await response.text();
+    const responseBody = await response.text();
 
     expect(resolveModel).toHaveBeenCalledWith("gpt-5.4");
+    expect(responseBody).toContain('"type":"data-agent-run"');
+    expect(responseBody).toContain('"type":"started"');
+    expect(responseBody).toContain('"type":"finished"');
     expect(mocks.createMCPClient).toHaveBeenCalledWith(
       expect.objectContaining({
         serverId: "mcp_1",
