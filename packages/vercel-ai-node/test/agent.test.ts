@@ -136,8 +136,8 @@ describe("workspace runtime policy", () => {
   it("removes denied tools and marks selected tools for approval", () => {
     const tools = applyRuntimePolicy(
       {
-        denied: { description: "denied" },
-        reviewed: { description: "reviewed" },
+        provider__denied: { description: "denied" },
+        provider__reviewed: { description: "reviewed" },
       } as never,
       "dangerous",
       workspace({
@@ -146,8 +146,8 @@ describe("workspace runtime policy", () => {
       }),
     );
 
-    expect(tools.denied).toBeUndefined();
-    expect(tools.reviewed).toMatchObject({ needsApproval: true });
+    expect(tools.provider__denied).toBeUndefined();
+    expect(tools.provider__reviewed).toMatchObject({ needsApproval: true });
   });
 
   it("binds the signed sandbox and rejects denied command inputs", async () => {

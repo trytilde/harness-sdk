@@ -324,7 +324,7 @@ export function applyRuntimePolicy(
   });
   return Object.fromEntries(
     Object.entries(tools)
-      .filter(([name]) => !deniedTools.has(name))
+      .filter(([name]) => !matchesPolicyTool(name, deniedTools))
       .map(([name, value]) => {
         const executable = value as ToolSet[string] & {
           execute?: (
@@ -334,7 +334,8 @@ export function applyRuntimePolicy(
         };
         const result = {
           ...value,
-          ...(effectivePosture === "strict" || approvalTools.has(name)
+          ...(effectivePosture === "strict" ||
+          matchesPolicyTool(name, approvalTools)
             ? { needsApproval: true }
             : {}),
         } as typeof executable;
@@ -378,6 +379,14 @@ export function applyRuntimePolicy(
         return [name, result];
       }),
   ) as ToolSet;
+}
+
+function matchesPolicyTool(name: string, configuredIds: Set<string>): boolean {
+  if (configuredIds.has(name)) return true;
+  for (const id of configuredIds) {
+    if (name.endsWith(`__${id}`)) return true;
+  }
+  return false;
 }
 
 async function bindWorkspaceSandbox(
