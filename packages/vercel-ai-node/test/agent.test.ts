@@ -17,6 +17,7 @@ vi.mock("../src/mcp", () => ({
 
 import {
   applyRuntimePolicy,
+  qmSkillCompatibilityPrompt,
   runAgent,
   workspaceCapabilityPrompt,
 } from "../src/agent";
@@ -198,6 +199,21 @@ describe("runAgent", () => {
 });
 
 describe("workspace runtime policy", () => {
+  it("translates QM-local procedures onto signed Tilde capabilities", () => {
+    const prompt = qmSkillCompatibilityPrompt([
+      {
+        source_repository_url: "https://github.com/yc-software/qm.git",
+      },
+    ] as never);
+
+    expect(prompt).toContain("QM package compatibility rules");
+    expect(prompt).toContain("read_skill_file");
+    expect(prompt).toContain("Tilde capability discovery");
+    expect(prompt).toContain("Do not call QM-only /v1/admin");
+    expect(prompt).toContain("report the missing capability");
+    expect(qmSkillCompatibilityPrompt([])).toBe("");
+  });
+
   it("makes disabled publishing and automation explicit to the model", () => {
     const prompt = workspaceCapabilityPrompt({
       ...workspace(),
