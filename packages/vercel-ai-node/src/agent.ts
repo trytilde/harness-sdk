@@ -1,5 +1,10 @@
 import { Buffer } from "node:buffer";
-import type { JsonObject, SkillItem } from "@trytilde/harness-sdk";
+import {
+  configHeaders,
+  type JsonObject,
+  type JsonValue,
+  type SkillItem,
+} from "@trytilde/harness-sdk";
 import {
   consumeStream,
   convertToModelMessages,
@@ -11,6 +16,10 @@ import {
   tool,
 } from "ai";
 import { convertToAiSdkMessages } from "./chatkit-message";
+import type {
+  AgentWorkspaceInvocationContext,
+  ChatKitAgentSecurityPosture,
+} from "./chatkit-request";
 import type { ChatKitEndpointContext } from "./handler";
 import { createMCPClient } from "./mcp";
 
@@ -28,6 +37,11 @@ export type AgentRunEvent =
   | {
       type: "failed";
       error: string;
+    }
+  | {
+      type: "policy-denied";
+      toolName: string;
+      reason: string;
     };
 
 export type RunAgentOptions = {
@@ -79,11 +93,21 @@ export async function runAgent(
       client: context.client,
       serverId: runtime.mcp_server_id,
       tools: localTools,
-      headers: actorHeaders(context),
+      headers: actorHeaders(
+        context,
+        request.headers.get("x-tilde-agent-delegation"),
+      ),
     });
-    const tools = applySecurityPosture(
+    const tools = applyRuntimePolicy(
       (await mcpHandle.mcp.tools()) as ToolSet,
       runtime.security_posture,
+      context.runtime.workspace ?? undefined,
+      options.onEvent,
+      async (sandboxId) => {
+        await bindWorkspaceSandbox(context, sandboxId);
+        const sandbox = context.runtime?.workspace?.sandbox;
+        if (sandbox) sandbox.sandboxId = sandboxId;
+      },
     );
     const model =
       typeof options.model === "function"
@@ -96,6 +120,14 @@ export async function runAgent(
       toolCount: Object.keys(tools).length,
     });
 
+    const wallClockSeconds =
+      context.runtime.workspace?.invocationPolicy.maxWallClockSeconds;
+    const abortSignal = wallClockSeconds
+      ? AbortSignal.any([
+          request.signal,
+          AbortSignal.timeout(wallClockSeconds * 1_000),
+        ])
+      : request.signal;
     const result = streamText({
       model,
       system: systemPrompt(
@@ -105,7 +137,7 @@ export async function runAgent(
       messages: await convertToModelMessages(messages),
       tools,
       stopWhen: stepCountIs(runtime.max_steps),
-      abortSignal: request.signal,
+      abortSignal,
       async onFinish(event) {
         await options.onEvent?.({
           type: "finished",
@@ -237,7 +269,10 @@ function systemPrompt(base: string | undefined, catalog: SkillItem[]): string {
   return `${prompt}\n\nAvailable skills:\n${skills}\n\nUse list_skills and read_skill progressively before applying a relevant procedure.`;
 }
 
-function actorHeaders(context: ChatKitEndpointContext): Record<string, string> {
+function actorHeaders(
+  context: ChatKitEndpointContext,
+  delegationToken?: string | null,
+): Record<string, string> {
   return Object.fromEntries(
     Object.entries({
       "x-tilde-org-id": context.orgId,
@@ -251,19 +286,186 @@ function actorHeaders(context: ChatKitEndpointContext): Record<string, string> {
       "x-external-user-provider": context.externalUserProvider,
       "x-external-user-provider-account-id":
         context.externalUserProviderAccountId,
+      "x-tilde-agent-workspace-id": context.runtime?.workspace?.id,
+      "x-tilde-agent-workspace-kind": context.runtime?.workspace?.kind,
+      "x-tilde-agent-workspace-subject": context.runtime?.workspace?.subjectId,
+      "x-tilde-agent-credential-mode":
+        context.runtime?.workspace?.credentialMode,
+      authorization: delegationToken ? `Bearer ${delegationToken}` : undefined,
     }).filter((entry): entry is [string, string] => Boolean(entry[1])),
   );
 }
 
-function applySecurityPosture(
+export function applyRuntimePolicy(
   tools: ToolSet,
-  posture: "auto" | "strict" | "dangerous",
+  posture: ChatKitAgentSecurityPosture,
+  workspace?: AgentWorkspaceInvocationContext,
+  onEvent?: RunAgentOptions["onEvent"],
+  onSandboxCreated?: (sandboxId: string) => void | Promise<void>,
 ): ToolSet {
-  if (posture !== "strict") return tools;
+  const deniedTools = new Set(workspace?.invocationPolicy.deniedToolIds ?? []);
+  const approvalTools = new Set(
+    workspace?.invocationPolicy.approvalRequiredToolIds ?? [],
+  );
+  const effectivePosture = stricterPosture(
+    posture,
+    workspace?.invocationPolicy.securityPosture,
+  );
+  const deniedPatterns = (
+    workspace?.invocationPolicy.deniedCommandPatterns ?? []
+  ).map((pattern) => {
+    try {
+      return { source: pattern, regex: new RegExp(pattern, "i") };
+    } catch (error) {
+      throw new TypeError(
+        `Invalid signed workspace command policy ${JSON.stringify(pattern)}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  });
   return Object.fromEntries(
-    Object.entries(tools).map(([name, value]) => [
-      name,
-      { ...value, needsApproval: true },
-    ]),
+    Object.entries(tools)
+      .filter(([name]) => !deniedTools.has(name))
+      .map(([name, value]) => {
+        const executable = value as ToolSet[string] & {
+          execute?: (
+            input: unknown,
+            options: unknown,
+          ) => unknown | Promise<unknown>;
+        };
+        const result = {
+          ...value,
+          ...(effectivePosture === "strict" || approvalTools.has(name)
+            ? { needsApproval: true }
+            : {}),
+        } as typeof executable;
+        if (
+          executable.execute &&
+          (deniedPatterns.length > 0 ||
+            workspace?.sandbox?.sandboxId ||
+            (workspace?.sandbox && isSandboxCreateTool(name)))
+        ) {
+          const execute = executable.execute;
+          result.execute = async (input, executeOptions) => {
+            const serialized = JSON.stringify(input);
+            const denied = deniedPatterns.find(({ regex }) =>
+              regex.test(serialized),
+            );
+            if (denied) {
+              const reason = `Tool input matched denied command pattern: ${denied.source}`;
+              await onEvent?.({
+                type: "policy-denied",
+                toolName: name,
+                reason,
+              });
+              throw new Error(reason);
+            }
+            const output = await execute(
+              bindSandboxInput(input, workspace?.sandbox?.sandboxId),
+              executeOptions,
+            );
+            if (isSandboxCreateTool(name)) {
+              const sandboxId = findSandboxId(output);
+              if (!sandboxId) {
+                throw new Error(
+                  "Sandbox creation succeeded without returning a sandbox ID",
+                );
+              }
+              await onSandboxCreated?.(sandboxId);
+            }
+            return output;
+          };
+        }
+        return [name, result];
+      }),
   ) as ToolSet;
+}
+
+async function bindWorkspaceSandbox(
+  context: ChatKitEndpointContext,
+  sandboxId: string,
+): Promise<void> {
+  const workspace = context.runtime?.workspace;
+  if (!workspace?.sandbox || workspace.sandbox.sandboxId === sandboxId) return;
+  const headers = configHeaders(context.client.config);
+  headers.set("content-type", "application/json");
+  for (const [key, value] of Object.entries(actorHeaders(context))) {
+    headers.set(key, value);
+  }
+  const baseUrl = context.client.config.baseUrl.replace(/\/+$/, "");
+  const url = `${baseUrl}/api/v1/team/${encodeURIComponent(context.teamId)}/chatkit/workspaces/${encodeURIComponent(workspace.id)}/sandbox`;
+  const response = await (context.client.config.fetch ?? fetch)(url, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ sandboxId }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Failed to persist agent workspace sandbox (${response.status}): ${await response.text()}`,
+    );
+  }
+}
+
+function isSandboxCreateTool(name: string): boolean {
+  return name === "e2b_create_sandbox" || name.endsWith("__e2b_create_sandbox");
+}
+
+function findSandboxId(value: unknown, depth = 0): string | undefined {
+  if (depth > 5 || value === null || value === undefined) return undefined;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findSandboxId(item, depth + 1);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  if (typeof value === "string") {
+    if (!value.trim().startsWith("{") && !value.trim().startsWith("[")) {
+      return undefined;
+    }
+    try {
+      return findSandboxId(JSON.parse(value) as JsonValue, depth + 1);
+    } catch {
+      return undefined;
+    }
+  }
+  if (typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  for (const key of ["sandboxID", "sandboxId", "sandbox_id"]) {
+    if (typeof record[key] === "string" && record[key]) {
+      return record[key];
+    }
+  }
+  for (const nested of Object.values(record)) {
+    const found = findSandboxId(nested, depth + 1);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function stricterPosture(
+  agent: ChatKitAgentSecurityPosture,
+  workspace?: ChatKitAgentSecurityPosture,
+): ChatKitAgentSecurityPosture {
+  const rank: Record<ChatKitAgentSecurityPosture, number> = {
+    dangerous: 0,
+    auto: 1,
+    strict: 2,
+  };
+  return workspace && rank[workspace] > rank[agent] ? workspace : agent;
+}
+
+function bindSandboxInput(input: unknown, sandboxId?: string | null): unknown {
+  if (
+    !sandboxId ||
+    !input ||
+    typeof input !== "object" ||
+    Array.isArray(input)
+  ) {
+    return input;
+  }
+  const record = input as Record<string, unknown>;
+  if ("sandboxId" in record) return { ...record, sandboxId };
+  if ("sandbox_id" in record) return { ...record, sandbox_id: sandboxId };
+  return input;
 }

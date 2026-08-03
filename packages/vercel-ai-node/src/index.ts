@@ -4,6 +4,17 @@ export {
   runAgent,
 } from "./agent";
 export {
+  type AgentHarness,
+  type AgentHarnessCapability,
+  type AgentHarnessControlTransport,
+  type AgentHarnessProfile,
+  type AgentHarnessToolTransport,
+  type AgentHarnessTurnInput,
+  createVercelAiAgentHarness,
+  defineAgentHarness,
+  runAgentWithHarness,
+} from "./agent-harness";
+export {
   type ChatKitAttachmentFilePartHandlerOptions,
   createChatKitAttachmentFilePartHandler,
 } from "./chatkit-attachments";
@@ -50,6 +61,11 @@ export {
   type SlackChatKitMessageMetadata,
 } from "./chatkit-provider-metadata";
 export {
+  type AgentWorkspaceCredentialMode,
+  type AgentWorkspaceInvocationContext,
+  type AgentWorkspaceInvocationPolicy,
+  type AgentWorkspaceKind,
+  type AgentWorkspaceSandboxBinding,
   type ChatKitAgentInvocationActor,
   type ChatKitAgentRuntimeConfiguration,
   type ChatKitAgentRuntimeContext,

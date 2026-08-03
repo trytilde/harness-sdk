@@ -204,6 +204,28 @@ describe("chatKitEndpoint", () => {
         external_user_provider: "slack",
         external_user_provider_account_id: "workspace-1",
       },
+      workspace: {
+        id: "019fc468-a3db-7273-8554-9a7491b5671a",
+        kind: "personal",
+        subjectId: "tilde:signed-user",
+        memoryBankIds: [],
+        credentialMode: "invoking_actor",
+        sandbox: {
+          toolProviderInstanceId: "e2b-company-agent",
+          sandboxId: "sandbox-1",
+          profileId: "company-agent",
+          scratch: false,
+        },
+        invocationPolicy: {
+          securityPosture: "strict",
+          deniedToolIds: ["dangerous_tool"],
+          approvalRequiredToolIds: ["browser_click"],
+          deniedCommandPatterns: ["rm\\s+-rf"],
+          maxWallClockSeconds: 295,
+        },
+        automationEnabled: true,
+        appPublishingEnabled: true,
+      },
       configuration: {
         mcp_server_id: "mcp_1",
         skill_registry_id: "skills_1",

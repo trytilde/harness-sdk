@@ -89,6 +89,41 @@ export type ChatKitRequestMessage = {
 
 export type ChatKitAgentSecurityPosture = "auto" | "strict" | "dangerous";
 
+export type AgentWorkspaceKind = "personal" | "conversation" | "project";
+
+export type AgentWorkspaceCredentialMode =
+  | "fixed"
+  | "invoking_actor"
+  | "workspace_shared";
+
+export type AgentWorkspaceSandboxBinding = {
+  toolProviderInstanceId: string;
+  sandboxId?: string | null;
+  profileId?: string | null;
+  scratch: boolean;
+};
+
+export type AgentWorkspaceInvocationPolicy = {
+  securityPosture: ChatKitAgentSecurityPosture;
+  deniedToolIds: string[];
+  approvalRequiredToolIds: string[];
+  deniedCommandPatterns: string[];
+  maxWallClockSeconds: number;
+};
+
+/** Signed, server-resolved workspace facts for one invocation. */
+export type AgentWorkspaceInvocationContext = {
+  id: string;
+  kind: AgentWorkspaceKind;
+  subjectId: string;
+  memoryBankIds: string[];
+  credentialMode: AgentWorkspaceCredentialMode;
+  sandbox?: AgentWorkspaceSandboxBinding | null;
+  invocationPolicy: AgentWorkspaceInvocationPolicy;
+  automationEnabled: boolean;
+  appPublishingEnabled: boolean;
+};
+
 /** Server-owned runtime bindings injected into a verified ChatKit request. */
 export type ChatKitAgentRuntimeConfiguration = {
   mcp_server_id: string;
@@ -115,6 +150,7 @@ export type ChatKitAgentRuntimeContext = {
   team_id: string;
   session_id: string;
   actor: ChatKitAgentInvocationActor;
+  workspace?: AgentWorkspaceInvocationContext | null;
   configuration: ChatKitAgentRuntimeConfiguration;
 };
 
@@ -225,7 +261,7 @@ function parseAgentRuntimeContext(
     }
     if (field !== undefined) parsedActor[key] = field as string | null;
   }
-  return {
+  const result: ChatKitAgentRuntimeContext = {
     agent_inbox_id: requiredString(value, "agent_inbox_id", path),
     agent_inbox_instance_id: requiredString(
       value,
@@ -238,6 +274,110 @@ function parseAgentRuntimeContext(
     actor: parsedActor,
     configuration: parsed,
   };
+  if (value.workspace !== undefined && value.workspace !== null) {
+    result.workspace = parseWorkspace(value.workspace, `${path}.workspace`);
+  } else if (value.workspace === null) {
+    result.workspace = null;
+  }
+  return result;
+}
+
+function parseWorkspace(
+  value: JsonValue,
+  path: string,
+): AgentWorkspaceInvocationContext {
+  if (!isRecord(value)) throw invalid(path, "must be an object");
+  const kind = requiredString(value, "kind", path);
+  if (kind !== "personal" && kind !== "conversation" && kind !== "project") {
+    throw invalid(`${path}.kind`, "must be personal, conversation, or project");
+  }
+  const credentialMode = requiredString(value, "credentialMode", path);
+  if (
+    credentialMode !== "fixed" &&
+    credentialMode !== "invoking_actor" &&
+    credentialMode !== "workspace_shared"
+  ) {
+    throw invalid(
+      `${path}.credentialMode`,
+      "must be fixed, invoking_actor, or workspace_shared",
+    );
+  }
+  const policyValue = value.invocationPolicy;
+  if (!isRecord(policyValue)) {
+    throw invalid(`${path}.invocationPolicy`, "must be an object");
+  }
+  const securityPosture = requiredString(
+    policyValue,
+    "securityPosture",
+    `${path}.invocationPolicy`,
+  );
+  if (!isSecurityPosture(securityPosture)) {
+    throw invalid(
+      `${path}.invocationPolicy.securityPosture`,
+      'must be "auto", "strict", or "dangerous"',
+    );
+  }
+  const workspace: AgentWorkspaceInvocationContext = {
+    id: requiredString(value, "id", path),
+    kind,
+    subjectId: requiredString(value, "subjectId", path),
+    memoryBankIds: requiredStringArray(value, "memoryBankIds", path),
+    credentialMode,
+    invocationPolicy: {
+      securityPosture,
+      deniedToolIds: requiredStringArray(
+        policyValue,
+        "deniedToolIds",
+        `${path}.invocationPolicy`,
+      ),
+      approvalRequiredToolIds: requiredStringArray(
+        policyValue,
+        "approvalRequiredToolIds",
+        `${path}.invocationPolicy`,
+      ),
+      deniedCommandPatterns: requiredStringArray(
+        policyValue,
+        "deniedCommandPatterns",
+        `${path}.invocationPolicy`,
+      ),
+      maxWallClockSeconds: requiredPositiveInteger(
+        policyValue,
+        "maxWallClockSeconds",
+        `${path}.invocationPolicy`,
+      ),
+    },
+    automationEnabled: requiredBoolean(value, "automationEnabled", path),
+    appPublishingEnabled: requiredBoolean(value, "appPublishingEnabled", path),
+  };
+  if (value.sandbox !== undefined && value.sandbox !== null) {
+    workspace.sandbox = parseWorkspaceSandbox(value.sandbox, `${path}.sandbox`);
+  } else if (value.sandbox === null) {
+    workspace.sandbox = null;
+  }
+  return workspace;
+}
+
+function parseWorkspaceSandbox(
+  value: JsonValue,
+  path: string,
+): AgentWorkspaceSandboxBinding {
+  if (!isRecord(value)) throw invalid(path, "must be an object");
+  const sandbox: AgentWorkspaceSandboxBinding = {
+    toolProviderInstanceId: requiredString(
+      value,
+      "toolProviderInstanceId",
+      path,
+    ),
+    scratch: requiredBoolean(value, "scratch", path),
+  };
+  for (const key of ["sandboxId", "profileId"] as const) {
+    const field = value[key];
+    if (field !== undefined && field !== null && typeof field !== "string") {
+      throw invalid(`${path}.${key}`, "must be a string or null");
+    }
+    if (field !== undefined) sandbox[key] = field as string | null;
+  }
+  return sandbox;
 }
 
 export function isChatKitRequestMessage(
@@ -376,6 +516,30 @@ function requiredPositiveInteger(
     throw invalid(`${path}.${key}`, "must be a positive integer");
   }
   return field as number;
+}
+
+function requiredBoolean(
+  value: JsonObject,
+  key: string,
+  path: string,
+): boolean {
+  const field = value[key];
+  if (typeof field !== "boolean") {
+    throw invalid(`${path}.${key}`, "must be a boolean");
+  }
+  return field;
+}
+
+function requiredStringArray(
+  value: JsonObject,
+  key: string,
+  path: string,
+): string[] {
+  const field = value[key];
+  if (!Array.isArray(field) || field.some((item) => typeof item !== "string")) {
+    throw invalid(`${path}.${key}`, "must be an array of strings");
+  }
+  return field as string[];
 }
 
 function isSecurityPosture(
