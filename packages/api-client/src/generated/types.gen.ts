@@ -42,6 +42,114 @@ export type AddTeamMemberBody = {
 };
 
 /**
+ * Persisted company-agent workspace.
+ */
+export type AgentWorkspace = {
+    configuration: AgentWorkspaceConfiguration;
+    createdAt: WrappedChronoDateTime;
+    displayName: string;
+    id: WrappedUuidV4;
+    kind: AgentWorkspaceKind;
+    orgId: string;
+    subjectId: string;
+    teamId: string;
+    updatedAt: WrappedChronoDateTime;
+};
+
+/**
+ * Durable bindings and policy owned by one personal, conversation, or project workspace.
+ */
+export type AgentWorkspaceConfiguration = {
+    appPublishingEnabled?: boolean;
+    automationEnabled?: boolean;
+    credentialMode?: AgentWorkspaceCredentialMode;
+    grants?: Array<AgentWorkspaceGrant>;
+    invocationPolicy?: AgentWorkspaceInvocationPolicy;
+    mcpServerId?: string | null;
+    memoryBankIds?: Array<WrappedUuidV4>;
+    /**
+     * Optional scope-owned model selector folded into the signed runtime.
+     */
+    model?: string | null;
+    sandbox?: null | AgentWorkspaceSandboxBinding;
+    skillRegistryId?: null | WrappedUuidV4;
+};
+
+/**
+ * Which credential identity an invocation may use.
+ */
+export enum AgentWorkspaceCredentialMode {
+    FIXED = 'fixed',
+    INVOKING_ACTOR = 'invoking_actor',
+    WORKSPACE_SHARED = 'workspace_shared'
+}
+
+/**
+ * A grant allowing one actor subject to use or administer a workspace.
+ */
+export type AgentWorkspaceGrant = {
+    /**
+     * `member` may use the workspace; `admin` may also change its configuration.
+     */
+    role: string;
+    /**
+     * Stable actor subject such as `tilde:<user-id>` or an external identity key.
+     */
+    subjectId: string;
+};
+
+/**
+ * Non-secret workspace facts covered by the ChatKit invocation signature.
+ */
+export type AgentWorkspaceInvocationContext = {
+    appPublishingEnabled: boolean;
+    automationEnabled: boolean;
+    credentialMode: AgentWorkspaceCredentialMode;
+    id: WrappedUuidV4;
+    invocationPolicy: AgentWorkspaceInvocationPolicy;
+    kind: AgentWorkspaceKind;
+    memoryBankIds: Array<WrappedUuidV4>;
+    model?: string | null;
+    sandbox?: null | AgentWorkspaceSandboxBinding;
+    subjectId: string;
+};
+
+/**
+ * Deterministic rules enforced before workspace tools are exposed to a runner.
+ */
+export type AgentWorkspaceInvocationPolicy = {
+    approvalRequiredToolIds?: Array<string>;
+    deniedCommandPatterns?: Array<string>;
+    deniedToolIds?: Array<string>;
+    maxWallClockSeconds?: number;
+    securityPosture?: ChatKitAgentSecurityPosture;
+};
+
+/**
+ * The collaboration boundary that owns an agent workspace.
+ */
+export enum AgentWorkspaceKind {
+    PERSONAL = 'personal',
+    CONVERSATION = 'conversation',
+    PROJECT = 'project'
+}
+
+export type AgentWorkspacePaginatedResponse = {
+    items: Array<AgentWorkspace>;
+    next_page_token?: string;
+};
+
+/**
+ * Provider-neutral durable-computer binding owned by a workspace.
+ */
+export type AgentWorkspaceSandboxBinding = {
+    profileId?: string | null;
+    sandboxId?: string | null;
+    scratch?: boolean;
+    toolProviderInstanceId: string;
+};
+
+/**
  * Result of an idempotent ontology-template installation.
  */
 export type ApplyOntologyTemplateResult = {
@@ -152,6 +260,13 @@ export enum BillingProductId {
     TILDE_CORE = 'tilde_core',
     TILDE_PAY = 'tilde_pay'
 }
+
+/**
+ * User-authored fields for binding a provider-owned durable computer.
+ */
+export type BindAgentWorkspaceSandboxRequestInner = {
+    sandboxId: string;
+};
 
 export type BrokerAction = {
     Redirect: BrokerActionRedirect;
@@ -441,6 +556,61 @@ export type ChatKitAgentPaginatedResponse = {
 };
 
 /**
+ * Non-secret configuration used by an external agent runtime.
+ */
+export type ChatKitAgentRuntimeConfiguration = {
+    /**
+     * Maximum historical ChatKit messages loaded for one turn.
+     */
+    max_history_messages: number;
+    /**
+     * Maximum model/tool steps for one turn.
+     */
+    max_steps: number;
+    /**
+     * MCP server exposed to the agent runtime.
+     */
+    mcp_server_id: string;
+    /**
+     * Deployment-specific model identifier resolved by the external runtime.
+     */
+    model?: string | null;
+    /**
+     * Runner-level tool approval posture.
+     */
+    security_posture: ChatKitAgentSecurityPosture;
+    skill_registry_id?: null | WrappedUuidV4;
+    /**
+     * Additional operator-authored system instructions.
+     */
+    system_prompt?: string | null;
+    workspace_template?: null | AgentWorkspaceConfiguration;
+};
+
+/**
+ * Signed runtime context attached to one outbound ChatKit agent invocation.
+ */
+export type ChatKitAgentRuntimeContext = {
+    actor: ChatKitAgentInvocationActor;
+    agent_inbox_id: string;
+    agent_inbox_instance_id: string;
+    configuration: ChatKitAgentRuntimeConfiguration;
+    org_id: string;
+    session_id: WrappedUuidV4;
+    team_id: string;
+    workspace?: null | AgentWorkspaceInvocationContext;
+};
+
+/**
+ * Runtime security posture requested for a ChatKit HTTP agent turn.
+ */
+export enum ChatKitAgentSecurityPosture {
+    AUTO = 'auto',
+    STRICT = 'strict',
+    DANGEROUS = 'dangerous'
+}
+
+/**
  * Persisted queued agent turn.
  */
 export type ChatKitAgentTurnQueueItem = {
@@ -476,6 +646,7 @@ export type ChatKitAgentTurnQueueItemPaginatedResponse = {
 export enum ChatKitAgentTurnQueueStatus {
     PENDING = 'pending',
     RUNNING = 'running',
+    WAITING_APPROVAL = 'waiting_approval',
     COMPLETED = 'completed',
     FAILED = 'failed',
     CANCELLED = 'cancelled'
@@ -588,6 +759,7 @@ export type ChatMessagePart = {
 export type ChatRequest = {
     chatId?: string | null;
     messages: Array<ChatMessage>;
+    tildeContext?: null | ChatKitAgentRuntimeContext;
 };
 
 /**
@@ -1311,6 +1483,10 @@ export type DataUiPart = {
 
 export type DebugAuthProfilesResponse = {
     profiles: Array<string>;
+};
+
+export type DeleteAgentWorkspaceResponse = {
+    deleted: boolean;
 };
 
 export type DeleteChatKitAgentTurnQueueItemResponse = {
@@ -2936,6 +3112,7 @@ export type RegisterHttpVercelAiSdkAgentRequestInner = {
      * Memory banks that should ingest conversations involving this agent.
      */
     memory_bank_ids?: Array<WrappedUuidV4> | null;
+    runtime?: null | ChatKitAgentRuntimeConfiguration;
     streaming?: boolean;
     timeout_ms?: number | null;
 };
@@ -3095,6 +3272,10 @@ export type RetainMemoryBody = {
     document: MemoryDocument;
 };
 
+export type RetryChatKitAgentTurnQueueItemResponse = {
+    retried: boolean;
+};
+
 export type RetryMemorySourceBody = {
     source_id: string;
     source_kind: MemorySourceKind;
@@ -3235,6 +3416,7 @@ export type SetupPayMcpResponse = {
 export type SignalAction = {
     agent_inbox_id: string;
     agent_inbox_instance_id?: string | null;
+    invocation_actor?: null | SignalInvocationActor;
     reply_to_inbox_id?: string | null;
     reply_to_inbox_instance_id?: string | null;
     type: 'invoke_chatkit_agent';
@@ -3289,6 +3471,20 @@ export type SignalInterpolationVariable = {
     description: string;
     example: string;
     key: string;
+};
+
+/**
+ * Identity context frozen when an authenticated caller configures an agent action.
+ *
+ * Signal deliveries run asynchronously with system credentials, so this context
+ * preserves the human actor needed by invoking-actor workspaces without storing
+ * or replaying the caller's original credentials.
+ */
+export type SignalInvocationActor = {
+    external_user_id?: string | null;
+    external_user_provider?: string | null;
+    external_user_provider_account_id?: string | null;
+    tilde_user_id?: string | null;
 };
 
 /**
@@ -4091,6 +4287,7 @@ export type UpdateHttpVercelAiSdkAgentRequestInner = {
      * Replaces the complete memory-bank selection when present.
      */
     memory_bank_ids?: Array<WrappedUuidV4> | null;
+    runtime?: null | ChatKitAgentRuntimeConfiguration;
     streaming?: boolean | null;
     timeout_ms?: number | null;
 };
@@ -4258,6 +4455,17 @@ export type UpdateWikiBody = {
      */
     memory_bank_ids?: Array<WrappedUuidV4> | null;
     name: string;
+};
+
+/**
+ * User-authored fields for creating or reconciling a workspace.
+ */
+export type UpsertAgentWorkspaceRequestInner = {
+    configuration: AgentWorkspaceConfiguration;
+    displayName: string;
+    id?: null | WrappedUuidV4;
+    kind: AgentWorkspaceKind;
+    subjectId: string;
 };
 
 export type UpsertPageRelationshipBody = {
@@ -7332,6 +7540,38 @@ export type ChatkitReorderAgentTurnQueueItemResponses = {
 
 export type ChatkitReorderAgentTurnQueueItemResponse = ChatkitReorderAgentTurnQueueItemResponses[keyof ChatkitReorderAgentTurnQueueItemResponses];
 
+export type ChatkitRetryAgentTurnQueueItemData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Durable ChatKit agent turn ID
+         */
+        queue_item_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/chatkit/agent-turn-queue/{queue_item_id}/retry';
+};
+
+export type ChatkitRetryAgentTurnQueueItemErrors = {
+    400: Error;
+    500: Error;
+};
+
+export type ChatkitRetryAgentTurnQueueItemError = ChatkitRetryAgentTurnQueueItemErrors[keyof ChatkitRetryAgentTurnQueueItemErrors];
+
+export type ChatkitRetryAgentTurnQueueItemResponses = {
+    /**
+     * Retry a failed or cancelled ChatKit agent turn
+     */
+    200: RetryChatKitAgentTurnQueueItemResponse;
+};
+
+export type ChatkitRetryAgentTurnQueueItemResponse = ChatkitRetryAgentTurnQueueItemResponses[keyof ChatkitRetryAgentTurnQueueItemResponses];
+
 export type ChatkitSteerAgentTurnQueueItemData = {
     body?: never;
     path: {
@@ -9258,6 +9498,193 @@ export type ChatkitRemoveSessionParticipantResponses = {
 };
 
 export type ChatkitRemoveSessionParticipantResponse = ChatkitRemoveSessionParticipantResponses[keyof ChatkitRemoveSessionParticipantResponses];
+
+export type ChatkitListAgentWorkspacesData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: {
+        page_size?: number;
+        next_page_token?: string | null;
+        kind?: null | AgentWorkspaceKind;
+        subject_id?: string | null;
+    };
+    url: '/api/v1/team/{team_id}/chatkit/workspaces';
+};
+
+export type ChatkitListAgentWorkspacesErrors = {
+    /**
+     * Bad Request
+     */
+    400: Error;
+    /**
+     * Internal Server Error
+     */
+    500: Error;
+};
+
+export type ChatkitListAgentWorkspacesError = ChatkitListAgentWorkspacesErrors[keyof ChatkitListAgentWorkspacesErrors];
+
+export type ChatkitListAgentWorkspacesResponses = {
+    /**
+     * List agent workspaces
+     */
+    200: AgentWorkspacePaginatedResponse;
+};
+
+export type ChatkitListAgentWorkspacesResponse = ChatkitListAgentWorkspacesResponses[keyof ChatkitListAgentWorkspacesResponses];
+
+export type ChatkitUpsertAgentWorkspaceData = {
+    body: UpsertAgentWorkspaceRequestInner;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/chatkit/workspaces';
+};
+
+export type ChatkitUpsertAgentWorkspaceErrors = {
+    /**
+     * Bad Request
+     */
+    400: Error;
+    /**
+     * Internal Server Error
+     */
+    500: Error;
+};
+
+export type ChatkitUpsertAgentWorkspaceError = ChatkitUpsertAgentWorkspaceErrors[keyof ChatkitUpsertAgentWorkspaceErrors];
+
+export type ChatkitUpsertAgentWorkspaceResponses = {
+    /**
+     * Create or reconcile an agent workspace
+     */
+    200: AgentWorkspace;
+};
+
+export type ChatkitUpsertAgentWorkspaceResponse = ChatkitUpsertAgentWorkspaceResponses[keyof ChatkitUpsertAgentWorkspaceResponses];
+
+export type ChatkitDeleteAgentWorkspaceData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Agent workspace ID
+         */
+        workspace_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/chatkit/workspaces/{workspace_id}';
+};
+
+export type ChatkitDeleteAgentWorkspaceErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: Error;
+};
+
+export type ChatkitDeleteAgentWorkspaceError = ChatkitDeleteAgentWorkspaceErrors[keyof ChatkitDeleteAgentWorkspaceErrors];
+
+export type ChatkitDeleteAgentWorkspaceResponses = {
+    /**
+     * Delete an agent workspace
+     */
+    200: DeleteAgentWorkspaceResponse;
+};
+
+export type ChatkitDeleteAgentWorkspaceResponse = ChatkitDeleteAgentWorkspaceResponses[keyof ChatkitDeleteAgentWorkspaceResponses];
+
+export type ChatkitGetAgentWorkspaceData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Agent workspace ID
+         */
+        workspace_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/chatkit/workspaces/{workspace_id}';
+};
+
+export type ChatkitGetAgentWorkspaceErrors = {
+    /**
+     * Not Found
+     */
+    404: Error;
+    /**
+     * Internal Server Error
+     */
+    500: Error;
+};
+
+export type ChatkitGetAgentWorkspaceError = ChatkitGetAgentWorkspaceErrors[keyof ChatkitGetAgentWorkspaceErrors];
+
+export type ChatkitGetAgentWorkspaceResponses = {
+    /**
+     * Get an agent workspace
+     */
+    200: AgentWorkspace;
+};
+
+export type ChatkitGetAgentWorkspaceResponse = ChatkitGetAgentWorkspaceResponses[keyof ChatkitGetAgentWorkspaceResponses];
+
+export type ChatkitBindAgentWorkspaceSandboxData = {
+    body: BindAgentWorkspaceSandboxRequestInner;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Agent workspace ID
+         */
+        workspace_id: WrappedUuidV4;
+    };
+    query?: never;
+    url: '/api/v1/team/{team_id}/chatkit/workspaces/{workspace_id}/sandbox';
+};
+
+export type ChatkitBindAgentWorkspaceSandboxErrors = {
+    /**
+     * Bad Request
+     */
+    400: Error;
+    /**
+     * Not Found
+     */
+    404: Error;
+    /**
+     * Internal Server Error
+     */
+    500: Error;
+};
+
+export type ChatkitBindAgentWorkspaceSandboxError = ChatkitBindAgentWorkspaceSandboxErrors[keyof ChatkitBindAgentWorkspaceSandboxErrors];
+
+export type ChatkitBindAgentWorkspaceSandboxResponses = {
+    /**
+     * Bind a durable sandbox
+     */
+    200: AgentWorkspace;
+};
+
+export type ChatkitBindAgentWorkspaceSandboxResponse = ChatkitBindAgentWorkspaceSandboxResponses[keyof ChatkitBindAgentWorkspaceSandboxResponses];
 
 export type ResumeUserCredentialBrokeringData = {
     body: ResumeUserCredentialBrokeringParams;

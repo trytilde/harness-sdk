@@ -164,6 +164,29 @@ export const POST = chatKitEndpoint({
 `requestTimeoutMs` is optional. When configured, the handler request aborts on
 either the incoming request signal or the configured timeout.
 
+Configured ChatKit agents can use `runAgent(request, context, { model })`. The
+runner accepts only webhook-verified runtime context, restores bounded history,
+loads skill packages progressively, and connects the assigned MCP server. When
+tilde-api resolves an `AgentWorkspace`, the runner enforces its hard-deny,
+approval, command, sandbox, and wall-clock policy. In Auto posture it also
+screens provenance-labelled shared history before model access and screens
+every tool result before returning it to the model. Suspicious content is
+quarantined, while unavailable or oversized screens are explicitly labelled as
+untrusted and recorded as durable run events. An invoking-actor workspace
+also forwards the short-lived Tilde delegation token together with the agent
+API key, so MCP authenticates the call as machine-on-behalf-of-human. If the
+workspace has no durable-computer ID yet, the first E2B create result is
+persisted through the workspace binding endpoint and reused on later turns.
+Before that binding exists, existing-sandbox and global enumeration tools are
+not exposed; after binding, sandbox creation and global enumeration are hidden
+and every supported sandbox ID field is replaced with the signed workspace ID.
+Signed workspace memory-bank IDs are also materialized as `memory_search`,
+`memory_reflect`, `memory_remember`, and `memory_forget` tools. The runner
+performs a bounded recall for the current human request, writes only to the
+first (narrowest) configured bank, pairs invoking-actor delegation with the
+agent API key, and screens recalled content in Auto posture before prompt
+injection.
+
 ## React ChatKit Hooks
 
 ```tsx

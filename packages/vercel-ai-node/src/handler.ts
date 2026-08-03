@@ -17,6 +17,7 @@ import {
   chatKitProviderContext,
 } from "./chatkit-provider-metadata";
 import {
+  type ChatKitAgentRuntimeContext,
   type ChatKitRequestBody,
   type ChatKitRequestMessage,
   ChatKitRequestValidationError,
@@ -68,10 +69,13 @@ export type ChatKitEndpointContext = ChatKitEndpointProviderContext & {
   userId?: string;
   externalUserId?: string;
   externalUserProvider?: string;
+  externalUserProviderAccountId?: string;
   client: Client;
   skills: SkillsClient;
   session: ChatKitSessionClient;
   chatkit: ChatKitContextClient;
+  /** Signed, server-owned runtime bindings for configured agents. */
+  runtime?: ChatKitAgentRuntimeContext;
 };
 
 export type ChatKitEndpointOptions = VerifyWebhookOptions & {
@@ -188,6 +192,22 @@ export function chatKitEndpoint(
       });
       return jsonError(400, sessionId.error);
     }
+    const signedContext = body.tildeContext;
+    if (
+      signedContext &&
+      (signedContext.org_id !== orgId.value ||
+        signedContext.team_id !== teamId.value ||
+        signedContext.session_id !== sessionId.value)
+    ) {
+      const error = "Signed ChatKit context does not match request headers";
+      log("warn", "request rejected", {
+        ...baseFields,
+        status: 400,
+        error,
+        elapsedMs: elapsedMs(startedAt),
+      });
+      return jsonError(400, error);
+    }
 
     const requestFields = {
       ...baseFields,
@@ -196,14 +216,26 @@ export function chatKitEndpoint(
       teamId: teamId.value,
       sessionId: sessionId.value,
     };
-    const actorContext = {
-      userId: optionalHeader(request.headers, TILDE_USER_ID_HEADER),
-      externalUserId: optionalHeader(request.headers, EXTERNAL_USER_ID_HEADER),
-      externalUserProvider: optionalHeader(
-        request.headers,
-        EXTERNAL_USER_PROVIDER_HEADER,
-      ),
-    };
+    const actorContext = signedContext
+      ? {
+          userId: signedContext.actor.tilde_user_id ?? undefined,
+          externalUserId: signedContext.actor.external_user_id ?? undefined,
+          externalUserProvider:
+            signedContext.actor.external_user_provider ?? undefined,
+          externalUserProviderAccountId:
+            signedContext.actor.external_user_provider_account_id ?? undefined,
+        }
+      : {
+          userId: optionalHeader(request.headers, TILDE_USER_ID_HEADER),
+          externalUserId: optionalHeader(
+            request.headers,
+            EXTERNAL_USER_ID_HEADER,
+          ),
+          externalUserProvider: optionalHeader(
+            request.headers,
+            EXTERNAL_USER_PROVIDER_HEADER,
+          ),
+        };
     log("info", "context resolved", {
       ...requestFields,
       requestMessageCount: body.messages.length,
@@ -344,10 +376,17 @@ export function chatKitEndpoint(
       ...(actorContext.externalUserProvider
         ? { externalUserProvider: actorContext.externalUserProvider }
         : {}),
+      ...(actorContext.externalUserProviderAccountId
+        ? {
+            externalUserProviderAccountId:
+              actorContext.externalUserProviderAccountId,
+          }
+        : {}),
       client,
       skills: client.skills,
       session,
       chatkit,
+      ...(body.tildeContext ? { runtime: body.tildeContext } : {}),
     };
 
     try {

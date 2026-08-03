@@ -1,4 +1,20 @@
 export {
+  type AgentRunEvent,
+  type RunAgentOptions,
+  runAgent,
+} from "./agent";
+export {
+  type AgentHarness,
+  type AgentHarnessCapability,
+  type AgentHarnessControlTransport,
+  type AgentHarnessProfile,
+  type AgentHarnessToolTransport,
+  type AgentHarnessTurnInput,
+  createVercelAiAgentHarness,
+  defineAgentHarness,
+  runAgentWithHarness,
+} from "./agent-harness";
+export {
   type ChatKitAttachmentFilePartHandlerOptions,
   createChatKitAttachmentFilePartHandler,
 } from "./chatkit-attachments";
@@ -45,6 +61,15 @@ export {
   type SlackChatKitMessageMetadata,
 } from "./chatkit-provider-metadata";
 export {
+  type AgentWorkspaceCredentialMode,
+  type AgentWorkspaceInvocationContext,
+  type AgentWorkspaceInvocationPolicy,
+  type AgentWorkspaceKind,
+  type AgentWorkspaceSandboxBinding,
+  type ChatKitAgentInvocationActor,
+  type ChatKitAgentRuntimeConfiguration,
+  type ChatKitAgentRuntimeContext,
+  type ChatKitAgentSecurityPosture,
   type ChatKitRequestApproval,
   type ChatKitRequestBody,
   type ChatKitRequestDataPart,
@@ -85,6 +110,18 @@ export {
   type TildeMCPClient,
   type TildeMCPClientHandle,
 } from "./mcp";
+export {
+  boundedSecurityPayload,
+  modelSecurityScreen,
+  parseSecurityScreenVerdict,
+  SECURITY_SCREEN_SYSTEM_PROMPT,
+  type SecurityScreener,
+  type SecurityScreenHook,
+  type SecurityScreenInput,
+  type SecurityScreenVerdict,
+  screenSecurityWithRetry,
+  unscreenedNotice,
+} from "./security-screen";
 export {
   DEFAULT_TOLERANCE_SECONDS,
   signBody,

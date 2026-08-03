@@ -5501,6 +5501,87 @@
         ]
       }
     },
+    "/api/v1/team/{team_id}/chatkit/agent-turn-queue/{queue_item_id}/retry": {
+      "post": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "Retry a durable ChatKit agent turn",
+        "description": "Moves a failed or cancelled agent turn back to pending, claims it atomically, and runs it again with the persisted actor and request context.",
+        "operationId": "chatkit-retry-agent-turn-queue-item",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "queue_item_id",
+            "in": "path",
+            "description": "Durable ChatKit agent turn ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Retry a failed or cancelled ChatKit agent turn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetryChatKitAgentTurnQueueItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
     "/api/v1/team/{team_id}/chatkit/agent-turn-queue/{queue_item_id}/steer": {
       "post": {
         "tags": [
@@ -10378,6 +10459,455 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RemoveChatKitParticipantResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/team/{team_id}/chatkit/workspaces": {
+      "get": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "List agent workspaces",
+        "description": "Lists tenant-scoped personal, conversation, or project workspaces.",
+        "operationId": "chatkit-list-agent-workspaces",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "next_page_token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentWorkspaceKind"
+                }
+              ]
+            }
+          },
+          {
+            "name": "subject_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List agent workspaces",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspacePaginatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "Create or reconcile an agent workspace",
+        "description": "Creates or reconciles one tenant-scoped personal, conversation, or project workspace and its server-owned bindings.",
+        "operationId": "chatkit-upsert-agent-workspace",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertAgentWorkspaceRequestInner"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Create or reconcile an agent workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspace"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/team/{team_id}/chatkit/workspaces/{workspace_id}": {
+      "get": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "Get an agent workspace",
+        "description": "Gets one tenant-scoped agent workspace and its server-owned bindings.",
+        "operationId": "chatkit-get-agent-workspace",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "Agent workspace ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WrappedUuidV4"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get an agent workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspace"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "Delete an agent workspace",
+        "description": "Deletes one tenant-scoped agent workspace without deleting provider-owned external resources.",
+        "operationId": "chatkit-delete-agent-workspace",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "Agent workspace ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WrappedUuidV4"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete an agent workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAgentWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          },
+          {
+            "bearer_token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/team/{team_id}/chatkit/workspaces/{workspace_id}/sandbox": {
+      "put": {
+        "tags": [
+          "chatkit",
+          "v1"
+        ],
+        "summary": "Bind an agent workspace sandbox",
+        "description": "Persists the first provider-owned sandbox ID for a workspace. A different sandbox cannot replace an existing binding through this endpoint.",
+        "operationId": "chatkit-bind-agent-workspace-sandbox",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "Agent workspace ID",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WrappedUuidV4"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "description": "Team ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindAgentWorkspaceSandboxRequestInner"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Bind a durable sandbox",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentWorkspace"
                 }
               }
             }
@@ -25766,6 +26296,284 @@
           }
         }
       },
+      "AgentWorkspace": {
+        "type": "object",
+        "description": "Persisted company-agent workspace.",
+        "required": [
+          "id",
+          "orgId",
+          "teamId",
+          "kind",
+          "subjectId",
+          "displayName",
+          "configuration",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "configuration": {
+            "$ref": "#/components/schemas/AgentWorkspaceConfiguration"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/WrappedChronoDateTime"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/WrappedUuidV4"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentWorkspaceKind"
+          },
+          "orgId": {
+            "type": "string"
+          },
+          "subjectId": {
+            "type": "string"
+          },
+          "teamId": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/WrappedChronoDateTime"
+          }
+        }
+      },
+      "AgentWorkspaceConfiguration": {
+        "type": "object",
+        "description": "Durable bindings and policy owned by one personal, conversation, or project workspace.",
+        "properties": {
+          "appPublishingEnabled": {
+            "type": "boolean"
+          },
+          "automationEnabled": {
+            "type": "boolean"
+          },
+          "credentialMode": {
+            "$ref": "#/components/schemas/AgentWorkspaceCredentialMode"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkspaceGrant"
+            }
+          },
+          "invocationPolicy": {
+            "$ref": "#/components/schemas/AgentWorkspaceInvocationPolicy"
+          },
+          "mcpServerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "memoryBankIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WrappedUuidV4"
+            }
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional scope-owned model selector folded into the signed runtime."
+          },
+          "sandbox": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentWorkspaceSandboxBinding"
+              }
+            ]
+          },
+          "skillRegistryId": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WrappedUuidV4"
+              }
+            ]
+          }
+        }
+      },
+      "AgentWorkspaceCredentialMode": {
+        "type": "string",
+        "description": "Which credential identity an invocation may use.",
+        "enum": [
+          "fixed",
+          "invoking_actor",
+          "workspace_shared"
+        ]
+      },
+      "AgentWorkspaceGrant": {
+        "type": "object",
+        "description": "A grant allowing one actor subject to use or administer a workspace.",
+        "required": [
+          "subjectId",
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "`member` may use the workspace; `admin` may also change its configuration."
+          },
+          "subjectId": {
+            "type": "string",
+            "description": "Stable actor subject such as `tilde:<user-id>` or an external identity key."
+          }
+        }
+      },
+      "AgentWorkspaceInvocationContext": {
+        "type": "object",
+        "description": "Non-secret workspace facts covered by the ChatKit invocation signature.",
+        "required": [
+          "id",
+          "kind",
+          "subjectId",
+          "memoryBankIds",
+          "credentialMode",
+          "invocationPolicy",
+          "automationEnabled",
+          "appPublishingEnabled"
+        ],
+        "properties": {
+          "appPublishingEnabled": {
+            "type": "boolean"
+          },
+          "automationEnabled": {
+            "type": "boolean"
+          },
+          "credentialMode": {
+            "$ref": "#/components/schemas/AgentWorkspaceCredentialMode"
+          },
+          "id": {
+            "$ref": "#/components/schemas/WrappedUuidV4"
+          },
+          "invocationPolicy": {
+            "$ref": "#/components/schemas/AgentWorkspaceInvocationPolicy"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentWorkspaceKind"
+          },
+          "memoryBankIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WrappedUuidV4"
+            }
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sandbox": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentWorkspaceSandboxBinding"
+              }
+            ]
+          },
+          "subjectId": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentWorkspaceInvocationPolicy": {
+        "type": "object",
+        "description": "Deterministic rules enforced before workspace tools are exposed to a runner.",
+        "properties": {
+          "approvalRequiredToolIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deniedCommandPatterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deniedToolIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "maxWallClockSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "securityPosture": {
+            "$ref": "#/components/schemas/ChatKitAgentSecurityPosture"
+          }
+        }
+      },
+      "AgentWorkspaceKind": {
+        "type": "string",
+        "description": "The collaboration boundary that owns an agent workspace.",
+        "enum": [
+          "personal",
+          "conversation",
+          "project"
+        ]
+      },
+      "AgentWorkspacePaginatedResponse": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentWorkspace"
+            }
+          },
+          "next_page_token": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentWorkspaceSandboxBinding": {
+        "type": "object",
+        "description": "Provider-neutral durable-computer binding owned by a workspace.",
+        "required": [
+          "toolProviderInstanceId"
+        ],
+        "properties": {
+          "profileId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sandboxId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scratch": {
+            "type": "boolean"
+          },
+          "toolProviderInstanceId": {
+            "type": "string"
+          }
+        }
+      },
       "ApplyOntologyTemplateResult": {
         "type": "object",
         "description": "Result of an idempotent ontology-template installation.",
@@ -26097,6 +26905,18 @@
           "tilde_core",
           "tilde_pay"
         ]
+      },
+      "BindAgentWorkspaceSandboxRequestInner": {
+        "type": "object",
+        "description": "User-authored fields for binding a provider-owned durable computer.",
+        "required": [
+          "sandboxId"
+        ],
+        "properties": {
+          "sandboxId": {
+            "type": "string"
+          }
+        }
       },
       "BrokerAction": {
         "oneOf": [
@@ -26950,6 +27770,129 @@
           }
         }
       },
+      "ChatKitAgentRuntimeConfiguration": {
+        "type": "object",
+        "description": "Non-secret configuration used by an external agent runtime.",
+        "required": [
+          "mcp_server_id",
+          "max_steps",
+          "max_history_messages",
+          "security_posture"
+        ],
+        "properties": {
+          "max_history_messages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Maximum historical ChatKit messages loaded for one turn.",
+            "minimum": 0
+          },
+          "max_steps": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Maximum model/tool steps for one turn.",
+            "minimum": 0
+          },
+          "mcp_server_id": {
+            "type": "string",
+            "description": "MCP server exposed to the agent runtime."
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Deployment-specific model identifier resolved by the external runtime."
+          },
+          "security_posture": {
+            "$ref": "#/components/schemas/ChatKitAgentSecurityPosture",
+            "description": "Runner-level tool approval posture."
+          },
+          "skill_registry_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WrappedUuidV4",
+                "description": "Skill registry exposed to the agent runtime."
+              }
+            ]
+          },
+          "system_prompt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Additional operator-authored system instructions."
+          },
+          "workspace_template": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentWorkspaceConfiguration",
+                "description": "Template used when ChatKit lazily creates a personal or shared workspace."
+              }
+            ]
+          }
+        }
+      },
+      "ChatKitAgentRuntimeContext": {
+        "type": "object",
+        "description": "Signed runtime context attached to one outbound ChatKit agent invocation.",
+        "required": [
+          "agent_inbox_id",
+          "agent_inbox_instance_id",
+          "org_id",
+          "team_id",
+          "session_id",
+          "actor",
+          "configuration"
+        ],
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/ChatKitAgentInvocationActor"
+          },
+          "agent_inbox_id": {
+            "type": "string"
+          },
+          "agent_inbox_instance_id": {
+            "type": "string"
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/ChatKitAgentRuntimeConfiguration"
+          },
+          "org_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/WrappedUuidV4"
+          },
+          "team_id": {
+            "type": "string"
+          },
+          "workspace": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentWorkspaceInvocationContext"
+              }
+            ]
+          }
+        }
+      },
+      "ChatKitAgentSecurityPosture": {
+        "type": "string",
+        "description": "Runtime security posture requested for a ChatKit HTTP agent turn.",
+        "enum": [
+          "auto",
+          "strict",
+          "dangerous"
+        ]
+      },
       "ChatKitAgentTurnQueueItem": {
         "type": "object",
         "description": "Persisted queued agent turn.",
@@ -27075,6 +28018,7 @@
         "enum": [
           "pending",
           "running",
+          "waiting_approval",
           "completed",
           "failed",
           "cancelled"
@@ -27486,6 +28430,17 @@
             "items": {
               "$ref": "#/components/schemas/ChatMessage"
             }
+          },
+          "tildeContext": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ChatKitAgentRuntimeContext",
+                "description": "Tilde-owned runtime configuration covered by the webhook signature."
+              }
+            ]
           }
         }
       },
@@ -30198,6 +31153,17 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "DeleteAgentWorkspaceResponse": {
+        "type": "object",
+        "required": [
+          "deleted"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "boolean"
           }
         }
       },
@@ -35615,6 +36581,17 @@
             },
             "description": "Memory banks that should ingest conversations involving this agent."
           },
+          "runtime": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ChatKitAgentRuntimeConfiguration",
+                "description": "Typed runtime bindings and limits sent with every signed invocation."
+              }
+            ]
+          },
           "streaming": {
             "type": "boolean"
           },
@@ -36167,6 +37144,17 @@
           }
         }
       },
+      "RetryChatKitAgentTurnQueueItemResponse": {
+        "type": "object",
+        "required": [
+          "retried"
+        ],
+        "properties": {
+          "retried": {
+            "type": "boolean"
+          }
+        }
+      },
       "RetryMemorySourceBody": {
         "type": "object",
         "required": [
@@ -36601,6 +37589,17 @@
                   "null"
                 ]
               },
+              "invocation_actor": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SignalInvocationActor",
+                    "description": "Server-authored actor context for deferred delivery."
+                  }
+                ]
+              },
               "reply_to_inbox_id": {
                 "type": [
                   "string",
@@ -36778,6 +37777,36 @@
           },
           "key": {
             "type": "string"
+          }
+        }
+      },
+      "SignalInvocationActor": {
+        "type": "object",
+        "description": "Identity context frozen when an authenticated caller configures an agent action.\n\nSignal deliveries run asynchronously with system credentials, so this context\npreserves the human actor needed by invoking-actor workspaces without storing\nor replaying the caller's original credentials.",
+        "properties": {
+          "external_user_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "external_user_provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "external_user_provider_account_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tilde_user_id": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -39651,6 +40680,17 @@
             },
             "description": "Replaces the complete memory-bank selection when present."
           },
+          "runtime": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ChatKitAgentRuntimeConfiguration",
+                "description": "Replaces the external agent runtime configuration when present."
+              }
+            ]
+          },
           "streaming": {
             "type": [
               "boolean",
@@ -40184,6 +41224,40 @@
             "description": "Replaces the complete memory-bank selection when present; an empty list clears it."
           },
           "name": {
+            "type": "string"
+          }
+        }
+      },
+      "UpsertAgentWorkspaceRequestInner": {
+        "type": "object",
+        "description": "User-authored fields for creating or reconciling a workspace.",
+        "required": [
+          "kind",
+          "subjectId",
+          "displayName",
+          "configuration"
+        ],
+        "properties": {
+          "configuration": {
+            "$ref": "#/components/schemas/AgentWorkspaceConfiguration"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WrappedUuidV4"
+              }
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentWorkspaceKind"
+          },
+          "subjectId": {
             "type": "string"
           }
         }
