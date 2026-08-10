@@ -114,6 +114,9 @@ importers:
       '@trytilde/harness-sdk':
         specifier: workspace:*
         version: link:../core
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
 
   packages/vercel-ai-react:
     dependencies:
