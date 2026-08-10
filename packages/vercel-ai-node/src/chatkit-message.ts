@@ -78,6 +78,117 @@ export type ChatKitSignalMessage = ChatKitMessageBase & {
 
 export type ChatKitHistoryMessage = ChatKitMessage | ChatKitSignalMessage;
 
+export type GitHubIssueSignalAction =
+  | "opened"
+  | "reopened"
+  | "closed"
+  | "edited"
+  | "labeled";
+
+export type GitHubPullRequestSignalAction =
+  | "opened"
+  | "reopened"
+  | "closed"
+  | "merged"
+  | "synchronize"
+  | "synchronized"
+  | "ready_for_review"
+  | "converted_to_draft";
+
+export type GitHubCiCheckSignalOutcome = "passed" | "failed";
+
+export type GitHubIssueSignalType = `github.issue.${GitHubIssueSignalAction}`;
+export type GitHubPullRequestSignalType =
+  `github.pull_request.${GitHubPullRequestSignalAction}`;
+export type GitHubCiCheckSignalType =
+  `github.ci_check.${GitHubCiCheckSignalOutcome}`;
+export type GitHubSignalType =
+  | GitHubIssueSignalType
+  | GitHubPullRequestSignalType
+  | GitHubCiCheckSignalType;
+
+export type GitHubWebhookRepository = JsonObject & {
+  full_name: string;
+  html_url?: string | null;
+  name?: string | null;
+};
+
+export type GitHubWebhookIssue = JsonObject & {
+  number: number;
+  title: string;
+  body?: string | null;
+  html_url?: string | null;
+};
+
+export type GitHubWebhookPullRequest = JsonObject & {
+  number: number;
+  title: string;
+  body?: string | null;
+  html_url?: string | null;
+  draft?: boolean | null;
+  merged?: boolean | null;
+};
+
+export type GitHubWebhookCheck = JsonObject & {
+  name?: string | null;
+  status?: string | null;
+  conclusion?: string | null;
+  html_url?: string | null;
+};
+
+export type GitHubIssueWebhook<TAction extends GitHubIssueSignalAction> =
+  JsonObject & {
+    action: TAction;
+    repository: GitHubWebhookRepository;
+    issue: GitHubWebhookIssue;
+  };
+
+export type GitHubPullRequestWebhook<
+  TAction extends GitHubPullRequestWebhookAction,
+> = JsonObject & {
+  action: TAction;
+  repository: GitHubWebhookRepository;
+  pull_request: GitHubWebhookPullRequest;
+};
+
+export type GitHubCiCheckWebhook = JsonObject & {
+  action: "completed";
+  repository: GitHubWebhookRepository;
+  check_run?: GitHubWebhookCheck | null;
+  check_suite?: GitHubWebhookCheck | null;
+};
+
+export type GitHubSignalMessage<
+  TType extends GitHubSignalType = GitHubSignalType,
+> = ChatKitSignalMessage & {
+  metadata: JsonObject & { signal_type: TType };
+  data: GitHubWebhookForSignalType<TType>;
+};
+
+export type GitHubSignalByType = {
+  [TType in GitHubSignalType]: GitHubSignalMessage<TType>;
+};
+
+type GitHubPullRequestWebhookAction = Exclude<
+  GitHubPullRequestSignalAction,
+  "merged" | "synchronized"
+>;
+
+type GitHubWebhookForSignalType<TType extends GitHubSignalType> =
+  TType extends `github.issue.${infer TAction extends GitHubIssueSignalAction}`
+    ? GitHubIssueWebhook<TAction>
+    : TType extends `github.pull_request.${infer TAction extends GitHubPullRequestSignalAction}`
+      ? GitHubPullRequestWebhook<
+          TAction extends "merged"
+            ? "closed"
+            : TAction extends "synchronized"
+              ? "synchronize"
+              : TAction
+        >
+      : TType extends GitHubCiCheckSignalType
+        ? GitHubCiCheckWebhook
+        : never;
+
 export type SentryIssueSignalAction =
   | "created"
   | "assigned"
@@ -160,8 +271,15 @@ export type ConvertToAiSdkSentryHandlers = {
   ) => Awaitable<UIMessage | null>;
 };
 
+export type ConvertToAiSdkGitHubHandlers = {
+  [TType in GitHubSignalType]?: (
+    signal: GitHubSignalByType[TType],
+  ) => Awaitable<UIMessage | null>;
+};
+
 export type ConvertToAiSdkUnprocessedHandlers = {
   fileUpload?: ConvertToAiSdkFileUploadHandler;
+  github?: ConvertToAiSdkGitHubHandlers;
   sentry?: ConvertToAiSdkSentryHandlers;
 };
 
@@ -456,12 +574,21 @@ async function convertSignalToAiSdkMessage(
   options: ConvertToAiSdkMessageOptions,
 ): Promise<UIMessage | null> {
   const signalType = message.metadata?.signal_type;
-  if (!isSentryIssueSignalType(signalType)) return null;
-  if (!isSentrySignalMessage(message, signalType)) return null;
-  const handler = options.onUnprocessed?.sentry?.[signalType] as
-    | ((signal: SentrySignalMessage) => Awaitable<UIMessage | null>)
-    | undefined;
-  return handler ? handler(message) : null;
+  if (isGitHubSignalType(signalType)) {
+    if (!isGitHubSignalMessage(message, signalType)) return null;
+    const handler = options.onUnprocessed?.github?.[signalType] as
+      | ((signal: GitHubSignalMessage) => Awaitable<UIMessage | null>)
+      | undefined;
+    return handler ? handler(message) : null;
+  }
+  if (isSentryIssueSignalType(signalType)) {
+    if (!isSentrySignalMessage(message, signalType)) return null;
+    const handler = options.onUnprocessed?.sentry?.[signalType] as
+      | ((signal: SentrySignalMessage) => Awaitable<UIMessage | null>)
+      | undefined;
+    return handler ? handler(message) : null;
+  }
+  return null;
 }
 
 async function cacheConvertedMessage(
@@ -530,6 +657,78 @@ function isUiMessage(value: JsonObject): boolean {
 
 function isAiSdkRole(value: unknown): value is UIMessage["role"] {
   return value === "system" || value === "user" || value === "assistant";
+}
+
+function isGitHubSignalType(value: unknown): value is GitHubSignalType {
+  return (
+    value === "github.issue.opened" ||
+    value === "github.issue.reopened" ||
+    value === "github.issue.closed" ||
+    value === "github.issue.edited" ||
+    value === "github.issue.labeled" ||
+    value === "github.pull_request.opened" ||
+    value === "github.pull_request.reopened" ||
+    value === "github.pull_request.closed" ||
+    value === "github.pull_request.merged" ||
+    value === "github.pull_request.synchronize" ||
+    value === "github.pull_request.synchronized" ||
+    value === "github.pull_request.ready_for_review" ||
+    value === "github.pull_request.converted_to_draft" ||
+    value === "github.ci_check.passed" ||
+    value === "github.ci_check.failed"
+  );
+}
+
+function isGitHubSignalMessage<TType extends GitHubSignalType>(
+  message: ChatKitSignalMessage,
+  signalType: TType,
+): message is GitHubSignalMessage<TType> {
+  const data = message.data;
+  if (!data || !isGitHubRepository(data.repository)) return false;
+  if (signalType.startsWith("github.issue.")) {
+    return (
+      data.action === signalType.slice("github.issue.".length) &&
+      isGitHubIssue(data.issue)
+    );
+  }
+  if (signalType.startsWith("github.pull_request.")) {
+    const signalAction = signalType.slice("github.pull_request.".length);
+    const webhookAction =
+      signalAction === "merged"
+        ? "closed"
+        : signalAction === "synchronized"
+          ? "synchronize"
+          : signalAction;
+    return (
+      data.action === webhookAction && isGitHubPullRequest(data.pull_request)
+    );
+  }
+  return (
+    data.action === "completed" &&
+    (isGitHubCheck(data.check_run) || isGitHubCheck(data.check_suite))
+  );
+}
+
+function isGitHubRepository(value: unknown): value is GitHubWebhookRepository {
+  return isRecord(value) && typeof value.full_name === "string";
+}
+
+function isGitHubIssue(value: unknown): value is GitHubWebhookIssue {
+  return (
+    isRecord(value) &&
+    typeof value.number === "number" &&
+    typeof value.title === "string"
+  );
+}
+
+function isGitHubPullRequest(
+  value: unknown,
+): value is GitHubWebhookPullRequest {
+  return isGitHubIssue(value);
+}
+
+function isGitHubCheck(value: unknown): value is GitHubWebhookCheck {
+  return isRecord(value);
 }
 
 function isSentryIssueSignalType(

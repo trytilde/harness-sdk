@@ -1136,6 +1136,155 @@ describe("ChatKit AI SDK converters", () => {
     expect(onResolved).not.toHaveBeenCalled();
   });
 
+  it("dispatches GitHub signals to typed handlers", async () => {
+    const onIssueOpened = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `${signal.data.repository.full_name}#${signal.data.issue.number}: ${signal.data.issue.title}`,
+        },
+      ],
+    }));
+    const onPullRequestMerged = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `merged:${signal.data.pull_request.title}`,
+        },
+      ],
+    }));
+    const onCiFailed = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `failed:${signal.data.check_run?.name}`,
+        },
+      ],
+    }));
+
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_issue",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "opened",
+              repository: { full_name: "trytilde/harness-sdk" },
+              issue: { number: 42, title: "Add GitHub signal handlers" },
+            },
+            metadata: { signal_type: "github.issue.opened" },
+          },
+          {
+            id: "signal_pr",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "closed",
+              repository: { full_name: "trytilde/harness-sdk" },
+              pull_request: {
+                number: 21,
+                title: "Add remote tool endpoint helper",
+                merged: true,
+              },
+            },
+            metadata: { signal_type: "github.pull_request.merged" },
+          },
+          {
+            id: "signal_ci",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "completed",
+              repository: { full_name: "trytilde/harness-sdk" },
+              check_run: {
+                name: "test",
+                status: "completed",
+                conclusion: "failure",
+              },
+            },
+            metadata: { signal_type: "github.ci_check.failed" },
+          },
+        ],
+        onUnprocessed: {
+          github: {
+            "github.issue.opened": onIssueOpened,
+            "github.pull_request.merged": onPullRequestMerged,
+            "github.ci_check.failed": onCiFailed,
+          },
+        },
+      }),
+    ).resolves.toEqual([
+      {
+        id: "signal_issue",
+        role: "user",
+        parts: [
+          {
+            type: "text",
+            text: "trytilde/harness-sdk#42: Add GitHub signal handlers",
+          },
+        ],
+      },
+      {
+        id: "signal_pr",
+        role: "user",
+        parts: [
+          {
+            type: "text",
+            text: "merged:Add remote tool endpoint helper",
+          },
+        ],
+      },
+      {
+        id: "signal_ci",
+        role: "user",
+        parts: [{ type: "text", text: "failed:test" }],
+      },
+    ]);
+    expect(onIssueOpened).toHaveBeenCalledOnce();
+    expect(onPullRequestMerged).toHaveBeenCalledOnce();
+    expect(onCiFailed).toHaveBeenCalledOnce();
+  });
+
+  it("drops unhandled and malformed GitHub signals", async () => {
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_unhandled",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "closed",
+              repository: { full_name: "trytilde/harness-sdk" },
+              issue: { number: 42, title: "Handled elsewhere" },
+            },
+            metadata: { signal_type: "github.issue.closed" },
+          },
+          {
+            id: "signal_malformed",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "opened",
+              repository: { full_name: "trytilde/harness-sdk" },
+              issue: { number: 43 },
+            },
+            metadata: { signal_type: "github.issue.opened" },
+          },
+        ],
+        onUnprocessed: { github: {} },
+      }),
+    ).resolves.toEqual([]);
+  });
+
   it("drops unhandled and malformed Sentry signals", async () => {
     await expect(
       convertToAiSdkMessages({
