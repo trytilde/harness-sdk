@@ -18,6 +18,8 @@ export type VerifiedWebhookRequest = {
   timestamp: number;
 };
 
+export type VerifiedWebhookSignature = Omit<VerifiedWebhookRequest, "json">;
+
 export class WebhookVerificationError extends Error {
   constructor(message: string) {
     super(message);
@@ -29,6 +31,25 @@ export async function verifyWebhookRequest(
   request: Request,
   options: VerifyWebhookOptions,
 ): Promise<VerifiedWebhookRequest> {
+  const verified = await verifyWebhookSignature(request, options);
+
+  let json: JsonValue;
+  try {
+    json = JSON.parse(new TextDecoder().decode(verified.rawBody)) as JsonValue;
+  } catch {
+    throw new WebhookVerificationError("Invalid JSON body");
+  }
+
+  return {
+    ...verified,
+    json,
+  };
+}
+
+export async function verifyWebhookSignature(
+  request: Request,
+  options: VerifyWebhookOptions,
+): Promise<VerifiedWebhookSignature> {
   if (!options.webhookSigningKey) {
     throw new WebhookVerificationError("webhookSigningKey is required");
   }
@@ -48,16 +69,8 @@ export async function verifyWebhookRequest(
     throw new WebhookVerificationError("Invalid webhook signature");
   }
 
-  let json: JsonValue;
-  try {
-    json = JSON.parse(new TextDecoder().decode(rawBody)) as JsonValue;
-  } catch {
-    throw new WebhookVerificationError("Invalid JSON body");
-  }
-
   return {
     rawBody,
-    json,
     webhookId,
     timestamp,
   };

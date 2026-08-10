@@ -86,6 +86,13 @@ export {
   type TildeMCPClientHandle,
 } from "./mcp";
 export {
+  type ToolEndpoint,
+  type ToolEndpointOptions,
+  type ToolEndpointProvider,
+  type ToolEndpointTool,
+  toolEndpoint,
+} from "./tool-endpoint";
+export {
   DEFAULT_TOLERANCE_SECONDS,
   signBody,
   TILDE_WEBHOOK_ID_HEADER,

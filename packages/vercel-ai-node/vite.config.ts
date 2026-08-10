@@ -15,6 +15,7 @@ export default defineConfig({
         "@ai-sdk/mcp",
         "@trytilde/harness-sdk",
         "ai",
+        "zod",
         "node:child_process",
         "node:crypto",
         "node:async_hooks",

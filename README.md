@@ -164,6 +164,34 @@ export const POST = chatKitEndpoint({
 `requestTimeoutMs` is optional. When configured, the handler request aborts on
 either the incoming request signal or the configured timeout.
 
+## Remote Custom Tool Endpoint
+
+Expose Zod-validated remote tools with signed discovery and invocation
+handlers. The invocation URL defaults to the incoming request URL, with
+optional `baseUrl` and `endpointPath` overrides for proxies.
+
+```ts
+import { toolEndpoint } from "@trytilde/harness-sdk-vercel-ai-node";
+import { z } from "zod";
+
+export const { GET, POST } = toolEndpoint({
+  webhookSigningKey: process.env.TILDE_CUSTOM_TOOL_SIGNING_KEY!,
+  provider: { name: "Example tools", version: "1.0.0" },
+  tools: [
+    {
+      id: "greet",
+      name: "Greet",
+      description: "Greet a person by name.",
+      inputSchema: z.object({ name: z.string() }),
+      outputSchema: z.object({ greeting: z.string() }),
+      async fn({ name }) {
+        return { greeting: `Hello, ${name}!` };
+      }
+    }
+  ]
+});
+```
+
 ## React ChatKit Hooks
 
 ```tsx
