@@ -256,12 +256,12 @@ export type ConvertToAiSdkFileUploadHandler = (input: {
 }) => Awaitable<UIMessage["parts"][number] | null>;
 
 export type ConvertToAiSdkCacheHandler = (input: {
-  message: ChatKitMessage;
+  message: ChatKitHistoryMessage;
   convertedMessage: UIMessage;
 }) => Awaitable<ChatKitConvertedMessage | null | undefined>;
 
 export type ConvertToAiSdkHydrateHandler = (input: {
-  message: ChatKitMessage;
+  message: ChatKitHistoryMessage;
   cachedAgentRepresentation: JsonObject;
 }) => Awaitable<UIMessage | null>;
 
@@ -333,6 +333,13 @@ export function isChatKitSignalMessage(
   if (value.type !== "signal" || value.role !== "system") return false;
   if (typeof value.id !== "string") return false;
   if (
+    value.cached_agent_representation !== undefined &&
+    value.cached_agent_representation !== null &&
+    !isRecord(value.cached_agent_representation)
+  ) {
+    return false;
+  }
+  if (
     value.summary !== undefined &&
     value.summary !== null &&
     typeof value.summary !== "string"
@@ -370,10 +377,20 @@ async function convertToAiSdkMessageInternal(
   options: InternalConvertToAiSdkMessageOptions,
 ): Promise<UIMessage | null> {
   const { message } = options;
+  if (isChatKitSignalMessage(message)) {
+    const signalOptions = {
+      ...options,
+      message,
+    } satisfies InternalConvertToAiSdkMessageOptions & {
+      message: ChatKitSignalMessage;
+    };
+    const hydrated = await hydrateCachedMessage(signalOptions);
+    if (hydrated) return hydrated;
+    const converted = await convertSignalToAiSdkMessage(message, options);
+    if (converted) await cacheConvertedMessage(signalOptions, converted);
+    return converted;
+  }
   if (!isChatKitMessage(message)) {
-    if (isChatKitSignalMessage(message)) {
-      return convertSignalToAiSdkMessage(message, options);
-    }
     if (isChatKitRequestMessage(message)) {
       return convertRequestMessageToAiSdkMessage(message, options);
     }
@@ -488,7 +505,7 @@ export async function convertToAiSdkMessages(
 }
 
 async function hydrateCachedMessage(
-  options: ConvertToAiSdkMessageOptions & { message: ChatKitMessage },
+  options: ConvertToAiSdkMessageOptions & { message: ChatKitHistoryMessage },
 ): Promise<UIMessage | null> {
   const cached = options.message.cached_agent_representation;
   if (!cached) return null;
@@ -592,7 +609,9 @@ async function convertSignalToAiSdkMessage(
 }
 
 async function cacheConvertedMessage(
-  options: InternalConvertToAiSdkMessageOptions & { message: ChatKitMessage },
+  options: InternalConvertToAiSdkMessageOptions & {
+    message: ChatKitHistoryMessage;
+  },
   convertedMessage: UIMessage,
 ): Promise<void> {
   const cacheEntry = options.onCacheMessage
@@ -614,7 +633,7 @@ async function cacheConvertedMessage(
 }
 
 function defaultConvertedMessageCacheEntry(
-  message: ChatKitMessage,
+  message: ChatKitHistoryMessage,
   convertedMessage: UIMessage,
 ): ChatKitConvertedMessage {
   return {

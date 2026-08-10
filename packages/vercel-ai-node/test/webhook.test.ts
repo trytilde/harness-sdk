@@ -1315,6 +1315,75 @@ describe("ChatKit AI SDK converters", () => {
     ).resolves.toEqual([]);
   });
 
+  it("reuses a cached signal conversion without invoking onUnprocessed again", async () => {
+    const cacheConvertedMessages = vi.fn(async () => ({ success: true }));
+    const onCreated = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [{ type: "text" as const, text: signal.data.data.issue.title }],
+    }));
+    const cached = {
+      id: "signal_cached",
+      role: "user" as const,
+      parts: [{ type: "text" as const, text: "cached conversion" }],
+    };
+
+    await expect(
+      convertToAiSdkMessages({
+        chatkit: {
+          cacheConvertedMessages,
+          hydrateConvertedMessages: vi.fn(async () => ({ messages: [] })),
+        },
+        messages: [
+          {
+            id: "signal_fresh",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "created",
+              data: { issue: { id: "1", title: "fresh conversion" } },
+            },
+            metadata: { signal_type: "sentry.issue.created" },
+          },
+          {
+            id: "signal_cached",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "created",
+              data: { issue: { id: "2", title: "must not be converted" } },
+            },
+            metadata: { signal_type: "sentry.issue.created" },
+            cached_agent_representation: cached,
+          },
+        ],
+        onUnprocessed: {
+          sentry: { "sentry.issue.created": onCreated },
+        },
+      }),
+    ).resolves.toEqual([
+      {
+        id: "signal_fresh",
+        role: "user",
+        parts: [{ type: "text", text: "fresh conversion" }],
+      },
+      cached,
+    ]);
+    expect(onCreated).toHaveBeenCalledOnce();
+    expect(cacheConvertedMessages).toHaveBeenCalledWith({
+      messages: [
+        {
+          chatKitMessageId: "signal_fresh",
+          message: {
+            id: "signal_fresh",
+            role: "user",
+            parts: [{ type: "text", text: "fresh conversion" }],
+          },
+        },
+      ],
+    });
+  });
+
   it("hydrates cached agent representations before converting raw parts", async () => {
     await expect(
       convertToAiSdkMessage({
