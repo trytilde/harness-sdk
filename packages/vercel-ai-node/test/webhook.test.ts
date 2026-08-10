@@ -1253,6 +1253,139 @@ describe("ChatKit AI SDK converters", () => {
     expect(onCiFailed).toHaveBeenCalledOnce();
   });
 
+  it("dispatches Firecrawl signals to typed handlers", async () => {
+    const onPageChanged = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `${signal.data.monitor.id}:${signal.data.page.url}:${signal.data.page.isMeaningful}`,
+        },
+      ],
+    }));
+    const onCheckCompleted = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `${signal.data.check.id}:${signal.data.result.changed}`,
+        },
+      ],
+    }));
+
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_firecrawl_page",
+            role: "system",
+            type: "signal",
+            data: {
+              event: "monitor.page",
+              monitor: { id: "mon_123" },
+              check: { id: "chk_456" },
+              page: {
+                monitorId: "mon_123",
+                checkId: "chk_456",
+                url: "https://example.com/pricing",
+                status: "changed",
+                isMeaningful: true,
+                diff: { text: "£10 -> £12" },
+              },
+              metadata: null,
+            },
+            metadata: { signal_type: "firecrawl.monitor.page.changed" },
+          },
+          {
+            id: "signal_firecrawl_check",
+            role: "system",
+            type: "signal",
+            data: {
+              event: "monitor.check.completed",
+              monitor: { id: "mon_123" },
+              check: { id: "chk_456" },
+              result: {
+                monitorId: "mon_123",
+                checkId: "chk_456",
+                status: "completed",
+                changed: 1,
+              },
+              metadata: null,
+            },
+            metadata: {
+              signal_type: "firecrawl.monitor.check.completed",
+            },
+          },
+        ],
+        onUnprocessed: {
+          firecrawl: {
+            "firecrawl.monitor.page.changed": onPageChanged,
+            "firecrawl.monitor.check.completed": onCheckCompleted,
+          },
+        },
+      }),
+    ).resolves.toEqual([
+      {
+        id: "signal_firecrawl_page",
+        role: "user",
+        parts: [
+          {
+            type: "text",
+            text: "mon_123:https://example.com/pricing:true",
+          },
+        ],
+      },
+      {
+        id: "signal_firecrawl_check",
+        role: "user",
+        parts: [{ type: "text", text: "chk_456:1" }],
+      },
+    ]);
+    expect(onPageChanged).toHaveBeenCalledOnce();
+    expect(onCheckCompleted).toHaveBeenCalledOnce();
+  });
+
+  it("drops unhandled and malformed Firecrawl signals", async () => {
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_firecrawl_unhandled",
+            role: "system",
+            type: "signal",
+            data: {
+              event: "monitor.page",
+              monitor: { id: "mon_123" },
+              check: { id: "chk_456" },
+              page: {
+                url: "https://example.com/about",
+                status: "same",
+              },
+              metadata: null,
+            },
+            metadata: { signal_type: "firecrawl.monitor.page.same" },
+          },
+          {
+            id: "signal_firecrawl_malformed",
+            role: "system",
+            type: "signal",
+            data: {
+              event: "monitor.page",
+              monitor: { id: "mon_123" },
+              check: { id: "chk_456" },
+              page: { status: "error" },
+              metadata: null,
+            },
+            metadata: { signal_type: "firecrawl.monitor.page.error" },
+          },
+        ],
+        onUnprocessed: { firecrawl: {} },
+      }),
+    ).resolves.toEqual([]);
+  });
+
   it("drops unhandled and malformed GitHub signals", async () => {
     await expect(
       convertToAiSdkMessages({

@@ -1,4 +1,4 @@
-import type { JsonObject } from "@trytilde/harness-sdk";
+import type { JsonObject, JsonValue } from "@trytilde/harness-sdk";
 import type { UIMessage } from "ai";
 import {
   type ChatKitContextClient,
@@ -77,6 +77,81 @@ export type ChatKitSignalMessage = ChatKitMessageBase & {
 };
 
 export type ChatKitHistoryMessage = ChatKitMessage | ChatKitSignalMessage;
+
+export type FirecrawlMonitorPageStatus =
+  | "same"
+  | "new"
+  | "changed"
+  | "removed"
+  | "error";
+
+export type FirecrawlMonitorPageSignalType =
+  `firecrawl.monitor.page.${FirecrawlMonitorPageStatus}`;
+export type FirecrawlMonitorCheckCompletedSignalType =
+  "firecrawl.monitor.check.completed";
+export type FirecrawlSignalType =
+  | FirecrawlMonitorPageSignalType
+  | FirecrawlMonitorCheckCompletedSignalType;
+
+export type FirecrawlSignalReference<
+  TId extends string | null = string | null,
+> = {
+  id: TId;
+};
+
+export type FirecrawlMonitorPage = JsonObject & {
+  monitorId?: string | null;
+  checkId?: string | null;
+  url: string;
+  status: string;
+  id?: string | null;
+  scrapeId?: string | null;
+  error?: string | null;
+  isMeaningful?: boolean | null;
+  judgment?: JsonValue;
+  diff?: JsonValue;
+};
+
+export type FirecrawlMonitorPageSignalData = JsonObject & {
+  event: "monitor.page";
+  monitor: FirecrawlSignalReference;
+  check: FirecrawlSignalReference;
+  page: FirecrawlMonitorPage;
+  metadata: JsonValue;
+};
+
+export type FirecrawlMonitorCheckResult = JsonObject & {
+  monitorId?: string | null;
+  checkId?: string | null;
+  id?: string | null;
+  status?: string | null;
+  same?: number;
+  new?: number;
+  changed?: number;
+  removed?: number;
+  error?: number;
+};
+
+export type FirecrawlMonitorCheckCompletedSignalData = JsonObject & {
+  event: "monitor.check.completed";
+  monitor: FirecrawlSignalReference<string>;
+  check: FirecrawlSignalReference<string>;
+  result: FirecrawlMonitorCheckResult;
+  metadata: JsonValue;
+};
+
+export type FirecrawlSignalMessage<
+  TType extends FirecrawlSignalType = FirecrawlSignalType,
+> = ChatKitSignalMessage & {
+  metadata: JsonObject & { signal_type: TType };
+  data: TType extends FirecrawlMonitorPageSignalType
+    ? FirecrawlMonitorPageSignalData
+    : FirecrawlMonitorCheckCompletedSignalData;
+};
+
+export type FirecrawlSignalByType = {
+  [TType in FirecrawlSignalType]: FirecrawlSignalMessage<TType>;
+};
 
 export type GitHubIssueSignalAction =
   | "opened"
@@ -277,8 +352,15 @@ export type ConvertToAiSdkGitHubHandlers = {
   ) => Awaitable<UIMessage | null>;
 };
 
+export type ConvertToAiSdkFirecrawlHandlers = {
+  [TType in FirecrawlSignalType]?: (
+    signal: FirecrawlSignalByType[TType],
+  ) => Awaitable<UIMessage | null>;
+};
+
 export type ConvertToAiSdkUnprocessedHandlers = {
   fileUpload?: ConvertToAiSdkFileUploadHandler;
+  firecrawl?: ConvertToAiSdkFirecrawlHandlers;
   github?: ConvertToAiSdkGitHubHandlers;
   sentry?: ConvertToAiSdkSentryHandlers;
 };
@@ -591,6 +673,13 @@ async function convertSignalToAiSdkMessage(
   options: ConvertToAiSdkMessageOptions,
 ): Promise<UIMessage | null> {
   const signalType = message.metadata?.signal_type;
+  if (isFirecrawlSignalType(signalType)) {
+    if (!isFirecrawlSignalMessage(message, signalType)) return null;
+    const handler = options.onUnprocessed?.firecrawl?.[signalType] as
+      | ((signal: FirecrawlSignalMessage) => Awaitable<UIMessage | null>)
+      | undefined;
+    return handler ? handler(message) : null;
+  }
   if (isGitHubSignalType(signalType)) {
     if (!isGitHubSignalMessage(message, signalType)) return null;
     const handler = options.onUnprocessed?.github?.[signalType] as
@@ -676,6 +765,51 @@ function isUiMessage(value: JsonObject): boolean {
 
 function isAiSdkRole(value: unknown): value is UIMessage["role"] {
   return value === "system" || value === "user" || value === "assistant";
+}
+
+function isFirecrawlSignalType(value: unknown): value is FirecrawlSignalType {
+  return (
+    value === "firecrawl.monitor.page.same" ||
+    value === "firecrawl.monitor.page.new" ||
+    value === "firecrawl.monitor.page.changed" ||
+    value === "firecrawl.monitor.page.removed" ||
+    value === "firecrawl.monitor.page.error" ||
+    value === "firecrawl.monitor.check.completed"
+  );
+}
+
+function isFirecrawlSignalMessage<TType extends FirecrawlSignalType>(
+  message: ChatKitSignalMessage,
+  signalType: TType,
+): message is FirecrawlSignalMessage<TType> {
+  const data = message.data;
+  if (!data || !isRecord(data.monitor) || !isRecord(data.check)) return false;
+  if (signalType.startsWith("firecrawl.monitor.page.")) {
+    return (
+      data.event === "monitor.page" &&
+      isNullableString(data.monitor.id) &&
+      isNullableString(data.check.id) &&
+      isFirecrawlMonitorPage(data.page)
+    );
+  }
+  return (
+    data.event === "monitor.check.completed" &&
+    typeof data.monitor.id === "string" &&
+    typeof data.check.id === "string" &&
+    isRecord(data.result)
+  );
+}
+
+function isFirecrawlMonitorPage(value: unknown): value is FirecrawlMonitorPage {
+  return (
+    isRecord(value) &&
+    typeof value.url === "string" &&
+    typeof value.status === "string"
+  );
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
 }
 
 function isGitHubSignalType(value: unknown): value is GitHubSignalType {
