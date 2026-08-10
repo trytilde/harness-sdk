@@ -1136,6 +1136,288 @@ describe("ChatKit AI SDK converters", () => {
     expect(onResolved).not.toHaveBeenCalled();
   });
 
+  it("dispatches GitHub signals to typed handlers", async () => {
+    const onIssueOpened = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `${signal.data.repository.full_name}#${signal.data.issue.number}: ${signal.data.issue.title}`,
+        },
+      ],
+    }));
+    const onPullRequestMerged = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `merged:${signal.data.pull_request.title}`,
+        },
+      ],
+    }));
+    const onCiFailed = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `failed:${signal.data.check_run?.name}`,
+        },
+      ],
+    }));
+
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_issue",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "opened",
+              repository: { full_name: "trytilde/harness-sdk" },
+              issue: { number: 42, title: "Add GitHub signal handlers" },
+            },
+            metadata: { signal_type: "github.issue.opened" },
+          },
+          {
+            id: "signal_pr",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "closed",
+              repository: { full_name: "trytilde/harness-sdk" },
+              pull_request: {
+                number: 21,
+                title: "Add remote tool endpoint helper",
+                merged: true,
+              },
+            },
+            metadata: { signal_type: "github.pull_request.merged" },
+          },
+          {
+            id: "signal_ci",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "completed",
+              repository: { full_name: "trytilde/harness-sdk" },
+              check_run: {
+                name: "test",
+                status: "completed",
+                conclusion: "failure",
+              },
+            },
+            metadata: { signal_type: "github.ci_check.failed" },
+          },
+        ],
+        onUnprocessed: {
+          github: {
+            "github.issue.opened": onIssueOpened,
+            "github.pull_request.merged": onPullRequestMerged,
+            "github.ci_check.failed": onCiFailed,
+          },
+        },
+      }),
+    ).resolves.toEqual([
+      {
+        id: "signal_issue",
+        role: "user",
+        parts: [
+          {
+            type: "text",
+            text: "trytilde/harness-sdk#42: Add GitHub signal handlers",
+          },
+        ],
+      },
+      {
+        id: "signal_pr",
+        role: "user",
+        parts: [
+          {
+            type: "text",
+            text: "merged:Add remote tool endpoint helper",
+          },
+        ],
+      },
+      {
+        id: "signal_ci",
+        role: "user",
+        parts: [{ type: "text", text: "failed:test" }],
+      },
+    ]);
+    expect(onIssueOpened).toHaveBeenCalledOnce();
+    expect(onPullRequestMerged).toHaveBeenCalledOnce();
+    expect(onCiFailed).toHaveBeenCalledOnce();
+  });
+
+  it("dispatches Firecrawl signals to typed handlers", async () => {
+    const onPageChanged = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `${signal.data.monitor.id}:${signal.data.page.url}:${signal.data.page.isMeaningful}`,
+        },
+      ],
+    }));
+    const onCheckCompleted = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [
+        {
+          type: "text" as const,
+          text: `${signal.data.check.id}:${signal.data.result.changed}`,
+        },
+      ],
+    }));
+
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_firecrawl_page",
+            role: "system",
+            type: "signal",
+            data: {
+              event: "monitor.page",
+              monitor: { id: "mon_123" },
+              check: { id: "chk_456" },
+              page: {
+                monitorId: "mon_123",
+                checkId: "chk_456",
+                url: "https://example.com/pricing",
+                status: "changed",
+                isMeaningful: true,
+                diff: { text: "£10 -> £12" },
+              },
+              metadata: null,
+            },
+            metadata: { signal_type: "firecrawl.monitor.page.changed" },
+          },
+          {
+            id: "signal_firecrawl_check",
+            role: "system",
+            type: "signal",
+            data: {
+              event: "monitor.check.completed",
+              monitor: { id: "mon_123" },
+              check: { id: "chk_456" },
+              result: {
+                monitorId: "mon_123",
+                checkId: "chk_456",
+                status: "completed",
+                changed: 1,
+              },
+              metadata: null,
+            },
+            metadata: {
+              signal_type: "firecrawl.monitor.check.completed",
+            },
+          },
+        ],
+        onUnprocessed: {
+          firecrawl: {
+            "firecrawl.monitor.page.changed": onPageChanged,
+            "firecrawl.monitor.check.completed": onCheckCompleted,
+          },
+        },
+      }),
+    ).resolves.toEqual([
+      {
+        id: "signal_firecrawl_page",
+        role: "user",
+        parts: [
+          {
+            type: "text",
+            text: "mon_123:https://example.com/pricing:true",
+          },
+        ],
+      },
+      {
+        id: "signal_firecrawl_check",
+        role: "user",
+        parts: [{ type: "text", text: "chk_456:1" }],
+      },
+    ]);
+    expect(onPageChanged).toHaveBeenCalledOnce();
+    expect(onCheckCompleted).toHaveBeenCalledOnce();
+  });
+
+  it("drops unhandled and malformed Firecrawl signals", async () => {
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_firecrawl_unhandled",
+            role: "system",
+            type: "signal",
+            data: {
+              event: "monitor.page",
+              monitor: { id: "mon_123" },
+              check: { id: "chk_456" },
+              page: {
+                url: "https://example.com/about",
+                status: "same",
+              },
+              metadata: null,
+            },
+            metadata: { signal_type: "firecrawl.monitor.page.same" },
+          },
+          {
+            id: "signal_firecrawl_malformed",
+            role: "system",
+            type: "signal",
+            data: {
+              event: "monitor.page",
+              monitor: { id: "mon_123" },
+              check: { id: "chk_456" },
+              page: { status: "error" },
+              metadata: null,
+            },
+            metadata: { signal_type: "firecrawl.monitor.page.error" },
+          },
+        ],
+        onUnprocessed: { firecrawl: {} },
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("drops unhandled and malformed GitHub signals", async () => {
+    await expect(
+      convertToAiSdkMessages({
+        messages: [
+          {
+            id: "signal_unhandled",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "closed",
+              repository: { full_name: "trytilde/harness-sdk" },
+              issue: { number: 42, title: "Handled elsewhere" },
+            },
+            metadata: { signal_type: "github.issue.closed" },
+          },
+          {
+            id: "signal_malformed",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "opened",
+              repository: { full_name: "trytilde/harness-sdk" },
+              issue: { number: 43 },
+            },
+            metadata: { signal_type: "github.issue.opened" },
+          },
+        ],
+        onUnprocessed: { github: {} },
+      }),
+    ).resolves.toEqual([]);
+  });
+
   it("drops unhandled and malformed Sentry signals", async () => {
     await expect(
       convertToAiSdkMessages({
@@ -1164,6 +1446,75 @@ describe("ChatKit AI SDK converters", () => {
         onUnprocessed: { sentry: {} },
       }),
     ).resolves.toEqual([]);
+  });
+
+  it("reuses a cached signal conversion without invoking onUnprocessed again", async () => {
+    const cacheConvertedMessages = vi.fn(async () => ({ success: true }));
+    const onCreated = vi.fn((signal) => ({
+      id: signal.id,
+      role: "user" as const,
+      parts: [{ type: "text" as const, text: signal.data.data.issue.title }],
+    }));
+    const cached = {
+      id: "signal_cached",
+      role: "user" as const,
+      parts: [{ type: "text" as const, text: "cached conversion" }],
+    };
+
+    await expect(
+      convertToAiSdkMessages({
+        chatkit: {
+          cacheConvertedMessages,
+          hydrateConvertedMessages: vi.fn(async () => ({ messages: [] })),
+        },
+        messages: [
+          {
+            id: "signal_fresh",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "created",
+              data: { issue: { id: "1", title: "fresh conversion" } },
+            },
+            metadata: { signal_type: "sentry.issue.created" },
+          },
+          {
+            id: "signal_cached",
+            role: "system",
+            type: "signal",
+            data: {
+              action: "created",
+              data: { issue: { id: "2", title: "must not be converted" } },
+            },
+            metadata: { signal_type: "sentry.issue.created" },
+            cached_agent_representation: cached,
+          },
+        ],
+        onUnprocessed: {
+          sentry: { "sentry.issue.created": onCreated },
+        },
+      }),
+    ).resolves.toEqual([
+      {
+        id: "signal_fresh",
+        role: "user",
+        parts: [{ type: "text", text: "fresh conversion" }],
+      },
+      cached,
+    ]);
+    expect(onCreated).toHaveBeenCalledOnce();
+    expect(cacheConvertedMessages).toHaveBeenCalledWith({
+      messages: [
+        {
+          chatKitMessageId: "signal_fresh",
+          message: {
+            id: "signal_fresh",
+            role: "user",
+            parts: [{ type: "text", text: "fresh conversion" }],
+          },
+        },
+      ],
+    });
   });
 
   it("hydrates cached agent representations before converting raw parts", async () => {
