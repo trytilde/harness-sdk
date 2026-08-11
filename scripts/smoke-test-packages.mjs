@@ -17,6 +17,7 @@ const temporaryDirectory = mkdtempSync(
 const packages = [
   "packages/api-client",
   "packages/core",
+  "packages/cli",
   "packages/vercel-ai-node",
 ];
 
@@ -60,6 +61,7 @@ try {
         dependencies: {
           "@ai-sdk/mcp": "1.0.59",
           "@trytilde/api-client": `file:${apiClientTarball}`,
+          "@trytilde/cli": `file:${tarballs.get("@trytilde/cli")}`,
           "@trytilde/harness-sdk": `file:${tarballs.get("@trytilde/harness-sdk")}`,
           "@trytilde/harness-sdk-vercel-ai-node": `file:${tarballs.get(
             "@trytilde/harness-sdk-vercel-ai-node",
@@ -142,6 +144,7 @@ console.log("Packed SDK consumer smoke test passed.");
   run("pnpm", ["install", "--frozen-lockfile=false"], temporaryDirectory);
   run("pnpm", ["build"], temporaryDirectory);
   run("pnpm", ["start"], temporaryDirectory);
+  run("pnpm", ["exec", "tilde", "--help"], temporaryDirectory);
 } finally {
   rmSync(temporaryDirectory, { force: true, recursive: true });
 }

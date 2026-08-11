@@ -1,8 +1,20 @@
 {
   "name": "@trytilde/cli",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Tilde command line interface.",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trytilde/harness-sdk.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/trytilde/harness-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/trytilde/harness-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,11 +33,12 @@
   ],
   "scripts": {
     "build": "vite build && chmod +x dist/cli.js",
+    "prepack": "pnpm build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config ../../vitest.config.ts test"
   },
   "dependencies": {
-    "@trytilde/harness-sdk": "workspace:*",
+    "@trytilde/harness-sdk": "^0.1.2",
     "ink": "^7.1.0",
     "react": "^19.2.7",
     "yaml": "^2.9.0"

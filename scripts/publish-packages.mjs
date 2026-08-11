@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 const packages = [
   "packages/api-client",
   "packages/core",
+  "packages/cli",
   "packages/vercel-ai-node",
 ];
 const dryRun = process.argv.includes("--dry-run");

@@ -53,7 +53,7 @@ importers:
   packages/cli:
     dependencies:
       '@trytilde/harness-sdk':
-        specifier: workspace:*
+        specifier: ^0.1.2
         version: link:../core
       ink:
         specifier: ^7.1.0

@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 const packages = [
   "packages/api-client",
   "packages/core",
+  "packages/cli",
   "packages/vercel-ai-node",
 ];
 
@@ -14,6 +15,7 @@ for (const packageDirectory of packages) {
   const targets = new Set([
     packageJson.main,
     packageJson.types,
+    ...Object.values(packageJson.bin ?? {}),
     ...exportTargets(packageJson.exports),
   ]);
 

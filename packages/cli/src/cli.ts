@@ -111,7 +111,12 @@ type ImportEvent = {
 
 async function main() {
   loadDotenvFiles(invocationCwd());
-  const args = parseArgs(process.argv.slice(2));
+  const cliArgs = process.argv.slice(2);
+  if (cliArgs.includes("--help") || cliArgs.includes("-h")) {
+    console.log(helpText());
+    return;
+  }
+  const args = parseArgs(cliArgs);
   if (args.commandName === "root") {
     await runRoot(args);
     return;
@@ -125,6 +130,18 @@ async function main() {
     return;
   }
   await runTunnelCommand(args);
+}
+
+function helpText(): string {
+  return `Usage: tilde <auth|state|tunnel> [options]
+
+Commands:
+  auth     Sign in, sign out, select a team, or show the current identity
+  state    Import or export Tilde state
+  tunnel   Run a local command behind a Tilde tunnel
+
+Options:
+  -h, --help  Show this help`;
 }
 
 async function runRoot(args: ParsedArgs): Promise<void> {
